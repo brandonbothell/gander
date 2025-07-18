@@ -1500,7 +1500,7 @@ function validateStreamInput({ ffmpegInput, rtspUser, rtspPass }: { ffmpegInput:
 function createStreamManager(stream: any) {
   // Use unique folders for each stream
   const hlsDir = path.join(__dirname, '..', `hls_${stream.id}`);
-  const recordDir = path.join('D:/Recordings/SecurityCam', stream.id);
+  const recordDir = path.join(config.recordingsDirectory, stream.id);
   const thumbDir = path.join(recordDir, 'thumbnails');
   return new StreamManager({
     id: stream.id,

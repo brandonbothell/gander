@@ -240,9 +240,6 @@ export class StreamManager {
       const output = data.toString();
       stderr += output;
 
-      // Log all stderr for debugging
-      console.log(`[${this.config.id}] FFmpeg: ${output.trim()}`);
-
       // Check for stream copy issues with RTSP
       if (inputIsRtsp && !hasErrored && (
         output.includes('Non-monotonous DTS') ||
