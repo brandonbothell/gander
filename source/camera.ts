@@ -69,19 +69,20 @@ async function loadStreamsFromDb() {
 }
 loadStreamsFromDb().then(setupStreamMotionMonitoring).then(() => {
   // --- Start server ---
-  if (process.env.NODE_ENV === 'production') {
-    // Use Greenlock for production
-    Greenlock.init({
-      packageRoot: path.join(__dirname, '..'),
-      configDir: config.greenlockConfigDir || path.join(__dirname, '..', 'greenlock.d'),
-      maintainerEmail: config.maintainerEmail,
-      cluster: false
-    }).serve(app);
-  } else {
+  // Use Greenlock for production
+  Greenlock.init({
+    packageRoot: path.join(__dirname, '..'),
+    configDir: config.greenlockConfigDir || path.join(__dirname, '..', 'greenlock.d'),
+    maintainerEmail: config.maintainerEmail,
+    cluster: false
+  }).serve(app);
+
+  if (process.env.NODE_ENV !== 'production') {
     // Use HTTP for development
+    // Always use Greenlock for HTTPS, but also start HTTP server in development for convenience
     const port = process.env.PORT || 3000;
-    app.listen(port, () => {
-      console.log(`Development server running on http://localhost:${port}`);
+    require('http').createServer(app).listen(port, () => {
+      console.log(`Development HTTP server running on http://localhost:${port}`);
       setTimeout(() => {
         open(`http://localhost:${port}`);
       }, 1500);
