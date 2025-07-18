@@ -5,11 +5,21 @@
 
 import { Jimp, diff as getDiff } from 'jimp';
 import fs from 'fs';
+import path from 'path';
 import { spawn } from 'child_process';
 import { prisma } from './camera';
 
 const STANDARD_WIDTH = 160;   // Much smaller for performance
 const STANDARD_HEIGHT = 90;
+
+// Debug logging flag
+const DEBUG_MOTION = process.env.DEBUG_MOTION === 'true';
+
+function debugLog(message: string) {
+  if (DEBUG_MOTION) {
+    console.log(message);
+  }
+}
 
 let lastFrame: { [streamId: string]: Awaited<ReturnType<typeof Jimp.read>> } = {};
 let streamMotionHistory: { [streamId: string]: boolean[] } = {};
@@ -19,8 +29,9 @@ const streamMotionThresholds = {
   min: 0.002, max: 0.4, // Slightly higher due to lower resolution
 };
 
-const GLOBAL_HISTORY_LENGTH = 4;  // Reduced for faster response
-const CAMERA_MOVEMENT_HISTORY_LENGTH = 6; // Reduced
+// Adjusted for 0.5-second segments instead of 2-second segments
+const GLOBAL_HISTORY_LENGTH = 4;  // Keep same for now
+const CAMERA_MOVEMENT_HISTORY_LENGTH = 6; // Keep same for now
 
 // Cache frame counts to avoid repeated ffprobe calls
 const frameCountCache: { [segmentPath: string]: { count: number, timestamp: number } } = {};
@@ -36,9 +47,8 @@ function getFrameCount(segmentPath: string): Promise<number> {
       return;
     }
 
-    // Quick estimation based on segment duration (usually 2 seconds at ~25fps = ~50 frames)
-    // This avoids the expensive ffprobe call in most cases
-    const estimatedFrames = 25; // Reasonable estimate for 2-second segments
+    // Quick estimation based on segment duration (0.5 seconds at ~20fps = ~10 frames)
+    const estimatedFrames = 10; // Reasonable estimate for 0.5-second segments
     frameCountCache[segmentPath] = { count: estimatedFrames, timestamp: now };
     resolve(estimatedFrames);
   });
@@ -71,19 +81,20 @@ export function clearMotionHistory(streamId: string) {
   streamMovementHistory[streamId] = [];
 }
 
-// Highly optimized frame extraction for Pi 4
+// Simplified frame extraction for very short segments
 function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
+    debugLog(`[Motion] Extracting frame from ${segmentPath} to ${outputPath}`);
+
+    // For 0.5-second segments, don't seek at all - just grab the first frame
     const ffmpeg = spawn('ffmpeg', [
       '-y',
-      '-ss', '1',  // Seek to middle of segment for consistent frames
       '-i', segmentPath,
       '-vf', `scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}`,
       '-vframes', '1',
       '-update', '1',
-      '-q:v', '8',          // Better quality for compatibility
-      '-pix_fmt', 'yuvj420p', // MJPEG compatible pixel format
-      '-f', 'image2',       // Explicit format
+      '-q:v', '5',  // Better quality
+      '-f', 'image2',
       outputPath
     ], {
       stdio: ['ignore', 'ignore', 'pipe']
@@ -97,21 +108,77 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
     const timeout = setTimeout(() => {
       ffmpeg.kill('SIGKILL');
       reject(new Error('Frame extraction timeout'));
-    }, 5000); // Increased timeout
+    }, 3000); // Shorter timeout
 
     ffmpeg.on('close', (code) => {
       clearTimeout(timeout);
-      if (code === 0) {
-        resolve();
-      } else {
-        // Log the full error for debugging
-        console.error(`[Motion] FFmpeg extraction error (code ${code}):`, errorOutput);
-        reject(new Error(`FFmpeg failed with code ${code}`));
-      }
+
+      // Small delay for file system sync
+      setTimeout(() => {
+        if (code === 0) {
+          // Check if file exists and has content
+          if (fs.existsSync(outputPath)) {
+            const stats = fs.statSync(outputPath);
+            if (stats.size > 100) { // At least 100 bytes
+              debugLog(`[Motion] Successfully extracted frame (${stats.size} bytes)`);
+              resolve();
+            } else {
+              debugLog(`[Motion] Frame file too small (${stats.size} bytes), retrying with PNG`);
+              // Try PNG format instead
+              const pngPath = outputPath.replace('.jpg', '.png');
+              const pngFfmpeg = spawn('ffmpeg', [
+                '-y',
+                '-i', segmentPath,
+                '-vf', `scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}`,
+                '-vframes', '1',
+                '-update', '1',
+                '-f', 'image2',
+                pngPath
+              ], {
+                stdio: ['ignore', 'ignore', 'pipe']
+              });
+
+              pngFfmpeg.on('close', (pngCode) => {
+                if (pngCode === 0 && fs.existsSync(pngPath) && fs.statSync(pngPath).size > 100) {
+                  // Rename PNG to JPG for consistency
+                  try {
+                    fs.renameSync(pngPath, outputPath);
+                    debugLog(`[Motion] PNG extraction successful, renamed to JPG`);
+                    resolve();
+                  } catch (e) {
+                    debugLog(`[Motion] PNG extraction successful but rename failed`);
+                    reject(new Error('Rename failed'));
+                  }
+                } else {
+                  console.error(`[Motion] Both JPG and PNG extraction failed`);
+                  reject(new Error('Both formats failed'));
+                }
+              });
+            }
+          } else {
+            debugLog(`[Motion] No output file found at ${outputPath} after FFmpeg success`);
+            // List directory to debug
+            if (DEBUG_MOTION) {
+              try {
+                const dir = path.dirname(outputPath);
+                const files = fs.readdirSync(dir);
+                debugLog(`[Motion] Directory contents: ${files.slice(0, 10).join(', ')}${files.length > 10 ? '...' : ''}`);
+              } catch (e) {
+                debugLog(`[Motion] Could not list directory: ${e}`);
+              }
+            }
+            reject(new Error('No output file'));
+          }
+        } else {
+          debugLog(`[Motion] FFmpeg failed with code ${code}: ${errorOutput}`);
+          reject(new Error(`FFmpeg failed with code ${code}`));
+        }
+      }, 50); // 50ms delay
     });
 
     ffmpeg.on('error', (err) => {
       clearTimeout(timeout);
+      debugLog(`[Motion] FFmpeg spawn error: ${err}`);
       reject(err);
     });
   });
@@ -123,14 +190,28 @@ export async function detectMotion(
   diffThreshold = streamMotionThresholds.min ?? 0.002,
   cameraMovementThreshold = streamMotionThresholds.max ?? 0.4,
 ): Promise<{ motion: boolean; aboveCameraMovementThreshold: boolean }> {
+  debugLog(`[${streamId}] [Motion] Starting detection for ${segmentPath}`);
+
   try {
     // Quick file existence check
     if (!fs.existsSync(segmentPath)) {
+      debugLog(`[${streamId}] [Motion] Segment file does not exist: ${segmentPath}`);
       return { motion: false, aboveCameraMovementThreshold: false };
     }
 
-    // Extract single frame from middle of segment
-    const framePath = segmentPath.replace(/\.ts$/, `_motion.jpg`);
+    // Check file size - sometimes segments are created but empty
+    const stats = fs.statSync(segmentPath);
+    if (stats.size < 1000) { // Less than 1KB is probably empty/incomplete
+      debugLog(`[${streamId}] [Motion] Segment too small (${stats.size} bytes), skipping`);
+      return { motion: false, aboveCameraMovementThreshold: false };
+    }
+
+    // Use absolute path construction for Windows
+    const segmentDir = path.dirname(segmentPath);
+    const segmentName = path.basename(segmentPath, '.ts');
+    const framePath = path.join(segmentDir, `${segmentName}_motion.jpg`);
+
+    debugLog(`[${streamId}] [Motion] Expected frame path: ${framePath}`);
 
     try {
       await extractFrame(segmentPath, framePath);
@@ -140,6 +221,7 @@ export async function detectMotion(
     }
 
     if (!fs.existsSync(framePath)) {
+      debugLog(`[${streamId}] [Motion] Frame extraction failed - no output file at ${framePath}`);
       return { motion: false, aboveCameraMovementThreshold: false };
     }
 
@@ -148,12 +230,22 @@ export async function detectMotion(
 
     try {
       const currentFrame = await Jimp.read(framePath);
+      debugLog(`[${streamId}] [Motion] Successfully loaded frame ${currentFrame.bitmap.width}x${currentFrame.bitmap.height}`);
+
+      // Resize if needed (sometimes FFmpeg doesn't scale properly)
+      if (currentFrame.bitmap.width !== STANDARD_WIDTH || currentFrame.bitmap.height !== STANDARD_HEIGHT) {
+        currentFrame.resize({ w: STANDARD_WIDTH, h: STANDARD_HEIGHT });
+      }
 
       // Aggressive preprocessing for speed
-      currentFrame.greyscale(); // Skip blur for performance
+      currentFrame.greyscale();
 
       // Apply masks efficiently
       const masks = await getMasksForStream(streamId);
+      if (masks.length > 0) {
+        debugLog(`[${streamId}] [Motion] Applying ${masks.length} masks`);
+      }
+
       for (const region of masks) {
         // Simple rectangle fill - much faster than scan
         for (let y = region.y; y < region.y + region.h && y < STANDARD_HEIGHT; y++) {
@@ -170,6 +262,7 @@ export async function detectMotion(
       if (!firstFrameSaved[streamId]) {
         await currentFrame.write(`test_firstframe_${streamId}.jpg`);
         firstFrameSaved[streamId] = true;
+        debugLog(`[${streamId}] [Motion] Saved first frame for debugging`);
       }
 
       if (lastFrame[streamId]) {
@@ -179,7 +272,7 @@ export async function detectMotion(
         const isAboveDiffThreshold = diffPercent > diffThreshold;
         aboveCameraMovementThreshold = diffPercent > cameraMovementThreshold;
 
-        // Simplified motion history logic
+        // Motion history logic
         if (!streamMotionHistory[streamId]) streamMotionHistory[streamId] = [];
         const isMotion = isAboveDiffThreshold && !aboveCameraMovementThreshold;
         streamMotionHistory[streamId].push(isMotion);
@@ -194,24 +287,23 @@ export async function detectMotion(
           streamMovementHistory[streamId].shift();
         }
 
-        // Simplified detection logic: 4/6 movement OR 2/4 motion
+        // Detection logic
         const movementCount = streamMovementHistory[streamId].filter(Boolean).length;
-        let motionCount = 0;
-        motionDetected = streamMovementHistory[streamId].length === CAMERA_MOVEMENT_HISTORY_LENGTH && movementCount >= 4;
+        const motionCount = streamMotionHistory[streamId].filter(Boolean).length;
 
-        if (!motionDetected) {
-          motionCount = streamMotionHistory[streamId].filter(Boolean).length;
-          motionDetected = streamMotionHistory[streamId].length === GLOBAL_HISTORY_LENGTH && motionCount >= 2;
-        }
+        // More responsive detection with 0.5s segments
+        motionDetected =
+          (streamMovementHistory[streamId].length === CAMERA_MOVEMENT_HISTORY_LENGTH && movementCount >= 4) ||
+          (streamMotionHistory[streamId].length === GLOBAL_HISTORY_LENGTH && motionCount >= 2);
 
-        if (!motionDetected) {
-          motionDetected = movementCount + motionCount > 6; // Combined logic
+        // Log motion detection results - always show actual motion, debug for all attempts
+        if (motionDetected || diffPercent > 0.02) {
+          console.log(`[${streamId}] [Motion] diff=${(diffPercent * 100).toFixed(2)}% motion=${motionDetected} threshold=${isAboveDiffThreshold} camMove=${aboveCameraMovementThreshold} (mov:${movementCount}/${streamMovementHistory[streamId].length}, mot:${motionCount}/${streamMotionHistory[streamId].length})`);
+        } else if (DEBUG_MOTION) {
+          debugLog(`[${streamId}] [Motion] diff=${(diffPercent * 100).toFixed(2)}% motion=${motionDetected} threshold=${isAboveDiffThreshold} camMove=${aboveCameraMovementThreshold} (mov:${movementCount}/${streamMovementHistory[streamId].length}, mot:${motionCount}/${streamMotionHistory[streamId].length})`);
         }
-
-        // Log only significant motion
-        if (diffPercent > 0.02) {
-          console.log(`[${streamId}] [Motion] diff=${(diffPercent * 100).toFixed(1)}% motion=${motionDetected}`);
-        }
+      } else {
+        debugLog(`[${streamId}] [Motion] No previous frame - storing first frame`);
       }
 
       lastFrame[streamId] = currentFrame;
@@ -242,6 +334,6 @@ export function safeUnlink(filePath: string) {
       fs.unlinkSync(filePath);
     }
   } catch (error) {
-    console.warn(`Failed to delete file ${filePath}:`, error);
+    // Ignore errors silently for performance
   }
 }
