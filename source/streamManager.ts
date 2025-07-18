@@ -195,8 +195,8 @@ export class StreamManager {
 
         // HLS settings
         '-f', 'hls',
-        '-hls_time', '2',
-        '-hls_list_size', '5',
+        '-hls_time', '0.5',
+        '-hls_list_size', '6',
         '-hls_flags', 'independent_segments',
         '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
         path.join(this.config.hlsDir, 'stream.m3u8')
@@ -229,8 +229,8 @@ export class StreamManager {
 
         // HLS settings
         '-f', 'hls',
-        '-hls_time', '2',
-        '-hls_list_size', '5',
+        '-hls_time', '0.5',
+        '-hls_list_size', '6',
         '-hls_flags', 'independent_segments',
         '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
         path.join(this.config.hlsDir, 'stream.m3u8')
@@ -286,7 +286,12 @@ export class StreamManager {
         !output.includes('speed=') &&
         !output.includes('Last message repeated') &&
         !output.includes('Timestamps are unset') &&
-        !output.includes('Non-monotonous DTS')) {
+        !output.includes('Non-monotonous DTS') &&
+        !output.includes('Non-monotonic DTS') &&
+        !output.includes('Queue input is backward') &&
+        !output.includes('max delay reached') &&
+        (!output.includes('Opening ') && !output.includes(' for writing')) &&
+        (!output.includes('RTP: missed') && !output.includes(' packets'))) {
         console.log(`[${this.config.id}] FFmpeg: ${output.trim()}`);
       }
     });
@@ -350,8 +355,8 @@ export class StreamManager {
 
       // HLS settings
       '-f', 'hls',
-      '-hls_time', '2',
-      '-hls_list_size', '5',
+      '-hls_time', '0.5',
+      '-hls_list_size', '6',
       '-hls_flags', 'independent_segments',
       '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
       path.join(this.config.hlsDir, 'stream.m3u8')

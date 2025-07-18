@@ -10,7 +10,7 @@ import { prisma } from './camera';
 
 const STANDARD_WIDTH = 320;  // Reduced for Pi 4 performance
 const STANDARD_HEIGHT = 180;
-const FRAMES_PER_SEGMENT: number = 3;
+const FRAMES_PER_SEGMENT: number = 1;
 
 let lastFrame: { [streamId: string]: Awaited<ReturnType<typeof Jimp.read>> } = {};
 let streamMotionHistory: { [streamId: string]: boolean[] } = {};
@@ -90,7 +90,8 @@ function extractFrame(segmentPath: string, frameIdx: number, outputPath: string)
       '-i', segmentPath,
       '-vf', `select=eq(n\\,${frameIdx}),scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}`,
       '-vframes', '1',
-      '-q:v', '5',  // Higher compression for faster processing
+      '-update', '1',  // Added -update flag
+      '-q:v', '5',     // Higher compression for faster processing
       outputPath
     ], {
       stdio: ['ignore', 'ignore', 'pipe']

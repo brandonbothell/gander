@@ -738,10 +738,10 @@ function saveMotionSegments(streamId: string): Promise<void> {
     const outFile = path.join(stream.config.recordDir, `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`);
     const thumbFile = path.join(stream.config.thumbDir, path.basename(outFile).replace(/\.mp4$/, '.jpg'));
     const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outFile}"`;
-    exec(ffmpegConcatCmd, { windowsHide: true }, async (err) => {
+    exec(ffmpegConcatCmd, (err) => { // Removed windowsHide: true
       if (!err) {
         let seek = 7; // Default seek time for thumbnail
-        exec(`ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 "${thumbFile}"`, { windowsHide: true }, async () => {
+        exec(`ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 -update 1 "${thumbFile}"`, async () => { // Added -update 1
           uniqueSegments.forEach(f => {
             if (!state.recentSegments.includes(f) && fs.existsSync(f)) {
               safeUnlink(f);
@@ -1072,9 +1072,9 @@ app.get('/signed/recordings/:streamId/thumbnails/latest.jpg', async (req, res) =
       } catch { /* ignore */ }
 
       if (regenerate) {
-        const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 "${thumbPath}"`;
+        const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 -update 1 "${thumbPath}"`;
         streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>((resolve) => {
-          require('child_process').exec(ffmpegCmd, { windowsHide: true }, (err: any) => {
+          require('child_process').exec(ffmpegCmd, (err: any) => {
             if (err || !fs.existsSync(thumbPath)) {
               console.error(`[${streamId}] Failed to generate thumbnail from ${latestTs}:`, err);
               resolve({ success: false });
