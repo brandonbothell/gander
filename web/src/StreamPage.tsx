@@ -1930,10 +1930,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
                 onClick={async () => {
                   if (!activeStream) return;
 
-                  // Default mask size and position (centered, 160x90 on 640x360)
+                  // Default mask size and position (centered, 160x90 on 320x180 stream)
                   const defaultMask = {
-                    x: 240,
-                    y: 135,
+                    x: 120,
+                    y: 45,
                     w: 160,
                     h: 90,
                     type: 'fixed'
