@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../source/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  username      String   @id
+  jwts          String   @default("[]")
+  refreshTokens String   @default("[]")
+  trustedIps    String   @default("[]")
+  createdAt     DateTime @default(now())
+}
+
+model UserLastSeenRecording {
+  username String
+  streamId String
+  lastSeen String // filename of the last seen recording
+
+  @@id([username, streamId])
+}
+
+model DeletedRecording {
+  streamId  String
+  filename  String
+  deletedAt DateTime @default(now())
+
+  @@id([streamId, filename])
+}
+
+model StreamMask {
+  id        String         @default(cuid())
+  streamId  String
+  mask      String
+  type      StreamMaskType @default(fixed)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @default(now())
+
+  @@id([id, streamId])
+}
+
+enum StreamMaskType {
+  fixed
+  conditional
+}
+
+model PushSubscription {
+  sid            String  @id @map("sid")
+  endpoint       String?
+  expirationTime String?
+  p256dh         String?
+  auth           String?
+  fcmToken       String? // <-- Add this line
+}
+
+model StreamState {
+  streamId  String   @id
+  state     String
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@index([streamId])
+}
+
+model MotionRecording {
+  streamId   String
+  filename   String
+  duration   Int
+  nickname   String?
+  recordedAt String
+  updatedAt  DateTime @default(now())
+
+  @@id([streamId, filename])
+}
+
+model Stream {
+  id          String   @id @default(cuid())
+  nickname    String
+  ffmpegInput String
+  rtspUser    String?
+  rtspPass    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
