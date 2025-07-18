@@ -1934,8 +1934,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
                   const defaultMask = {
                     x: 120,
                     y: 45,
-                    w: 160,
-                    h: 90,
+                    w: 80,
+                    h: 45,
                     type: 'fixed'
                   };
                   // After any mask API update:
