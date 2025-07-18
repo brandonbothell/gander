@@ -2056,8 +2056,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
                 setMasks={setMasks}
                 streamWidth={videoSize.width}
                 streamHeight={videoSize.height}
-                maskBaseWidth={320}
-                maskBaseHeight={180}
+                maskBaseWidth={160}
+                maskBaseHeight={90}
                 setIsDraggingMask={setIsDraggingMask}
                 onMaskMove={handleMaskMove}
                 saveMaskPosition={async (maskId, newPos) => {
