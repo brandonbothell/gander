@@ -32,7 +32,14 @@ export class StreamManager {
       this.config.rtspUser &&
       this.config.rtspPass
     ) {
-      return this.config.ffmpegInput.replace(
+      let url = this.config.ffmpegInput;
+
+      // Add default stream path if missing for Tapo cameras
+      if (url.endsWith(':554') || url.endsWith(':554/')) {
+        url = url.replace(/\/?$/, '/stream1'); // Main stream
+      }
+
+      return url.replace(
         /^rtsp:\/\//,
         `rtsp://${encodeURIComponent(this.config.rtspUser)}:${encodeURIComponent(this.config.rtspPass)}@`
       );
@@ -159,10 +166,10 @@ export class StreamManager {
     let ffmpegArgs: string[];
 
     if (inputIsRtsp) {
-      // RTSP input - try stream copy first with UDP for Tapo cameras
+      // RTSP input - try stream copy first with better timestamp handling
       ffmpegArgs = [
         '-y',
-        '-fflags', '+genpts',
+        '-fflags', '+genpts+discardcorrupt',
         '-rtsp_transport', 'udp',
         '-analyzeduration', '2000000',
         '-probesize', '2000000',
@@ -171,7 +178,7 @@ export class StreamManager {
         // Try to copy video first
         '-c:v', 'copy',
 
-        // Handle audio more carefully
+        // Handle audio more carefully  
         '-map', '0:v:0',
         '-map', '0:a:0?', // Optional audio mapping
         '-c:a', 'aac',
@@ -179,10 +186,14 @@ export class StreamManager {
         '-ac', '2',
         '-b:a', '128k',
 
-        // Timestamp handling
+        // Better timestamp handling for stream copy
         '-avoid_negative_ts', 'make_zero',
+        '-copyts',
+        '-start_at_zero',
+        '-muxdelay', '0',
+        '-muxpreload', '0',
 
-        // HLS settings - removed delete_segments
+        // HLS settings
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '5',
@@ -216,7 +227,7 @@ export class StreamManager {
         // No audio for most local cameras
         '-an',
 
-        // HLS settings - removed delete_segments
+        // HLS settings
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '5',
@@ -235,43 +246,66 @@ export class StreamManager {
 
     let hasErrored = false;
     let stderr = '';
+    let segmentCount = 0;
 
     this.ffmpeg.stderr?.on('data', data => {
       const output = data.toString();
       stderr += output;
 
-      // Check for stream copy issues with RTSP
-      if (inputIsRtsp && !hasErrored && (
-        output.includes('Non-monotonous DTS') ||
-        output.includes('Application provided invalid') ||
-        output.includes('Packet corrupt') ||
-        output.includes('Invalid data found') ||
-        output.includes('codec not currently supported in container')
-      )) {
-        console.log(`[${this.config.id}] Stream copy failed, switching to reencoding...`);
-        hasErrored = true;
-        this.ffmpeg?.kill();
-        setTimeout(() => this.startFFmpegWithReencoding(), 1000);
-        return;
+      // Count successful segment creation
+      if (output.includes("Opening '/home/brandon/gander/hls_") && output.includes("/segment_")) {
+        segmentCount++;
+      }
+
+      // Only check for real errors - ignore common warnings
+      if (inputIsRtsp && !hasErrored && segmentCount < 2) { // Only check for errors before we have 2 segments
+        const hasRealError = (
+          output.includes('Connection refused') ||
+          output.includes('Connection timed out') ||
+          output.includes('No route to host') ||
+          output.includes('401 Unauthorized') ||
+          output.includes('403 Forbidden') ||
+          output.includes('404 Not Found') ||
+          output.includes('Invalid data found when processing input') ||
+          output.includes('codec not currently supported in container') ||
+          (output.includes('Packet corrupt') && !output.includes('DTS'))
+        );
+
+        if (hasRealError) {
+          console.log(`[${this.config.id}] Real stream error detected, switching to reencoding...`);
+          hasErrored = true;
+          this.ffmpeg?.kill();
+          setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+          return;
+        }
+      }
+
+      // Log non-repetitive output
+      if (!output.includes('frame=') &&
+        !output.includes('bitrate=') &&
+        !output.includes('speed=') &&
+        !output.includes('Last message repeated') &&
+        !output.includes('Timestamps are unset') &&
+        !output.includes('Non-monotonous DTS')) {
+        console.log(`[${this.config.id}] FFmpeg: ${output.trim()}`);
       }
     });
 
     const handleFfmpegExit = (code: number | null, signal: NodeJS.Signals | null) => {
       console.log(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal}`);
 
-      if (stderr) {
-        console.log(`[${this.config.id}] Full FFmpeg stderr:`, stderr);
-      }
-
-      if (!hasErrored && inputIsRtsp && code !== 0) {
-        console.log(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
+      // Only try reencoding if we never got any segments and it wasn't intentionally killed
+      if (!hasErrored && inputIsRtsp && code !== 0 && signal !== 'SIGTERM' && segmentCount === 0) {
+        console.log(`[${this.config.id}] Stream copy failed on exit (no segments created), trying reencoding...`);
         hasErrored = true;
         setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+      } else if (segmentCount > 0) {
+        console.log(`[${this.config.id}] Stream copy worked (${segmentCount} segments created)`);
       }
     };
 
     this.ffmpeg.addListener('exit', handleFfmpegExit);
-    setTimeout(() => { this.ffmpeg?.removeListener('exit', handleFfmpegExit); }, 10000);
+    setTimeout(() => { this.ffmpeg?.removeListener('exit', handleFfmpegExit); }, 15000); // Longer timeout
   }
 
   // Fallback with reencoding for problematic RTSP streams
@@ -314,7 +348,7 @@ export class StreamManager {
       '-avoid_negative_ts', 'make_zero',
       '-vsync', 'cfr',
 
-      // HLS settings - removed delete_segments
+      // HLS settings
       '-f', 'hls',
       '-hls_time', '2',
       '-hls_list_size', '5',
@@ -332,7 +366,11 @@ export class StreamManager {
 
     this.ffmpeg.stderr?.on('data', data => {
       const output = data.toString();
-      console.log(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
+      if (!output.includes('frame=') &&
+        !output.includes('bitrate=') &&
+        !output.includes('speed=')) {
+        console.log(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
+      }
     });
 
     this.ffmpeg.on('exit', (code, signal) => {
