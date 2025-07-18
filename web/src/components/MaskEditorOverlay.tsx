@@ -133,7 +133,7 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
     const relX = (clientX - (rect?.left ?? 0)) / scaleX;
     const relY = (clientY - (rect?.top ?? 0)) / scaleY;
 
-    const minWidth = 20, minHeight = 20;
+    const minWidth = 10, minHeight = 10;
 
     if (dragging.mode === 'move') {
       let newX = Math.round(relX - dragging.offsetX);
