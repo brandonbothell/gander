@@ -34,9 +34,9 @@ export class StreamManager {
     ) {
       let url = this.config.ffmpegInput;
 
-      // Use stream2 (substream) for lower CPU usage
+      // Use stream1 (main stream) but with reencoding for stability
       if (url.endsWith(':554') || url.endsWith(':554/')) {
-        url = url.replace(/\/?$/, '/stream2'); // Substream is lower resolution
+        url = url.replace(/\/?$/, '/stream1'); // Main stream for better quality
       }
 
       return url.replace(
@@ -80,38 +80,38 @@ export class StreamManager {
     const webrtcArgs = [
       '-y',
       '-fflags', '+genpts',
-      '-analyzeduration', '500000', // Reduced
-      '-probesize', '500000',       // Reduced
+      '-analyzeduration', '1000000',
+      '-probesize', '1000000',
       ...(inputIsRtsp
         ? ['-rtsp_transport', 'udp', '-i', inputUrl]
         : ['-f', 'v4l2', '-input_format', 'mjpeg', '-video_size', '640x360', '-framerate', '10', '-i', inputUrl]
       ),
 
-      // Very aggressive encoding for WebRTC
+      // Balanced encoding for WebRTC
       '-c:v', 'libx264',
-      '-preset', 'ultrafast',
+      '-preset', 'faster',  // Less aggressive than ultrafast
       '-tune', 'zerolatency',
       '-profile:v', 'baseline',
       '-level', '3.0',
       '-pix_fmt', 'yuv420p',
-      '-b:v', '300k',
-      '-maxrate', '400k',
-      '-bufsize', '800k',
-      '-g', '20',
-      '-keyint_min', '20',
-      '-x264opts', 'keyint=20:min-keyint=20:no-scenecut:bframes=0:threads=2',
-      '-vf', 'scale=480:270', // Very small for WebRTC
+      '-b:v', '400k',
+      '-maxrate', '500k',
+      '-bufsize', '1000k',
+      '-g', '25',
+      '-keyint_min', '25',
+      '-x264opts', 'keyint=25:min-keyint=25:no-scenecut:threads=3', // More threads
+      '-vf', 'scale=640:360',
 
-      // Minimal audio
+      // Audio
       '-c:a', 'libopus',
-      '-ar', '16000',
+      '-ar', '24000',
       '-ac', '1',
-      '-b:a', '32k',
+      '-b:a', '48k',
 
       // WebM output
       '-f', 'webm',
       '-deadline', 'realtime',
-      '-cpu-used', '8', // Fastest VP8/VP9 encoding
+      '-cpu-used', '6', // Less aggressive than 8
       '-'
     ];
 
@@ -159,7 +159,7 @@ export class StreamManager {
     return this.webrtcClients.size;
   }
 
-  // Main HLS stream - optimized for Pi 4 with 720p output
+  // Main HLS stream - balanced for stability and performance
   startFFmpeg() {
     const inputIsRtsp = this.config.ffmpegInput.startsWith('rtsp://');
     const inputUrl = inputIsRtsp ? this.getRtspUrlWithAuth() : this.config.ffmpegInput;
@@ -167,78 +167,69 @@ export class StreamManager {
     let ffmpegArgs: string[];
 
     if (inputIsRtsp) {
-      // RTSP input - use substream and scale down for better performance
+      // RTSP input - try stream copy first, fallback to reencoding
       ffmpegArgs = [
         '-y',
         '-fflags', '+genpts+discardcorrupt',
         '-rtsp_transport', 'udp',
-        '-analyzeduration', '1000000', // Reduced
-        '-probesize', '1000000',       // Reduced
+        '-analyzeduration', '2000000',
+        '-probesize', '2000000',
         '-i', inputUrl,
 
-        // Force reencoding with aggressive optimization for Pi 4
-        '-c:v', 'libx264',
-        '-preset', 'veryfast',   // Faster than 'faster'
-        '-tune', 'zerolatency',
-        '-profile:v', 'main',    // Better compression than baseline
-        '-level', '3.1',
-        '-pix_fmt', 'yuv420p',
-        '-b:v', '600k',          // Lower bitrate
-        '-maxrate', '800k',
-        '-bufsize', '1600k',
-        '-g', '25',              // Shorter GOP
-        '-x264opts', 'keyint=25:min-keyint=25:no-scenecut:threads=2:sliced-threads=1',
-        '-vf', 'scale=1280:720', // 720p output - still sharp but less CPU
+        // Try stream copy first for maximum performance
+        '-c:v', 'copy',
 
-        // Audio optimization
+        // Handle audio
         '-map', '0:v:0',
         '-map', '0:a:0?',
         '-c:a', 'aac',
-        '-ar', '22050',  // Lower sample rate
-        '-ac', '1',      // Mono audio
-        '-b:a', '64k',
+        '-ar', '44100',
+        '-ac', '2',
+        '-b:a', '128k',
 
-        // Timestamp handling
+        // Better timestamp handling for stability
         '-avoid_negative_ts', 'make_zero',
-        '-vsync', 'cfr',
+        '-copyts',
+        '-start_at_zero',
+        '-muxdelay', '0',
 
-        // HLS settings - longer segments for less overhead
+        // HLS settings optimized for smooth playback
         '-f', 'hls',
-        '-hls_time', '2',        // Back to 2 seconds
+        '-hls_time', '0.5', // Shorter segments for better responsiveness
         '-hls_list_size', '6',
         '-hls_flags', 'independent_segments',
         '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
         path.join(this.config.hlsDir, 'stream.m3u8')
       ];
     } else {
-      // Local camera input (USB/V4L2) - optimize for lower resolution
+      // Local camera input (USB/V4L2)
       ffmpegArgs = [
         '-y',
         '-f', 'v4l2',
         '-input_format', 'mjpeg',
-        '-video_size', '1280x720', // Start with 720p input
-        '-framerate', '12',        // Lower framerate
+        '-video_size', '1280x720',
+        '-framerate', '15', // Slightly higher for smoother motion
         '-i', inputUrl,
 
-        // Encode for local camera
+        // Balanced encoding
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
+        '-preset', 'faster', // Better balance than veryfast
         '-tune', 'zerolatency',
         '-profile:v', 'main',
         '-level', '3.1',
         '-pix_fmt', 'yuv420p',
-        '-b:v', '800k',
-        '-maxrate', '1000k',
-        '-bufsize', '2000k',
-        '-g', '25',
-        '-x264opts', 'keyint=25:min-keyint=25:no-scenecut:threads=2',
+        '-b:v', '1000k',
+        '-maxrate', '1200k',
+        '-bufsize', '2400k',
+        '-g', '30', // Longer GOP for stability
+        '-x264opts', 'keyint=30:min-keyint=30:no-scenecut:threads=3',
 
         // No audio for most local cameras
         '-an',
 
         // HLS settings
         '-f', 'hls',
-        '-hls_time', '2',
+        '-hls_time', '0.5', // Shorter segments for better responsiveness
         '-hls_list_size', '6',
         '-hls_flags', 'independent_segments',
         '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
@@ -253,26 +244,139 @@ export class StreamManager {
       shell: false
     });
 
+    let hasErrored = false;
     let stderr = '';
     let segmentCount = 0;
+    let lastSegmentTime = Date.now();
 
     this.ffmpeg.stderr?.on('data', data => {
       const output = data.toString();
       stderr += output;
 
-      // Count successful segment creation
-      if (output.includes("Opening '/home/brandon/gander/hls_") && output.includes("/segment_")) {
+      // Count successful segment creation and track timing
+      if (output.includes("Opening") && output.includes("/segment_")) {
         segmentCount++;
+        const now = Date.now();
+        const timeSinceLastSegment = now - lastSegmentTime;
+        lastSegmentTime = now;
+
+        // Log if segments are taking too long (indicates stuttering)
+        if (segmentCount > 1 && timeSinceLastSegment > 3000) {
+          console.log(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`);
+        }
+      }
+
+      // Only check for real errors that require reencoding
+      if (inputIsRtsp && !hasErrored && segmentCount < 3) {
+        const hasRealError = (
+          output.includes('Connection refused') ||
+          output.includes('Connection timed out') ||
+          output.includes('No route to host') ||
+          output.includes('401 Unauthorized') ||
+          output.includes('403 Forbidden') ||
+          output.includes('404 Not Found') ||
+          output.includes('Invalid data found when processing input') ||
+          output.includes('codec not currently supported in container') ||
+          (output.includes('Packet corrupt') && !output.includes('DTS'))
+        );
+
+        if (hasRealError) {
+          console.log(`[${this.config.id}] Stream copy failed, switching to reencoding...`);
+          hasErrored = true;
+          this.ffmpeg?.kill();
+          setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+          return;
+        }
       }
 
       // Minimal logging for performance
-      if (output.includes('Error') || output.includes('Invalid')) {
-        console.log(`[${this.config.id}] FFmpeg Error: ${output.trim()}`);
+      if (output.includes('Error') && !output.includes('Non-monotonous DTS')) {
+        console.log(`[${this.config.id}] FFmpeg: ${output.trim()}`);
+      }
+    });
+
+    const handleFfmpegExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      console.log(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
+
+      // Only try reencoding if stream copy failed and we got no segments
+      if (!hasErrored && inputIsRtsp && code !== 0 && signal !== 'SIGTERM' && segmentCount === 0) {
+        console.log(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
+        hasErrored = true;
+        setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+      }
+    };
+
+    this.ffmpeg.addListener('exit', handleFfmpegExit);
+    setTimeout(() => { this.ffmpeg?.removeListener('exit', handleFfmpegExit); }, 20000);
+  }
+
+  // Fallback reencoding with balanced settings
+  private startFFmpegWithReencoding() {
+    console.log(`[${this.config.id}] Starting FFmpeg with reencoding...`);
+
+    const inputUrl = this.getRtspUrlWithAuth();
+
+    const ffmpegArgs = [
+      '-y',
+      '-fflags', '+genpts',
+      '-rtsp_transport', 'udp',
+      '-analyzeduration', '3000000',
+      '-probesize', '3000000',
+      '-i', inputUrl,
+
+      // Balanced reencoding settings
+      '-c:v', 'libx264',
+      '-preset', 'faster', // Better balance than veryfast
+      '-tune', 'zerolatency',
+      '-profile:v', 'main',
+      '-level', '3.1',
+      '-pix_fmt', 'yuv420p',
+      '-b:v', '800k',
+      '-maxrate', '1000k',
+      '-bufsize', '2000k',
+      '-g', '30', // Longer GOP for stability
+      '-x264opts', 'keyint=30:min-keyint=30:no-scenecut:threads=3',
+      '-vf', 'scale=1280:720',
+
+      // Audio handling
+      '-map', '0:v:0',
+      '-map', '0:a:0?',
+      '-c:a', 'aac',
+      '-ar', '44100',
+      '-ac', '2',
+      '-b:a', '128k',
+
+      // Timestamp handling
+      '-avoid_negative_ts', 'make_zero',
+      '-vsync', 'cfr',
+
+      // HLS settings
+      '-f', 'hls',
+      '-hls_time', '0.5', // Shorter segments for better responsiveness
+      '-hls_list_size', '6',
+      '-hls_flags', 'independent_segments',
+      '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
+      path.join(this.config.hlsDir, 'stream.m3u8')
+    ];
+
+    console.log(`[${this.config.id}] Reencoding FFmpeg args:`, ffmpegArgs.join(' '));
+
+    this.ffmpeg = spawn('ffmpeg', ffmpegArgs, {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      shell: false
+    });
+
+    this.ffmpeg.stderr?.on('data', data => {
+      const output = data.toString();
+      if (!output.includes('frame=') &&
+        !output.includes('bitrate=') &&
+        !output.includes('speed=')) {
+        console.log(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
       }
     });
 
     this.ffmpeg.on('exit', (code, signal) => {
-      console.log(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
+      console.log(`[${this.config.id}] FFmpeg (reencoded) exited with code ${code} and signal ${signal}`);
     });
   }
 
