@@ -1,18 +1,16 @@
 /**
  * Motion detection module for video streams.
- * This module uses Jimp for image processing and ffmpeg/ffprobe for video frame extraction.
- * It detects motion based on frame differences and applies masking to specific regions.
+ * Optimized for Raspberry Pi 4 with FFmpeg 5.1.6
  */
 
 import { Jimp, diff as getDiff } from 'jimp';
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 import { prisma } from './camera';
 
-const STANDARD_WIDTH = 640;
-const STANDARD_HEIGHT = 360; // Scalable dimensions for processing
-
-const FRAMES_PER_SEGMENT: number = 1; // Scalable
+const STANDARD_WIDTH = 320;  // Reduced for Pi 4 performance
+const STANDARD_HEIGHT = 180;
+const FRAMES_PER_SEGMENT: number = 3;
 
 let lastFrame: { [streamId: string]: Awaited<ReturnType<typeof Jimp.read>> } = {};
 let streamMotionHistory: { [streamId: string]: boolean[] } = {};
@@ -22,26 +20,45 @@ const streamMotionThresholds = {
   min: 0.001, max: 0.4,
 };
 
-// Use a global rolling history of diffs per stream (not reset per segment)
 const GLOBAL_HISTORY_LENGTH = 6;
-const CAMERA_MOVEMENT_HISTORY_LENGTH = 9; // 4/6 logic
+const CAMERA_MOVEMENT_HISTORY_LENGTH = 9;
 
-function getFrameCount(segmentPath: string): number {
-  try {
-    const ffprobeCmd = `ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of default=nokey=1:noprint_wrappers=1 "${segmentPath}"`;
-    const output = execSync(ffprobeCmd).toString().trim();
-    return Math.max(1, parseInt(output, 10));
-  } catch {
-    return 1;
-  }
+// Use spawn instead of execSync for better performance on Pi
+function getFrameCount(segmentPath: string): Promise<number> {
+  return new Promise((resolve) => {
+    const ffprobe = spawn('ffprobe', [
+      '-v', 'error',
+      '-count_frames',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=nb_read_frames',
+      '-of', 'default=nokey=1:noprint_wrappers=1',
+      segmentPath
+    ]);
+
+    let output = '';
+    ffprobe.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    ffprobe.on('close', (code) => {
+      if (code === 0) {
+        const count = parseInt(output.trim(), 10);
+        resolve(Math.max(1, isNaN(count) ? 1 : count));
+      } else {
+        resolve(1);
+      }
+    });
+
+    ffprobe.on('error', () => {
+      resolve(1);
+    });
+  });
 }
 
-// Top-level flag to ensure we only save the first frame once per process
-let firstFrameSaved = false;
+let firstFrameSaved: { [streamId: string]: boolean } = {};
 
-// Helper to fetch masks for a stream from the DB (cache for a few seconds for performance)
 const maskCache: { [streamId: string]: { masks: Array<{ x: number, y: number, w: number, h: number }>, ts: number } } = {};
-const MASK_CACHE_TTL = 5000; // ms
+const MASK_CACHE_TTL = 5000;
 
 async function getMasksForStream(streamId: string): Promise<Array<{ x: number, y: number, w: number, h: number }>> {
   const now = Date.now();
@@ -65,135 +82,176 @@ export function clearMotionHistory(streamId: string) {
   streamMovementHistory[streamId] = [];
 }
 
+// Optimized frame extraction for Pi 4
+function extractFrame(segmentPath: string, frameIdx: number, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn('ffmpeg', [
+      '-y',
+      '-i', segmentPath,
+      '-vf', `select=eq(n\\,${frameIdx}),scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}`,
+      '-vframes', '1',
+      '-q:v', '5',  // Higher compression for faster processing
+      outputPath
+    ], {
+      stdio: ['ignore', 'ignore', 'pipe']
+    });
+
+    let errorOutput = '';
+    ffmpeg.stderr?.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        console.error(`[Motion] FFmpeg frame extraction failed: ${errorOutput}`);
+        reject(new Error(`FFmpeg failed with code ${code}`));
+      }
+    });
+
+    ffmpeg.on('error', (err) => {
+      console.error(`[Motion] FFmpeg spawn error:`, err);
+      reject(err);
+    });
+  });
+}
+
 export async function detectMotion(
   streamId: string,
   segmentPath: string,
   diffThreshold = streamMotionThresholds.min ?? 0.01,
   cameraMovementThreshold = streamMotionThresholds.max ?? 0.2,
 ): Promise<{ motion: boolean; aboveCameraMovementThreshold: boolean }> {
-  // 1. Get frame count using ffprobe
-  const frameCount = getFrameCount(segmentPath);
+  try {
+    // 1. Get frame count
+    const frameCount = await getFrameCount(segmentPath);
 
-  // 2. Calculate frame indices (evenly spaced, clamped)
-  const frameIndices: number[] = [];
-  for (let i = 0; i < FRAMES_PER_SEGMENT; i++) {
-    let idx = 0;
-    if (FRAMES_PER_SEGMENT === 1) {
-      idx = 0;
-    } else {
-      idx = Math.round((frameCount - 1) * i / (FRAMES_PER_SEGMENT - 1));
+    // 2. Calculate frame indices
+    const frameIndices: number[] = [];
+    for (let i = 0; i < FRAMES_PER_SEGMENT; i++) {
+      let idx = 0;
+      if (FRAMES_PER_SEGMENT === 1) {
+        idx = 0;
+      } else {
+        idx = Math.round((frameCount - 1) * i / (FRAMES_PER_SEGMENT - 1));
+      }
+      frameIndices.push(Math.min(idx, frameCount - 1));
     }
-    frameIndices.push(Math.min(idx, frameCount - 1));
-  }
 
-  // 3. Extract frames
-  const framePaths: string[] = [];
-  for (let i = 0; i < frameIndices.length; i++) {
-    const frameIdx = frameIndices[i];
-    const framePath = segmentPath.replace(/\.ts$/, `_f${i}.jpg`);
-    framePaths.push(framePath);
+    // 3. Extract frames
+    const framePaths: string[] = [];
+    for (let i = 0; i < frameIndices.length; i++) {
+      const frameIdx = frameIndices[i];
+      const framePath = segmentPath.replace(/\.ts$/, `_f${i}.jpg`);
+      framePaths.push(framePath);
 
-    const ffmpegCmd = `ffmpeg -y -i "${segmentPath}" -vf "select=eq(n\\,${frameIdx}),scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}" -vframes 1 "${framePath}"`;
+      try {
+        await extractFrame(segmentPath, frameIdx, framePath);
+      } catch (error) {
+        console.error(`[${streamId}] Failed to extract frame ${i} from ${segmentPath}:`, error);
+        framePaths.pop();
+      }
+    }
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        require('child_process').exec(ffmpegCmd, (err: any) => {
-          if (err) {
-            console.error(`[${streamId}] FFmpeg frame extraction failed:`, err);
-            reject(err);
-          } else {
-            resolve();
+    let motionDetected = false;
+    let aboveCameraMovementThreshold = false;
+    const diffPercents: number[] = [];
+
+    // 4. Process frames
+    for (let i = 0; i < framePaths.length; i++) {
+      const framePath = framePaths[i];
+      if (!fs.existsSync(framePath)) continue;
+
+      try {
+        const currentFrame = await Jimp.read(framePath);
+
+        // Preprocess - optimized for Pi 4
+        currentFrame.greyscale().blur(1); // Reduced blur for performance
+
+        // Fetch and apply masks from DB
+        const masks = await getMasksForStream(streamId);
+        for (const region of masks) {
+          currentFrame.scan(region.x, region.y, region.w, region.h, function (xx, yy, idx) {
+            currentFrame.bitmap.data[idx] = 0;
+            currentFrame.bitmap.data[idx + 1] = 0;
+            currentFrame.bitmap.data[idx + 2] = 0;
+          });
+        }
+
+        // Save first frame for debugging
+        if (!firstFrameSaved[streamId] && i === 0) {
+          await currentFrame.write(`test_firstframe_${streamId}.jpg`);
+          firstFrameSaved[streamId] = true;
+        }
+
+        let diff: { percent: number, image: any } = { percent: 0, image: null };
+
+        if (lastFrame[streamId]) {
+          diff = getDiff(lastFrame[streamId], currentFrame);
+          const diffPercent = diff.percent;
+          diffPercents.push(diffPercent);
+
+          const isAboveDiffThreshold = diffPercent > diffThreshold;
+          aboveCameraMovementThreshold = diffPercent > cameraMovementThreshold;
+
+          // Motion history logic
+          if (!streamMotionHistory[streamId]) streamMotionHistory[streamId] = [];
+          const isMotion = isAboveDiffThreshold && !aboveCameraMovementThreshold;
+          streamMotionHistory[streamId].push(isMotion);
+          if (streamMotionHistory[streamId].length > GLOBAL_HISTORY_LENGTH) {
+            streamMotionHistory[streamId].shift();
           }
-        });
-      });
-    } catch (error) {
-      console.error(`[${streamId}] Failed to extract frame ${i} from ${segmentPath}:`, error);
-      // Remove this frame from processing list
-      framePaths.pop();
+
+          // Movement history logic
+          if (!streamMovementHistory[streamId]) streamMovementHistory[streamId] = [];
+          streamMovementHistory[streamId].push(isAboveDiffThreshold);
+          if (streamMovementHistory[streamId].length > CAMERA_MOVEMENT_HISTORY_LENGTH) {
+            streamMovementHistory[streamId].shift();
+          }
+
+          // 6/9 logic
+          const movementCount = streamMovementHistory[streamId].filter(Boolean).length;
+          motionDetected = streamMovementHistory[streamId].length === CAMERA_MOVEMENT_HISTORY_LENGTH && movementCount >= 6;
+
+          // 3/6 logic
+          if (!motionDetected) {
+            const motionCount = streamMotionHistory[streamId].filter(Boolean).length;
+            motionDetected = streamMotionHistory[streamId].length === GLOBAL_HISTORY_LENGTH && motionCount >= 3;
+          }
+        }
+
+        lastFrame[streamId] = currentFrame;
+      } catch (error) {
+        console.error(`[${streamId}] Error processing frame ${framePath}:`, error);
+      }
+
+      // Clean up frame file
+      safeUnlink(framePath);
     }
+
+    // Log results
+    if (diffPercents.length > 0) {
+      const mean = diffPercents.reduce((a, b) => a + b, 0) / diffPercents.length;
+      if (mean > 0.01) {
+        console.log(
+          `[${streamId}] [Motion] diffs=[${diffPercents.map(p => (p * 100).toFixed(1)).join(', ')}]% mean=${(mean * 100).toFixed(2)}%`
+        );
+      }
+    }
+
+    return {
+      motion: motionDetected,
+      aboveCameraMovementThreshold
+    };
+
+  } catch (error) {
+    console.error(`[${streamId}] Motion detection failed:`, error);
+    return {
+      motion: false,
+      aboveCameraMovementThreshold: false
+    };
   }
-
-  let motionDetected = false;
-  let aboveCameraMovementThreshold = false;
-
-  const diffPercents: number[] = [];
-
-  for (let i = 0; i < framePaths.length; i++) {
-    const framePath = framePaths[i];
-    if (!fs.existsSync(framePath)) continue;
-    const currentFrame = await Jimp.read(framePath);
-
-    // Preprocess
-    currentFrame.greyscale().blur(2);
-
-    // Fetch and apply masks from DB
-    const masks = await getMasksForStream(streamId);
-    for (const region of masks) {
-      currentFrame.scan(region.x, region.y, region.w, region.h, function (xx, yy, idx) {
-        currentFrame.bitmap.data[idx] = 0;
-        currentFrame.bitmap.data[idx + 1] = 0;
-        currentFrame.bitmap.data[idx + 2] = 0;
-      });
-    }
-
-    // Save the very first frame processed (once per process)
-    if (!firstFrameSaved && i === 0) {
-      await currentFrame.write(`test_firstframe_${streamId}.jpg`);
-      firstFrameSaved = true;
-    }
-
-    let diff: { percent: number, image: any } = { percent: 0, image: null };
-
-    if (lastFrame[streamId]) {
-      diff = getDiff(lastFrame[streamId], currentFrame);
-      const diffPercent = diff.percent;
-      diffPercents.push(diffPercent);
-
-      const isAboveDiffThreshold = diffPercent > diffThreshold;
-      // Track if frame is above camera movement threshold
-      aboveCameraMovementThreshold = diffPercent > cameraMovementThreshold
-
-      // --- GLOBAL 3/6 logic to start motion (ignores camera movement) ---
-      if (!streamMotionHistory[streamId]) streamMotionHistory[streamId] = [];
-      const isMotion = isAboveDiffThreshold && !aboveCameraMovementThreshold;
-      streamMotionHistory[streamId].push(isMotion);
-      if (streamMotionHistory[streamId].length > GLOBAL_HISTORY_LENGTH) streamMotionHistory[streamId].shift();
-
-      // --- GLOBAL 6/9 logic (for all movement) ---
-      if (!streamMovementHistory[streamId]) streamMovementHistory[streamId] = [];
-      streamMovementHistory[streamId].push(isAboveDiffThreshold);
-      if (streamMovementHistory[streamId].length > CAMERA_MOVEMENT_HISTORY_LENGTH) streamMovementHistory[streamId].shift();
-
-      // 6/9 logic
-      const motionCount = streamMovementHistory[streamId].filter(Boolean).length;
-      motionDetected = streamMovementHistory[streamId].length === CAMERA_MOVEMENT_HISTORY_LENGTH && motionCount >= 6;
-
-      // 3/6 logic
-      if (!motionDetected) {
-        const motionCount = streamMotionHistory[streamId].filter(Boolean).length;
-        motionDetected = streamMotionHistory[streamId].length === GLOBAL_HISTORY_LENGTH && motionCount >= 3;
-      };
-    }
-
-    lastFrame[streamId] = currentFrame;
-    safeUnlink(framePath);
-  }
-
-  // Log all diffs and mean after processing all frames
-  if (diffPercents.length > 0) {
-    const mean = diffPercents.reduce((a, b) => a + b, 0) / diffPercents.length
-    if (mean > 0.01) {
-      console.log(
-        `[${streamId}] [Motion] diffs=[${diffPercents.map(p => (p * 100).toFixed(1)).join(', ')}]% mean=${(mean * 100).toFixed(2)}%`
-      );
-    }
-
-  }
-
-  return {
-    motion: motionDetected,
-    aboveCameraMovementThreshold
-  };
 }
 
 export function safeUnlink(filePath: string) {
@@ -202,7 +260,6 @@ export function safeUnlink(filePath: string) {
       fs.unlinkSync(filePath);
     }
   } catch (error) {
-    // Log the error but don't crash the process
     console.warn(`Failed to delete file ${filePath}:`, error);
   }
 }

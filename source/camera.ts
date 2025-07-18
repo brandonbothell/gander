@@ -69,25 +69,29 @@ async function loadStreamsFromDb() {
 }
 loadStreamsFromDb().then(setupStreamMotionMonitoring).then(() => {
   // --- Start server ---
-  Greenlock.init({
-    packageRoot: path.join(__dirname, '..'),
-    configDir: config.greenlockConfigDir || path.join(__dirname, '..', 'greenlock.d'),
-    maintainerEmail: config.maintainerEmail,
-    cluster: false
-  }).serve(app);
-
-  if (process.env.NODE_ENV !== 'production') {
-    setTimeout(() => {
-      open(config.baseUrl);
-    }, 1500);
+  if (process.env.NODE_ENV === 'production') {
+    // Use Greenlock for production
+    Greenlock.init({
+      packageRoot: path.join(__dirname, '..'),
+      configDir: config.greenlockConfigDir || path.join(__dirname, '..', 'greenlock.d'),
+      maintainerEmail: config.maintainerEmail,
+      cluster: false
+    }).serve(app);
+  } else {
+    // Use HTTP for development
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+      console.log(`Development server running on http://localhost:${port}`);
+      setTimeout(() => {
+        open(`http://localhost:${port}`);
+      }, 1500);
+    });
   }
 });
 
 // --- CORS ---
 app.use(cors({
-  origin: [
-    config.baseUrl
-  ],
+  origin: (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000']).concat([config.baseUrl]),
   credentials: true
 }));
 
