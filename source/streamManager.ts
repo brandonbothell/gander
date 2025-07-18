@@ -70,7 +70,6 @@ export class StreamManager {
     const inputIsRtsp = this.config.ffmpegInput.startsWith('rtsp://');
     const inputUrl = inputIsRtsp ? this.getRtspUrlWithAuth() : this.config.ffmpegInput;
 
-    // Use hardware acceleration if available on Pi 4
     const webrtcArgs = [
       '-y',
       '-fflags', '+genpts',
@@ -160,7 +159,7 @@ export class StreamManager {
     let ffmpegArgs: string[];
 
     if (inputIsRtsp) {
-      // RTSP input optimized for Pi 4
+      // RTSP input - try stream copy first with UDP for Tapo cameras
       ffmpegArgs = [
         '-y',
         '-fflags', '+genpts',
@@ -169,22 +168,21 @@ export class StreamManager {
         '-probesize', '2000000',
         '-i', inputUrl,
 
-        // Try stream copy first for RTSP
+        // Try to copy video first
         '-c:v', 'copy',
-        '-c:a', 'copy',
+
+        // Handle audio more carefully
+        '-map', '0:v:0',
+        '-map', '0:a:0?', // Optional audio mapping
+        '-c:a', 'aac',
+        '-ar', '44100',
+        '-ac', '2',
+        '-b:a', '128k',
+
+        // Timestamp handling
         '-avoid_negative_ts', 'make_zero',
-        '-copyts',
 
-        // Audio handling
-        '-map', '0:v:0', // Map only the first video stream
-        '-map', '0:a:0?', // Map first audio stream if it exists (? makes it optional)
-        '-c:a', 'aac', // If audio exists, convert to AAC for HLS compatibility
-        '-ac', '2', // Stereo audio
-        '-ar', '44100', // Standard sample rate
-        '-b:a', '128k', // Audio bitrate
-
-
-        // HLS settings
+        // HLS settings - removed delete_segments
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '5',
@@ -218,7 +216,7 @@ export class StreamManager {
         // No audio for most local cameras
         '-an',
 
-        // HLS settings
+        // HLS settings - removed delete_segments
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '5',
@@ -236,42 +234,42 @@ export class StreamManager {
     });
 
     let hasErrored = false;
+    let stderr = '';
+
     this.ffmpeg.stderr?.on('data', data => {
       const output = data.toString();
+      stderr += output;
 
-      // Log errors but filter common warnings
-      if (output.includes('deprecated') ||
-        output.includes('Stream map') ||
-        output.includes('Last message repeated')) {
-        return;
-      }
+      // Log all stderr for debugging
+      console.log(`[${this.config.id}] FFmpeg: ${output.trim()}`);
 
       // Check for stream copy issues with RTSP
       if (inputIsRtsp && !hasErrored && (
         output.includes('Non-monotonous DTS') ||
         output.includes('Application provided invalid') ||
         output.includes('Packet corrupt') ||
-        output.includes('Invalid data found')
+        output.includes('Invalid data found') ||
+        output.includes('codec not currently supported in container')
       )) {
         console.log(`[${this.config.id}] Stream copy failed, switching to reencoding...`);
         hasErrored = true;
         this.ffmpeg?.kill();
-        this.startFFmpegWithReencoding();
+        setTimeout(() => this.startFFmpegWithReencoding(), 1000);
         return;
-      }
-
-      if (output.includes('Error') || output.includes('Invalid')) {
-        console.error(`[${this.config.id}] FFmpeg Error: ${output}`);
       }
     });
 
     const handleFfmpegExit = (code: number | null, signal: NodeJS.Signals | null) => {
       console.log(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal}`);
 
+      if (stderr) {
+        console.log(`[${this.config.id}] Full FFmpeg stderr:`, stderr);
+      }
+
       if (!hasErrored && inputIsRtsp && code !== 0) {
         console.log(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
         hasErrored = true;
-        this.startFFmpegWithReencoding();
+        setTimeout(() => this.startFFmpegWithReencoding(), 1000);
       }
     };
 
@@ -288,7 +286,7 @@ export class StreamManager {
     const ffmpegArgs = [
       '-y',
       '-fflags', '+genpts',
-      '-rtsp_transport', 'tcp',
+      '-rtsp_transport', 'udp',
       '-analyzeduration', '3000000',
       '-probesize', '3000000',
       '-i', inputUrl,
@@ -307,19 +305,19 @@ export class StreamManager {
       '-x264opts', 'keyint=30:min-keyint=30:no-scenecut',
       '-vf', 'scale=1280:720',
 
-      // Audio handling
-      '-map', '0:v:0', // Map only the first video stream
-      '-map', '0:a:0?', // Map first audio stream if it exists (? makes it optional)
-      '-c:a', 'aac', // If audio exists, convert to AAC for HLS compatibility
-      '-ac', '2', // Stereo audio
-      '-ar', '44100', // Standard sample rate
-      '-b:a', '128k', // Audio bitrate
+      // Audio handling - only if audio stream exists
+      '-map', '0:v:0',
+      '-map', '0:a:0?',
+      '-c:a', 'aac',
+      '-ar', '44100',
+      '-ac', '2',
+      '-b:a', '128k',
 
       // Timestamp handling
       '-avoid_negative_ts', 'make_zero',
       '-vsync', 'cfr',
 
-      // HLS settings
+      // HLS settings - removed delete_segments
       '-f', 'hls',
       '-hls_time', '2',
       '-hls_list_size', '5',
@@ -328,6 +326,8 @@ export class StreamManager {
       path.join(this.config.hlsDir, 'stream.m3u8')
     ];
 
+    console.log(`[${this.config.id}] Reencoding FFmpeg args:`, ffmpegArgs.join(' '));
+
     this.ffmpeg = spawn('ffmpeg', ffmpegArgs, {
       stdio: ['ignore', 'ignore', 'pipe'],
       shell: false
@@ -335,9 +335,7 @@ export class StreamManager {
 
     this.ffmpeg.stderr?.on('data', data => {
       const output = data.toString();
-      if (output.includes('Error') || output.includes('Invalid')) {
-        console.error(`[${this.config.id}] FFmpeg (reencoded) Error: ${output}`);
-      }
+      console.log(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
     });
 
     this.ffmpeg.on('exit', (code, signal) => {
