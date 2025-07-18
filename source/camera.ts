@@ -550,11 +550,19 @@ async function notifyMotion(streamId: string, custom?: { title?: string; body?: 
           }
         });
       } catch (err: any) {
-        if (err && err.code === 'messaging/server-unavailable') {
+        if (!err) throw new Error('FCM notification error: No error object provided');
+
+        if (err.code === 'messaging/server-unavailable') {
           console.warn('FCM server unavailable, retrying...');
-          setTimeout(() => {
+          return setTimeout(() => {
             notifyMotion(streamId, custom);
           }, 5000); // Retry after 5 seconds
+        } else if (err.code === 'messaging/registration-token-not-registered') {
+          console.warn(`Invalid FCM token, removing from subscription for ${sub.sid}`)
+          return prisma.pushSubscription.update({
+            where: { sid: sub.sid },
+            data: { fcmToken: null }
+          }).catch(() => { });
         }
 
         console.error('FCM notification error:', err);
