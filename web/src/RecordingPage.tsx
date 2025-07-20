@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './RecordingPage.css';
-import { API_BASE } from './main';
+import { API_BASE, authFetch } from './main';
 import { useSignedUrl } from './hooks/useSignedUrl';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 
@@ -16,21 +16,6 @@ function formatTimestamp(filename: string) {
   );
   const date = new Date(iso);
   return isNaN(date.getTime()) ? match[1] : date.toLocaleString();
-}
-
-function getToken() {
-  return localStorage.getItem('jwt');
-}
-
-function authFetch(input: RequestInfo, init: RequestInit = {}) {
-  const token = getToken();
-  return fetch(input, {
-    ...init,
-    headers: {
-      ...(init.headers || {}),
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-  });
 }
 
 function RecordingPage() {

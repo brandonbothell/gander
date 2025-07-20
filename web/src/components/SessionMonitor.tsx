@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FiChevronLeft, FiChevronRight, FiMapPin, FiClock, FiGlobe } from 'react-icons/fi';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { authFetch, API_BASE } from '../main';
-
-const GOOGLE_MAPS_API_KEY = 'AIzaSyDSyD5X9HO-XxbSS3ondskjWlCg_zqtSig';
+import { GOOGLE_MAPS_API_KEY } from '../../config.json';
 
 interface Session {
   ip: string;
@@ -875,12 +874,12 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
 
 export const geolocateIP = async (knownSessions?: string[], ip?: string) => {
   try {
-    console.log(`Geolocating IP ${ip || 'local'}...`);
+    // console.log(`Geolocating IP ${ip || 'local'}...`);
 
     const geoResponse = await fetchWithRetry(`https://ipinfo.io/${ip ? ip + '/' : ''}json`);
     const geoData = await geoResponse.json();
 
-    console.log(`Geolocation data for ${ip || 'local'}:`, geoData);
+    // console.log(`Geolocation data for ${ip || 'local'}:`, geoData);
 
     if (geoData.error) {
       throw new Error(`API Error: ${geoData.error.message || 'Unknown error'}`);
@@ -910,7 +909,7 @@ export const geolocateIP = async (knownSessions?: string[], ip?: string) => {
         geolocated: true,
         isGeolocating: false,
       };
-      console.log(`Successfully created session for ${ip}`);
+      // console.log(`Successfully created session for ${ip}`);
       return session;
     } else {
       console.warn(`No valid coordinates found for IP ${ip}`);

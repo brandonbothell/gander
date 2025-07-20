@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoginPage from './LoginPage';
 import './App.css';
 import RecordingPage, { type Recording } from './RecordingPage';
-import { API_BASE, authFetch } from './main';
+import { API_BASE, authFetch, setAuthHandlers } from './main';
 import StreamPage from './StreamPage';
 import { RouterLoadingHandler } from './components/RouterLoadingHandler';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
@@ -21,7 +21,7 @@ export default function App() {
   const [hasCheckedSessions, setHasCheckedSessions] = useState(false);
 
   // Helper: Try to refresh token
-  const tryRefreshToken = async () => {
+  const tryRefreshToken = async (): Promise<boolean> => {
     try {
       const refreshToken = await SecureStorage.getRefreshToken();
       if (!refreshToken) {
@@ -30,7 +30,7 @@ export default function App() {
         return false;
       }
 
-      const res = await authFetch(`${API_BASE}/api/refresh-token`, {
+      const res = await fetch(`${API_BASE}/api/refresh-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -47,7 +47,7 @@ export default function App() {
           await SecureStorage.setRefreshToken(data.refreshToken);
           localStorage.setItem('jwt', data.token);
 
-          console.log('Token refreshed successfully');
+          // console.log('Token refreshed successfully');
           return true;
         }
       } else {
@@ -67,12 +67,12 @@ export default function App() {
   };
 
   // Enhanced logout function
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     try {
       const refreshToken = await SecureStorage.getRefreshToken();
       if (refreshToken) {
-        // Notify server of logout
-        await authFetch(`${API_BASE}/api/logout`, {
+        // Notify server of logout - use fetch directly to avoid recursive authFetch calls
+        await fetch(`${API_BASE}/api/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -89,6 +89,11 @@ export default function App() {
       setAuthenticated(false);
     }
   };
+
+  // Set global auth handlers for authFetch
+  useEffect(() => {
+    setAuthHandlers(logout, tryRefreshToken);
+  }, []);
 
   // Enhanced login function
   const handleLogin = async (token: string, refreshToken: string) => {
@@ -198,7 +203,8 @@ export default function App() {
     const handleBeforeUnload = () => {
       // Only clear JWT from memory, keep refresh token for next session
       // This is optional - you might want to keep the JWT for better UX
-      if (performance.navigation.type === 1) { // Only on refresh, not on navigation
+      const navigationEntries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+      if (navigationEntries.length > 0 && navigationEntries[0].type === "reload") { // Only on refresh, not on navigation
         localStorage.removeItem('jwt');
       }
     };

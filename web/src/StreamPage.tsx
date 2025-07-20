@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
-import { API_BASE } from './main';
+import { API_BASE, authFetch } from './main';
 import { setupPushNotifications, subscribeToWebPush } from './pushNotifications';
 import { RecordingThumbItem } from './components/RecordingThumbItem';
 import { RecordingIndicator } from './components/RecordingIndicator';
@@ -881,7 +881,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   useEffect(() => {
     function updateSticky() {
       if (keyboardTransitioningRef.current || isMobile) {
-        console.warn(`Skipping sticky update ${keyboardTransitioningRef.current ? 'due to keyboard transition' : 'on mobile'}`);
+        // console.warn(`Skipping sticky update ${keyboardTransitioningRef.current ? 'due to keyboard transition' : 'on mobile'}`);
         return; // Add isMobile check
       }
 
@@ -923,7 +923,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   useEffect(() => {
     function updateMobileSticky() {
       if (keyboardTransitioningRef.current || forceSticky || !isMobile) {
-        console.warn(`Skipping sticky update ${keyboardTransitioningRef.current ? 'due to keyboard transition' : 'on desktop'}`);
+        // console.warn(`Skipping sticky update ${keyboardTransitioningRef.current ? 'due to keyboard transition' : 'on desktop'}`);
         return; // Add !isMobile check
       }
       const sentinel = mobileSearchStickySentinelRef.current;
@@ -1473,8 +1473,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
         // Always fetch if missing or expiring soon
         fetchSignedThumbUrls();
       }, 5000);
-      (window as any)._thumbInterval = interval; 6
-    }, 2000);
+      (window as any)._thumbInterval = interval;
+    }, 5000);
 
     return () => {
       clearTimeout(timeout);
@@ -3109,21 +3109,6 @@ function seekToLive(videoRef: React.RefObject<HTMLVideoElement | null>) {
   if (video && Number.isFinite(video.duration) && video.duration > 0) {
     video.currentTime = video.duration - 1; // Seek to the last second
   }
-}
-
-// Helper for authenticated fetch
-function getToken() {
-  return localStorage.getItem('jwt');
-}
-function authFetch(input: RequestInfo, init: RequestInit = {}) {
-  const token = getToken();
-  return fetch(input, {
-    ...init,
-    headers: {
-      ...(init.headers || {}),
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-  });
 }
 
 async function fetchWithRetry<T>(
