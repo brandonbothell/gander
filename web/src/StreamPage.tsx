@@ -1041,8 +1041,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
 
   // 1. --- Load stream video on stream change ---
   useEffect(() => {
-    if (activeStream) localStorage.setItem('activeStreamId', activeStream.id);
-    // else localStorage.removeItem('activeStreamId');
+    if (!activeStream) return;
+    localStorage.setItem('activeStreamId', activeStream.id);
 
     loadStream();
 
