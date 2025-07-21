@@ -2882,7 +2882,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           aria-label="Open recordings list"
           style={{
             position: 'fixed',
-            left: '50%',
+            right: '-2.5%',
             bottom: isMobile ? 40 : 10,
             transform: 'translateX(-50%)',
             zIndex: 2002,
