@@ -1362,6 +1362,35 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   useEffect(() => {
     if (!activeStream) return;
     let lastRecording: { [streamId: string]: { recording: boolean } } = {};
+
+    // Create a reusable audio element with proper iOS configuration
+    const createNotificationAudio = () => {
+      const audio = new Audio('/sounds/recording-started.mp3');
+
+      // Configure for iOS to not interrupt other audio
+      if (isIOS()) {
+        // Set volume lower to be less intrusive
+        audio.volume = 0.3;
+
+        // Try to set the audio category to not interrupt other audio (iOS Safari only)
+        try {
+          // @ts-ignore - webkitAudioContext is iOS-specific
+          if (window.webkitAudioContext || window.AudioContext) {
+            // This helps hint to iOS that this is a brief notification sound
+            audio.preload = 'auto';
+
+            // Load the audio immediately but don't play yet
+            audio.load();
+          }
+        } catch (e) {
+          // Fallback if AudioContext APIs aren't available
+          console.log('AudioContext not available for audio configuration');
+        }
+      }
+
+      return audio;
+    };
+
     const pollMotionStatus = () => {
       if (!activeStream) return;
       authFetch(`${API_BASE}/api/motion-status`)
@@ -1371,14 +1400,44 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
           for (const [streamId, s] of Object.entries(status)) {
             if (s.recording && s.secondsLeft > 28 && !lastRecording[streamId]?.recording) {
               // Play sound when recording starts
-              const audio = new Audio('/sounds/recording-started.mp3');
-              audio.play().catch(() => { });
+              if (isIOS()) {
+                // On iOS, use a more subtle approach
+                const audio = createNotificationAudio();
+
+                // Play briefly and quietly
+                const playPromise = audio.play();
+                if (playPromise) {
+                  playPromise
+                    .then(() => {
+                      // Success - audio played without interrupting
+                      console.log('Motion notification sound played');
+                    })
+                    .catch(error => {
+                      // Failed to play - could be due to autoplay policies
+                      console.log('Motion notification sound blocked:', error);
+
+                      // Alternative: Use the Web Audio API for a brief tone
+                      try {
+                        playNotificationTone();
+                      } catch (e) {
+                        console.log('Notification tone fallback failed:', e);
+                      }
+                    });
+                }
+              } else {
+                // Non-iOS devices - use original approach
+                const audio = new Audio('/sounds/recording-started.mp3');
+                audio.play().catch(() => {
+                  console.log('Motion notification sound failed to play');
+                });
+              }
             }
           }
           lastRecording = status;
         })
         .catch(() => setMotionStatus({}));
     };
+
     pollMotionStatus();
     const interval = setInterval(pollMotionStatus, 1000);
     return () => clearInterval(interval);
@@ -3452,3 +3511,43 @@ export function isIOS() {
 export function isAndroid() {
   return /Android/i.test(navigator.userAgent);
 };
+
+// Add this function near the other helper functions in StreamPage.tsx
+function playNotificationTone() {
+  // Fallback: Create a brief notification tone using Web Audio API
+  // This is less likely to interrupt other audio
+  try {
+    // @ts-ignore
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioContext = new AudioContext();
+
+    // Create a brief, subtle notification tone
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    // Configure the tone
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800Hz tone
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01); // Fade in
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.15); // Fade out
+
+    // Play for 150ms
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.15);
+
+    // Clean up
+    setTimeout(() => {
+      try {
+        audioContext.close();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }, 200);
+
+  } catch (error) {
+    console.log('Web Audio API notification tone failed:', error);
+  }
+}
