@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FiCircle, FiPause, FiPlay, FiX } from 'react-icons/fi';
 import { type Stream } from '../../../types/shared'
 
-export interface StreamTilesGridProps {
+interface StreamTilesGridProps {
   streams: Stream[];
   canAddStream: boolean;
   onAddStream: () => void;
@@ -14,6 +14,7 @@ export interface StreamTilesGridProps {
   onDeleteStream?: (stream: Stream) => void; // Add this prop
   motionRecordingPaused: { [streamId: string]: boolean };
   motionActive: { [streamId: string]: boolean };
+  motionSaving: { [streamId: string]: boolean };
   activeStreamId?: string;
 }
 
@@ -29,6 +30,7 @@ export function StreamTilesGrid({
   onDeleteStream,
   motionRecordingPaused,
   motionActive,
+  motionSaving,
   activeStreamId
 }: StreamTilesGridProps) {
   const gridRef = useRef<HTMLDivElement>(null);
@@ -181,7 +183,18 @@ export function StreamTilesGrid({
         >
           <div className="stream-tile">
             {/* Recording dot in top right if motionActive */}
-            {motionActive[stream.id] && (
+            {motionSaving[stream.id] ? (
+              <div className="motion-saving-indicator">
+                <div className="spinner" style={{
+                  width: 16, height: 16,
+                  border: '2px solid rgba(255, 193, 7, 0.3)',
+                  borderTop: '2px solid #ffc107',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                <span>Saving</span>
+              </div>
+            ) : motionActive[stream.id] ? (
               <div
                 className="stream-tile-recording-dot"
                 style={{
@@ -199,7 +212,7 @@ export function StreamTilesGrid({
                 }}
                 title="Motion Recording"
               />
-            )}
+            ) : <></>}
             {/* Delete button - only show on active stream */}
             {stream.id === activeStreamId && onDeleteStream && (
               <button

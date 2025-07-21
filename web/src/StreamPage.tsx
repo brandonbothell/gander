@@ -85,7 +85,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   const location = useLocation();
   const [cachedRecordings, setCachedRecordings] = useLocalStorageState<{ [streamId: string]: Recording[] }>('cachedRecordings', {});
   const [viewed, setViewed] = useLocalStorageState<{ filename: string; streamId: string }[]>('viewedRecordings', []);
-  const [motionStatus, setMotionStatus] = useState<{ [streamId: string]: { recording: boolean; secondsLeft: number } }>({});
+  const [motionStatus, setMotionStatus] = useState<{ [streamId: string]: { recording: boolean; secondsLeft: number; saving: boolean } }>({});
   const [isMotionRecordingPaused, setMotionRecordingPaused] = useState<{ [streamId: string]: boolean }>({});
   const [nicknames, setNicknames] = useState<{ [filename: string]: string }>({});
   const [shouldNotifyOnMotion, setShouldNotifyOnMotion] = useLocalStorageState<boolean>('motionNotify', false);
@@ -1395,7 +1395,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
       if (!activeStream) return;
       authFetch(`${API_BASE}/api/motion-status`)
         .then(res => res.json())
-        .then((status: { [streamId: string]: { recording: boolean, secondsLeft: number } }) => {
+        .then((status: { [streamId: string]: { recording: boolean, secondsLeft: number, saving: boolean } }) => {
           setMotionStatus(status);
           for (const [streamId, s] of Object.entries(status)) {
             if (s.recording && s.secondsLeft > 28 && !lastRecording[streamId]?.recording) {
@@ -2516,6 +2516,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
           motionRecordingPaused={isMotionRecordingPaused}
           motionActive={Object.entries(motionStatus).reduce((prev, e) => ({ ...prev, [e[0]]: e[1].recording }), {})}
           activeStreamId={activeStream?.id}
+          motionSaving={Object.entries(motionStatus).reduce((prev, e) => ({ ...prev, [e[0]]: e[1].saving }), {})}
         />
         {/* Desktop: Show heading and search tools */}
         {/* Desktop: Show heading and search tools */}
@@ -3086,7 +3087,11 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
         }}
       />
       {activeStream &&
-        <RecordingIndicator recording={motionStatus[activeStream.id]?.recording} secondsLeft={motionStatus[activeStream.id]?.secondsLeft} />
+        <RecordingIndicator
+          recording={motionStatus[activeStream.id]?.recording}
+          secondsLeft={motionStatus[activeStream.id]?.secondsLeft}
+          saving={motionStatus[activeStream.id]?.saving}
+        />
       }
       {activeStream && selected.length > 0 && (
         <div className='desktop-action-buttons'>

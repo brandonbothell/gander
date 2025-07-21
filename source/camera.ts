@@ -154,6 +154,8 @@ app.get('/hls/:streamId/:segment', jwtAuth, (req, res) => {
 // --- Clean Exit Handler ---
 async function cleanExit() {
   console.log('\nExiting... Cleaning up.');
+
+  // First, save any pending motion segments before cleaning up directories
   for (const streamId of Object.keys(dynamicStreams)) {
     const state = streamStates[streamId];
     if (state?.motionTimeout) clearTimeout(state.motionTimeout);
@@ -164,13 +166,21 @@ async function cleanExit() {
       state.currentSaveProcess.kill('SIGTERM');
     }
 
-    dynamicStreams[streamId].ffmpeg?.kill('SIGINT');
-    await new Promise(res => setTimeout(res, 1000));
-
+    // Save any pending segments BEFORE stopping FFmpeg and cleaning directories
     if (state?.motionSegments.length > 0) {
       console.log(`[${streamId}] [cleanExit] Saving`, state.motionSegments.length, 'pending segments');
-      await saveMotionSegmentsWithRetry(streamId);
+      try {
+        await saveMotionSegmentsWithRetry(streamId);
+      } catch (error) {
+        console.error(`[${streamId}] [cleanExit] Failed to save pending segments:`, error);
+      }
     }
+  }
+
+  // Then stop FFmpeg processes and clean up directories
+  for (const streamId of Object.keys(dynamicStreams)) {
+    dynamicStreams[streamId].ffmpeg?.kill('SIGINT');
+    await new Promise(res => setTimeout(res, 1000));
 
     try {
       if (fs.existsSync(dynamicStreams[streamId].config.hlsDir)) {
@@ -181,6 +191,7 @@ async function cleanExit() {
       console.warn(`[Cleanup] Failed to delete HLS directory:`, e);
     }
   }
+
   process.exit(0);
 }
 process.on('SIGINT', () => cleanExit());
@@ -810,10 +821,35 @@ function saveMotionSegments(streamId: string): Promise<void> {
     state.savingInProgress = true;
 
     const uniqueSegments = [...new Set(state.motionSegments)];
+
+    // Filter out segments that no longer exist
+    const existingSegments = uniqueSegments.filter(segmentPath => {
+      if (!fs.existsSync(segmentPath)) {
+        console.warn(`[${streamId}] [Motion] Segment no longer exists, skipping: ${path.basename(segmentPath)}`);
+        return false;
+      }
+      return true;
+    });
+
+    if (existingSegments.length === 0) {
+      console.log(`[${streamId}] [Motion] No existing segments to save, aborting save operation`);
+      state.savingInProgress = false;
+      state.motionSegments = [];
+      return resolve();
+    }
+
     const listFile = path.join(stream.config.hlsDir, 'concat_list.txt');
 
     try {
-      fs.writeFileSync(listFile, uniqueSegments.map(f => `file '${f.replace(/\\/g, '/')}'`).join('\n'));
+      // Ensure HLS directory exists before writing concat list
+      if (!fs.existsSync(stream.config.hlsDir)) {
+        console.warn(`[${streamId}] [Motion] HLS directory no longer exists, cannot save segments`);
+        state.savingInProgress = false;
+        state.motionSegments = [];
+        return resolve();
+      }
+
+      fs.writeFileSync(listFile, existingSegments.map(f => `file '${f.replace(/\\/g, '/')}'`).join('\n'));
     } catch (error) {
       state.savingInProgress = false;
       return reject(new Error(`Failed to write concat list: ${error}`));
@@ -823,7 +859,7 @@ function saveMotionSegments(streamId: string): Promise<void> {
     const thumbFile = path.join(stream.config.thumbDir, path.basename(outFile).replace(/\.mp4$/, '.jpg'));
     const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outFile}"`;
 
-    console.log(`[${streamId}] [Motion] Starting save of ${uniqueSegments.length} segments to ${path.basename(outFile)}`);
+    console.log(`[${streamId}] [Motion] Starting save of ${existingSegments.length} segments to ${path.basename(outFile)}`);
 
     const ffmpegProcess = exec(ffmpegConcatCmd, (err) => {
       // Check if process was killed (canceled due to new motion)
@@ -848,7 +884,7 @@ function saveMotionSegments(streamId: string): Promise<void> {
       let seek = 7; // Default seek time for thumbnail
       const thumbProcess = exec(`ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 -update 1 "${thumbFile}"`, async (thumbErr) => {
         // Clean up segments that are no longer needed
-        uniqueSegments.forEach(f => {
+        existingSegments.forEach(f => {
           if (!state.recentSegments.includes(f) && fs.existsSync(f)) {
             safeUnlink(f);
           }
@@ -882,7 +918,7 @@ function saveMotionSegments(streamId: string): Promise<void> {
             }
           });
 
-          console.log(`[${streamId}] [Motion] Successfully saved ${filename} (${duration}s, ${uniqueSegments.length} segments)`);
+          console.log(`[${streamId}] [Motion] Successfully saved ${filename} (${duration}s, ${existingSegments.length} segments)`);
         } catch (e) {
           console.error(`[${streamId}] Failed to upsert MotionRecording:`, e);
         }
@@ -1513,17 +1549,21 @@ app.get('/signed/stream/:streamId/:segment', (req, res) => {
 
 // --- Motion status ---
 app.get('/api/motion-status', jwtAuth, (req, res) => {
-  const states: { [streamId: string]: { recording: boolean, secondsLeft: number } } = {};
+  const states: { [streamId: string]: { recording: boolean, secondsLeft: number, saving: boolean } } = {};
   for (const streamId in streamStates) {
     const state = streamStates[streamId];
-    if (!state) { res.status(404).json({ recording: false, secondsLeft: 0 }); return; }
+    if (!state) {
+      states[streamId] = { recording: false, secondsLeft: 0, saving: false };
+      continue;
+    }
     let secondsLeft = 0;
     if (state.motionRecordingActive && state.motionRecordingTimeoutAt) {
       secondsLeft = Math.max(0, Math.ceil((state.motionRecordingTimeoutAt - Date.now()) / 1000));
     }
     states[streamId] = {
       recording: state.motionRecordingActive,
-      secondsLeft
+      secondsLeft,
+      saving: state.savingInProgress || false
     };
   }
   res.json(states);
