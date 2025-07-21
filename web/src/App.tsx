@@ -214,6 +214,15 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
+  // In App.tsx, add this function to handle session monitor closing
+  const handleSessionMonitorClose = () => {
+    setShowSessionMonitor(false);
+    // Call the global handler if it exists (for mobile logout button)
+    if ((window as any).handleSessionMonitorClose) {
+      (window as any).handleSessionMonitorClose();
+    }
+  };
+
   if (authenticated === false) {
     return <LoginPage onLogin={handleLogin} />;
   }
@@ -225,12 +234,12 @@ export default function App() {
     <Router>
       <RouterLoadingHandler />
       <Routes>
-        <Route path="/" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} />} />
-        <Route path="/stream/:streamId" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} />} />
-        <Route path="/recordings/:streamId/:filename" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} />} />
+        <Route path="/" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} onSessionMonitorClosed={handleSessionMonitorClose} logout={logout} />} />
+        <Route path="/stream/:streamId" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} onSessionMonitorClosed={handleSessionMonitorClose} logout={logout} />} />
+        <Route path="/recordings/:streamId/:filename" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} onSessionMonitorClosed={handleSessionMonitorClose} logout={logout} />} />
       </Routes>
       {showSessionMonitor && (
-        <SessionMonitor onClose={() => setShowSessionMonitor(false)} />
+        <SessionMonitor onClose={() => handleSessionMonitorClose()} />
       )}
     </Router>
   );

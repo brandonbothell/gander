@@ -18,17 +18,20 @@ import { useLoading } from './LoadingContext';
 import { SearchTools } from './components/SearchTools';
 import { MaskEditorOverlay } from './components/MaskEditorOverlay';
 import { type StreamMask, type Stream } from '../../types/shared';
-import { FiBell, FiBellOff, FiChevronDown, FiChevronUp, FiRefreshCw, FiUsers } from 'react-icons/fi';
+import { FiBell, FiBellOff, FiChevronDown, FiChevronUp, FiLogOut, FiRefreshCw, FiUsers } from 'react-icons/fi';
 import { StreamTilesGrid } from './components/StreamTilesGrid';
 import { RecordingBar } from './components/RecordingBar';
 import { StreamControlBar } from './components/StreamControlBar';
 import type { Recording } from './App';
+import SecureStorage from './utils/secureStorage';
 
 export type ClientMask = StreamMask & { pendingUpdate?: boolean, pendingUpdateSince?: number };
 
 interface StreamPageProps {
   streamId?: string;
   onShowSessionMonitor?: () => void;
+  onSessionMonitorClosed?: () => void; // Add this new prop
+  logout: () => Promise<void>;
 }
 
 /**
@@ -57,7 +60,7 @@ interface StreamPageProps {
  * - Integrates with APIs for live streaming, recordings, thumbnails, masks, and notifications.
  * - Designed for use in a security camera web application.
  */
-export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPageProps) {
+export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMonitorClosed, logout }: StreamPageProps) {
   // --- New state for dynamic streams ---
   const [streams, setStreams] = useState<Stream[]>([]);
   const [streamOrder, setStreamOrder] = useLocalStorageState<string[]>('streamOrder', []);
@@ -146,6 +149,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   const [recordingsListInView, setRecordingsListInView] = useState(true);
   const [lastVideoSize, setLastVideoSize] = useState({ width: 640, height: 360 });
   const [isLoadingStream, setIsLoadingStream] = useState(false);
+  const [showMobileLogout, setShowMobileLogout] = useState(false);
 
 
   // Filtered recordings
@@ -156,6 +160,20 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   const [userTyping, setUserTyping] = useState(false);
   const [searchInputActive, setSearchInputActive] = useState(false);
   const [filterUpdatesBlocked, setFilterUpdatesBlocked] = useState(false);
+
+  const handleLogout = async () => {
+    if (confirm('Are you sure you want to log out?')) {
+      try {
+        await logout();
+      } catch (error) {
+        console.error('Error during logout:', error);
+        // Fallback: just clear storage and reload
+        localStorage.removeItem('jwt');
+        await SecureStorage.clearAll();
+        window.location.reload();
+      }
+    }
+  };
 
   // Simplify the search worker initialization (remove the test message):
   useEffect(() => {
@@ -1976,7 +1994,29 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
     };
   }, [showMaskEditor, pauseMaskPollingUntil, activeStream]);
 
-  // Update the video size effect to handle loading states
+  useEffect(() => {
+    if (onSessionMonitorClosed) {
+      // Listen for when session monitor closes on mobile
+      const handleSessionMonitorClose = () => {
+        if (isMobile) {
+          setShowMobileLogout(true);
+          // Hide after 5 seconds
+          setTimeout(() => {
+            setShowMobileLogout(false);
+          }, 5000);
+        }
+      };
+
+      // Store the handler globally so it can be called from App.tsx
+      (window as any).handleSessionMonitorClose = handleSessionMonitorClose;
+    }
+
+    return () => {
+      delete (window as any).handleSessionMonitorClose;
+    };
+  }, [onSessionMonitorClosed, isMobile]);
+
+  // Update video size when video element is ready or resized
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -2246,40 +2286,114 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
             </button>
 
             {/* Add Active Sessions button */}
-            {!showMaskEditor && <button
-              className="reload-btn"
-              style={{
-                position: 'absolute',
-                top: -44,
-                left: 72, // Position it next to the notifications button
-                zIndex: 2,
-                minWidth: 120,
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: '1em',
-                padding: '8px 18px 5px 18px',
-                background: 'transparent',
-                color: '#fff',
-                border: 'none',
-                boxShadow: 'inset 0 -3px 0 0 #fff',
-                transition: 'color 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                e.currentTarget.style.color = '#1cf1d1';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-                e.currentTarget.style.color = '#fff';
-              }}
-              onClick={() => onShowSessionMonitor?.()}
-            >
-              <FiUsers size={22} color="currentColor" />
-              Sessions
-            </button>}
+            {!showMaskEditor && !isMobile && (
+              <button
+                className="reload-btn"
+                style={{
+                  position: 'absolute',
+                  top: -44,
+                  left: 72, // Position it next to the notifications button
+                  zIndex: 2,
+                  minWidth: 120,
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: '1em',
+                  padding: '8px 18px 5px 18px',
+                  background: 'transparent',
+                  color: '#fff',
+                  border: 'none',
+                  boxShadow: 'inset 0 -3px 0 0 #fff',
+                  transition: 'color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
+                  e.currentTarget.style.color = '#1cf1d1';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onClick={() => onShowSessionMonitor?.()}
+              >
+                <FiUsers size={22} color="currentColor" />
+                Sessions
+              </button>
+            )}
+
+            {/* Sessions button for mobile - only show when logout is NOT showing */}
+            {!showMaskEditor && isMobile && !showMobileLogout && (
+              <button
+                className="reload-btn"
+                style={{
+                  position: 'absolute',
+                  top: -44,
+                  left: 72,
+                  zIndex: 2,
+                  minWidth: 120,
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: '1em',
+                  padding: '8px 18px 5px 18px',
+                  background: 'transparent',
+                  color: '#fff',
+                  border: 'none',
+                  boxShadow: 'inset 0 -3px 0 0 #fff',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+                onClick={() => onShowSessionMonitor?.()}
+              >
+                <FiUsers size={22} color="currentColor" />
+                Sessions
+              </button>
+            )}
+
+            {/* Update the Logout button - show on desktop always, on mobile only when showMobileLogout is true */}
+            {!showMaskEditor && (!isMobile || showMobileLogout) && (
+              <button
+                className="reload-btn"
+                style={{
+                  position: 'absolute',
+                  top: -44,
+                  left: isMobile ? 72 : 228, // On mobile, take the Sessions button position
+                  zIndex: 2,
+                  minWidth: 100,
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: '1em',
+                  padding: '8px 18px 5px 18px',
+                  background: 'transparent',
+                  color: '#ff6b6b', // Red color like disabled notifications
+                  border: 'none',
+                  boxShadow: 'inset 0 -3px 0 0 #ff6b6b', // Red underline
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  // Add fade-in animation for mobile
+                  opacity: isMobile && showMobileLogout ? 1 : (!isMobile ? 1 : 0),
+                  transform: isMobile && showMobileLogout ? 'translateY(0)' : (isMobile ? 'translateY(-10px)' : 'translateY(0)'),
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
+                  e.currentTarget.style.color = '#1cf1d1';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #ff6b6b';
+                  e.currentTarget.style.color = '#ff6b6b';
+                }}
+                onClick={handleLogout}
+                aria-label="Logout"
+              >
+                <FiLogOut size={22} color="currentColor" />
+                Logout
+              </button>
+            )}
 
             {/* Mask Editor Controls */}
             {showMaskEditor && (
