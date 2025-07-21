@@ -504,7 +504,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
 
   const { setLoading } = useLoading();
 
-  // Update the loadStream function with more aggressive live seeking
+  // Update the loadStream function with proper HLS cleanup
   async function loadStream() {
     if (!videoRef.current || !activeStream) return console.warn('No video ref and/or active stream set');
 
@@ -518,6 +518,22 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
         height: videoRef.current.clientHeight
       });
     }
+
+    // IMPORTANT: Cleanup existing HLS instance first to prevent buffer conflicts
+    const existingHls = (videoRef.current as any)._hls;
+    if (existingHls) {
+      console.log('Cleaning up existing HLS instance');
+      try {
+        existingHls.destroy();
+        delete (videoRef.current as any)._hls;
+      } catch (error) {
+        console.warn('Error cleaning up HLS instance:', error);
+      }
+    }
+
+    // Clear video source to ensure clean state
+    videoRef.current.src = '';
+    videoRef.current.load();
 
     let url = `${API_BASE}/api/signed-stream-url/${activeStream.id}`;
 
@@ -544,77 +560,65 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
       videoRef.current.load();
       videoRef.current.play().catch(() => { });
 
-      // Safari-specific live seeking
+      // Safari-specific live seeking - wait for actual playback
       const video = videoRef.current;
-      const handleLoadedData = () => {
-        if (video.duration && Number.isFinite(video.duration)) {
-          video.currentTime = video.duration - 0.5; // Stay very close to live
-        }
-        setIsLoadingStream(false);
+      const handleCanPlay = () => {
+        // Wait a bit more for Safari to actually start playing
+        setTimeout(() => {
+          if (video.duration && Number.isFinite(video.duration)) {
+            video.currentTime = video.duration - 0.5;
+          }
+          setIsLoadingStream(false);
+        }, 500);
       };
 
-      video.addEventListener('loadeddata', handleLoadedData, { once: true });
+      video.addEventListener('canplay', handleCanPlay, { once: true });
     } else {
       try {
         if (Hls.isSupported()) {
+          // Create fresh HLS instance with better error recovery
           const hls = new Hls({
-            // Aggressive live settings
-            liveSyncDurationCount: 3, // Keep only 3 segments in buffer
-            liveMaxLatencyDurationCount: 5, // Max 5 segments behind live
+            // Buffer management - more conservative for stream switching
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: 5,
             liveDurationInfinity: true,
             enableWorker: true,
-            lowLatencyMode: true, // Enable low latency mode if available
-            backBufferLength: 90, // Keep 90 seconds of back buffer
-            maxBufferLength: 30, // Reduce forward buffer to 30 seconds
-            maxMaxBufferLength: 60, // Max buffer size
-            maxBufferSize: 60 * 1000 * 1000, // 60MB buffer
-            maxBufferHole: 0.5, // Small buffer holes
+            lowLatencyMode: false, // Disable for initial load
+            backBufferLength: 30, // Reduced back buffer
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            maxBufferSize: 60 * 1000 * 1000,
+            maxBufferHole: 0.5,
 
-            // Fragment loading optimizations
+            // Loading settings
             manifestLoadingTimeOut: 10000,
             manifestLoadingMaxRetry: 3,
             manifestLoadingRetryDelay: 1000,
 
-            // Segment loading optimizations  
             fragLoadingTimeOut: 20000,
             fragLoadingMaxRetry: 3,
             fragLoadingRetryDelay: 1000,
 
-            // Enable adaptive bitrate but prefer quality
-            startLevel: -1, // Auto start level
-            capLevelToPlayerSize: false, // Don't limit quality based on player size
+            startLevel: -1,
+            capLevelToPlayerSize: false,
 
-            // Stall detection and recovery
+            // Buffer append error recovery
+            appendErrorMaxRetry: 3,
+
+            // More aggressive error recovery
             highBufferWatchdogPeriod: 2,
             nudgeOffset: 0.1,
-            nudgeMaxRetry: 3,
+            nudgeMaxRetry: 5,
 
-            // Live edge seeking
-            liveBackBufferLength: 0, // Don't keep much back buffer for live
+            liveBackBufferLength: 0,
           });
 
-          let hasSeenLive = false;
+          let hasStartedPlaying = false;
+          let initialSeekDone = false;
 
-          hls.loadSource(url);
-          hls.attachMedia(videoRef.current);
-
-          // More aggressive live seeking
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            console.log('HLS manifest parsed, seeking to live edge');
-            seekToLiveEdge(videoRef, hls);
-            setIsLoadingStream(false);
-          });
-
-          hls.on(Hls.Events.FRAG_BUFFERED, () => {
-            if (!hasSeenLive) {
-              seekToLiveEdge(videoRef, hls);
-              hasSeenLive = true;
-            }
-          });
-
-          // Handle stalls by jumping to live
+          // Add better error handling for buffer append errors
           hls.on(Hls.Events.ERROR, (_event, data) => {
-            console.log('HLS error:', data.type, data.details);
+            console.log('HLS error:', data.type, data.details, data);
 
             if (data.fatal) {
               switch (data.type) {
@@ -628,25 +632,107 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
                   break;
                 default:
                   console.log('Fatal error, destroying and recreating HLS...');
+                  setIsLoadingStream(false);
                   hls.destroy();
-                  // Restart the stream
                   setTimeout(() => loadStream(), 1000);
                   break;
               }
-            } else if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
-              console.log('Buffer stalled, jumping to live edge');
-              seekToLiveEdge(videoRef, hls);
+            } else {
+              // Handle non-fatal errors
+              switch (data.details) {
+                case Hls.ErrorDetails.BUFFER_APPEND_ERROR:
+                  console.log('Buffer append error, clearing buffers and restarting...');
+                  try {
+                    // Clear source buffers and restart
+                    const video = videoRef.current;
+                    if (video) {
+                      hls.startLoad();
+                    }
+                  } catch (error) {
+                    console.error('Error recovering from buffer append error:', error);
+                    // Fallback: destroy and recreate
+                    hls.destroy();
+                    setTimeout(() => loadStream(), 500);
+                  }
+                  break;
+                case Hls.ErrorDetails.BUFFER_STALLED_ERROR:
+                  // Only seek to live if we've already started playing
+                  if (hasStartedPlaying) {
+                    console.log('Buffer stalled, jumping to live edge');
+                    seekToLiveEdge(videoRef, hls);
+                  }
+                  break;
+                case Hls.ErrorDetails.BUFFER_NUDGE_ON_STALL:
+                  console.log('Buffer nudge on stall');
+                  break;
+                default:
+                  console.log('Non-fatal HLS error:', data.details);
+                  break;
+              }
             }
           });
 
-          // Monitor buffer health and jump to live if falling behind
+          hls.loadSource(url);
+          hls.attachMedia(videoRef.current);
+
+          // Don't seek immediately on manifest parse - wait for actual playback
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log('HLS manifest parsed for stream:', activeStream.id);
+            // Don't set loading to false yet or seek - wait for playback
+          });
+
+          // Wait for the first fragment to be buffered AND playing
+          const handleInitialPlayback = () => {
+            const video = videoRef.current;
+            if (!video || hasStartedPlaying) return;
+
+            // Check if video is actually playing and has buffered content
+            if (video.readyState >= 3 && !video.paused && video.currentTime > 0) {
+              hasStartedPlaying = true;
+              console.log('HLS initial playback started for stream:', activeStream.id);
+              setIsLoadingStream(false);
+
+              // Now do initial seek to live, but be less aggressive
+              if (!initialSeekDone) {
+                initialSeekDone = true;
+                setTimeout(() => {
+                  seekToLiveEdgeGentle(videoRef, hls);
+                }, 1000); // Wait 1 second before seeking
+              }
+            }
+          };
+
+          // Check for initial playback on multiple events
+          hls.on(Hls.Events.FRAG_BUFFERED, handleInitialPlayback);
+
+          // Also check periodically until playback starts
+          const playbackCheckInterval = setInterval(() => {
+            if (hasStartedPlaying) {
+              clearInterval(playbackCheckInterval);
+              return;
+            }
+            handleInitialPlayback();
+          }, 500);
+
+          // Clean up interval after 10 seconds max
+          setTimeout(() => {
+            clearInterval(playbackCheckInterval);
+            if (!hasStartedPlaying) {
+              console.log('Fallback: setting loading to false after timeout for stream:', activeStream.id);
+              setIsLoadingStream(false);
+            }
+          }, 10000);
+
+          // Monitor buffer health, but only after initial playback
           hls.on(Hls.Events.FRAG_LOADED, () => {
+            if (!hasStartedPlaying) return;
+
             const video = videoRef.current;
             if (video && hls.liveSyncPosition !== undefined) {
               const latency = hls.liveSyncPosition! - video.currentTime;
 
-              // If we're more than 10 seconds behind live, jump forward
-              if (latency > 10) {
+              // Be less aggressive - only jump if really far behind
+              if (latency > 15) {
                 console.log(`Latency too high (${latency.toFixed(1)}s), jumping to live`);
                 seekToLiveEdge(videoRef, hls);
               }
@@ -663,27 +749,45 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
           videoRef.current.play().catch(() => { });
 
           const video = videoRef.current;
-          const handleLoadedData = () => {
-            seekToLive(videoRef);
-            setIsLoadingStream(false);
+          const handleCanPlay = () => {
+            // Wait for actual playback before seeking
+            const checkPlayback = () => {
+              if (video.readyState >= 3 && !video.paused && video.currentTime > 0) {
+                setIsLoadingStream(false);
+                setTimeout(() => {
+                  seekToLive(videoRef);
+                }, 1000);
+              } else {
+                setTimeout(checkPlayback, 200);
+              }
+            };
+            checkPlayback();
           };
 
-          video.addEventListener('loadeddata', handleLoadedData, { once: true });
+          video.addEventListener('canplay', handleCanPlay, { once: true });
         }
       } catch (err) {
-        // Fallback if HLS.js import fails
         console.error('HLS.js failed, using native video:', err);
         videoRef.current.src = url;
         videoRef.current.load();
         videoRef.current.play().catch(() => { });
 
         const video = videoRef.current;
-        const handleLoadedData = () => {
-          seekToLive(videoRef);
-          setIsLoadingStream(false);
+        const handleCanPlay = () => {
+          const checkPlayback = () => {
+            if (video.readyState >= 3 && !video.paused && video.currentTime > 0) {
+              setIsLoadingStream(false);
+              setTimeout(() => {
+                seekToLive(videoRef);
+              }, 1000);
+            } else {
+              setTimeout(checkPlayback, 200);
+            }
+          };
+          checkPlayback();
         };
 
-        video.addEventListener('loadeddata', handleLoadedData, { once: true });
+        video.addEventListener('canplay', handleCanPlay, { once: true });
       }
     }
 
@@ -693,6 +797,28 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
 
     setLoading(false);
   }
+
+  // Also update the cleanup effect to be more thorough
+  useEffect(() => {
+    return () => {
+      const video = videoRef.current;
+      if (video) {
+        const hls = (video as any)._hls;
+        if (hls) {
+          console.log('Cleaning up HLS instance on component unmount');
+          try {
+            hls.destroy();
+            delete (video as any)._hls;
+          } catch (error) {
+            console.warn('Error cleaning up HLS instance on unmount:', error);
+          }
+        }
+        // Also clear video source
+        video.src = '';
+        video.load();
+      }
+    };
+  }, []);
 
   // --- Helper function to get ordered streams ---
   const getOrderedStreams = (allStreams: Stream[], order: string[]): Stream[] => {
@@ -1189,16 +1315,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   useEffect(() => {
     if (!activeStream) return;
     localStorage.setItem('activeStreamId', activeStream.id);
-
     loadStream();
-
-    const interval = setInterval(() => {
-      // Ignore scroll events for 1.2s while stream reloads
-      autoScrollUntilRef.current = Date.now() + 1200;
-      loadStream();
-    }, 60000);
-
-    return () => { clearInterval(interval); };
   }, [activeStream]);
 
   useEffect(() => {
@@ -1454,13 +1571,13 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
       if (video && hls && hls.liveSyncPosition !== undefined) {
         const latency = hls.liveSyncPosition - video.currentTime;
 
-        // If latency is too high and video isn't buffering, jump to live
-        if (latency > 8 && video.readyState >= 3 && !video.paused) {
+        // Be more conservative - only correct if really far behind and video is well established
+        if (latency > 12 && video.readyState >= 3 && !video.paused && video.currentTime > 10) {
           console.log(`Auto-correcting high latency: ${latency.toFixed(1)}s`);
           seekToLiveEdge(videoRef, hls);
         }
       }
-    }, 5000); // Check every 5 seconds
+    }, 10000); // Check every 10 seconds instead of 5
 
     return () => clearInterval(interval);
   }, [activeStream, isVideoPaused]);
@@ -3418,6 +3535,27 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
       )}
     </div>
   );
+}
+
+function seekToLiveEdgeGentle(videoRef: React.RefObject<HTMLVideoElement | null>, hls?: any) {
+  const video = videoRef.current;
+  if (!video) return;
+
+  if (hls && hls.liveSyncPosition !== undefined) {
+    // Be more conservative for initial seek - stay further from live edge
+    const targetTime = hls.liveSyncPosition - 3; // 3 seconds behind live edge
+    console.log(`Initial gentle seek to HLS live edge: ${targetTime.toFixed(2)}s`);
+    video.currentTime = Math.max(0, targetTime);
+  } else if (video.duration && Number.isFinite(video.duration) && video.duration > 0) {
+    // More conservative for initial load
+    const targetTime = video.duration - 2;
+    console.log(`Initial gentle seek to duration-based live edge: ${targetTime.toFixed(2)}s`);
+    video.currentTime = Math.max(0, targetTime);
+  } else if (video.seekable && video.seekable.length > 0) {
+    const targetTime = video.seekable.end(video.seekable.length - 1) - 2;
+    console.log(`Initial gentle seek to seekable live edge: ${targetTime.toFixed(2)}s`);
+    video.currentTime = Math.max(0, targetTime);
+  }
 }
 
 // Enhanced live seeking function
