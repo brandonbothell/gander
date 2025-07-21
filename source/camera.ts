@@ -77,6 +77,8 @@ loadStreamsFromDb().then(setupStreamMotionMonitoring).then(() => {
     cluster: false
   }).serve(app);
 
+  setInterval(syncDeletedRecordings, 1000 * 60 * 60); // Sync deleted recordings every hour
+
   if (process.env.NODE_ENV !== 'production') {
     // Use HTTP for development
     // Always use Greenlock for HTTPS, but also start HTTP server in development for convenience
@@ -857,14 +859,37 @@ app.get('/api/recordings/:streamId/:page', jwtAuth, async (req, res) => {
     take: PAGE_SIZE,
   });
 
-  // Only update lastSeen if the newest file is newer than the current lastSeen
+  // Get current lastSeen to determine what deleted recordings to send
+  const currentLastSeen = await prisma.userLastSeenRecording.findUnique({
+    where: { username_streamId: { username, streamId } }
+  });
+
+  // Get deleted recordings that are newer than or equal to lastSeen
+  let deletedRecordings: string[] = [];
+  if (currentLastSeen?.lastSeen) {
+    const deleted = await prisma.deletedRecording.findMany({
+      where: {
+        streamId,
+        filename: { gte: currentLastSeen.lastSeen } // Include recordings from lastSeen onwards
+      },
+      select: { filename: true },
+      orderBy: { filename: 'desc' }
+    });
+    deletedRecordings = deleted.map(d => d.filename);
+  } else {
+    // If no lastSeen, send all deleted recordings
+    const deleted = await prisma.deletedRecording.findMany({
+      where: { streamId },
+      select: { filename: true },
+      orderBy: { filename: 'desc' }
+    });
+    deletedRecordings = deleted.map(d => d.filename);
+  }
+
+  // Update lastSeen if we have recordings and they're newer
   if (recordings.length > 0) {
     try {
-      const current = await prisma.userLastSeenRecording.findUnique({
-        where: { username_streamId: { username, streamId } }
-      });
-      const currentLastSeen = current?.lastSeen;
-      if (!currentLastSeen || recordings[0].filename.localeCompare(currentLastSeen) < 0) {
+      if (!currentLastSeen?.lastSeen || recordings[0].filename.localeCompare(currentLastSeen.lastSeen) > 0) {
         await prisma.userLastSeenRecording.upsert({
           where: { username_streamId: { username, streamId } },
           update: { lastSeen: recordings[0].filename },
@@ -876,9 +901,14 @@ app.get('/api/recordings/:streamId/:page', jwtAuth, async (req, res) => {
     }
   }
 
-  res.json({ total, recordings });
+  res.json({
+    total,
+    recordings,
+    deletedRecordings // Include deleted recordings in response
+  });
 });
 
+// Latest recordings endpoint
 app.get('/api/latest-recordings/:streamId', jwtAuth, async (req, res) => {
   const { streamId } = req.params;
   const username = (req as any).user.username;
@@ -899,7 +929,24 @@ app.get('/api/latest-recordings/:streamId', jwtAuth, async (req, res) => {
 
   const newRecordings = recordings.map(r => r.filename);
 
-  res.json({ recordings: newRecordings });
+  // Get deleted recordings since lastSeen
+  let deletedRecordings: string[] = [];
+  if (lastSeen) {
+    const deleted = await prisma.deletedRecording.findMany({
+      where: {
+        streamId,
+        filename: { gt: lastSeen } // Only new deletions since lastSeen
+      },
+      select: { filename: true },
+      orderBy: { filename: 'desc' }
+    });
+    deletedRecordings = deleted.map(d => d.filename);
+  }
+
+  res.json({
+    recordings: newRecordings,
+    deletedRecordings // Include new deletions
+  });
 
   // Update lastSeen to the newest file
   if (newRecordings.length > 0) {
@@ -1485,7 +1532,13 @@ function safeUnlink(filePath: string, retries = 3) {
 // --- Deleted recordings endpoint ---
 app.get('/api/deleted-recordings/:streamId', jwtAuth, async (req, res) => {
   const { streamId } = req.params;
-  const deleted = await prisma.deletedRecording.findMany({ where: { streamId } });
+
+  // Return all deleted recordings after sync
+  const deleted = await prisma.deletedRecording.findMany({
+    where: { streamId },
+    orderBy: { deletedAt: 'desc' }
+  });
+
   res.json(deleted.map(d => d.filename));
 });
 
@@ -1624,3 +1677,57 @@ app.get('/api/user/sessions', jwtAuth, async (req: RequestWithUser, res) => {
   });
   res.json(user ? JSON.parse(user.trustedIps) : []);
 })
+
+async function syncDeletedRecordings() {
+  for (const streamId in dynamicStreams) {
+    if (!dynamicStreams[streamId]) continue; // Skip if stream is not active
+    try {
+      const stream = dynamicStreams[streamId];
+      if (stream) {
+        // Get all recordings from DB that aren't already marked as deleted
+        const allDbRecordings = await prisma.motionRecording.findMany({
+          where: { streamId },
+          select: { filename: true }
+        });
+
+        const existingDeleted = await prisma.deletedRecording.findMany({
+          where: { streamId },
+          select: { filename: true }
+        });
+
+        const deletedSet = new Set(existingDeleted.map(d => d.filename));
+        const missingRecordings: string[] = [];
+
+        // Check which files are missing from the filesystem
+        for (const recording of allDbRecordings) {
+          if (!deletedSet.has(recording.filename)) {
+            const filePath = path.join(stream.config.recordDir, recording.filename);
+            if (!fs.existsSync(filePath)) {
+              missingRecordings.push(recording.filename);
+            }
+          }
+        }
+
+        // Add missing recordings to deleted table
+        if (missingRecordings.length > 0) {
+          console.log(`[${streamId}] Syncing ${missingRecordings.length} deleted recordings to database`);
+
+          await prisma.deletedRecording.createMany({
+            data: missingRecordings.map(filename => ({ streamId, filename })),
+          });
+
+          // Also remove them from the motion recordings table
+          await prisma.motionRecording.deleteMany({
+            where: {
+              streamId,
+              filename: { in: missingRecordings }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[${streamId}] Error syncing deleted recordings:`, error);
+      // Continue with the request even if sync fails
+    }
+  }
+}

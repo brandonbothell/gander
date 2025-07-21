@@ -1,7 +1,7 @@
 import React from 'react';
 import { BatchDeleteButton } from './BatchDeleteButton';
 import { DeselectButton } from './DeselectButton';
-import type { Recording } from '../RecordingPage';
+import type { Recording } from '../App';
 
 interface FloatingMenuPopoutProps {
   open: boolean;

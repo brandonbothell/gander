@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoginPage from './LoginPage';
 import './App.css';
-import RecordingPage, { type Recording } from './RecordingPage';
 import { API_BASE, authFetch, setAuthHandlers } from './main';
 import StreamPage from './StreamPage';
 import { RouterLoadingHandler } from './components/RouterLoadingHandler';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import SecureStorage from './utils/secureStorage';
 import { geolocateIP, SessionMonitor } from './components/SessionMonitor';
+
+export type Recording = { streamId: string, filename: string };
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -226,7 +227,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} />} />
         <Route path="/stream/:streamId" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} />} />
-        <Route path="/recordings/:streamId/:filename" element={<RecordingPage />} />
+        <Route path="/recordings/:streamId/:filename" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} />} />
       </Routes>
       {showSessionMonitor && (
         <SessionMonitor onClose={() => setShowSessionMonitor(false)} />

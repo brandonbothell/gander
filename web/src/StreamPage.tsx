@@ -11,7 +11,6 @@ import { FloatingMenuButton } from './components/FloatingMenuButton';
 import { FloatingMenuPopout } from './components/FloatingMenuPopout';
 import { BatchDeleteButton } from './components/BatchDeleteButton';
 import { DeselectButton } from './components/DeselectButton';
-import type { Recording as RecordingType } from './RecordingPage';
 import { MotionService } from './plugins/motionService';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import Hls from 'hls.js';
@@ -23,6 +22,7 @@ import { FiBell, FiBellOff, FiChevronDown, FiChevronUp, FiRefreshCw, FiUsers } f
 import { StreamTilesGrid } from './components/StreamTilesGrid';
 import { RecordingBar } from './components/RecordingBar';
 import { StreamControlBar } from './components/StreamControlBar';
+import type { Recording } from './App';
 
 export type ClientMask = StreamMask & { pendingUpdate?: boolean, pendingUpdateSince?: number };
 
@@ -83,7 +83,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   const videoRef = useRef<HTMLVideoElement>(null);
   const recordingsListRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
-  const [cachedRecordings, setCachedRecordings] = useLocalStorageState<{ [streamId: string]: RecordingType[] }>('cachedRecordings', {});
+  const [cachedRecordings, setCachedRecordings] = useLocalStorageState<{ [streamId: string]: Recording[] }>('cachedRecordings', {});
   const [viewed, setViewed] = useLocalStorageState<{ filename: string; streamId: string }[]>('viewedRecordings', []);
   const [motionStatus, setMotionStatus] = useState<{ [streamId: string]: { recording: boolean; secondsLeft: number } }>({});
   const [isMotionRecordingPaused, setMotionRecordingPaused] = useState<{ [streamId: string]: boolean }>({});
@@ -144,6 +144,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   const [viewingRecordingsFrom, setViewingRecordingsFrom] = useState<Stream | null>(null);
   const [recordingBeingViewed, setRecordingOverlay] = useState<{ streamId: string, filename: string } | null>(null);
   const [recordingsListInView, setRecordingsListInView] = useState(true);
+  const [lastVideoSize, setLastVideoSize] = useState({ width: 640, height: 360 });
+  const [isLoadingStream, setIsLoadingStream] = useState(false);
 
 
   // Filtered recordings
@@ -195,9 +197,9 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   }, []);
 
   // Add a cache for filtered recordings
-  const [filteredRecordingsCache, setFilteredRecordingsCache] = useState<RecordingType[]>([]);
+  const [filteredRecordingsCache, setFilteredRecordingsCache] = useState<Recording[]>([]);
   // Add this new state to store a "frozen" version of filtered recordings during typing
-  const [frozenFilteredRecordings, setFrozenFilteredRecordings] = useState<RecordingType[]>([]);
+  const [frozenFilteredRecordings, setFrozenFilteredRecordings] = useState<Recording[]>([]);
 
   // Update the filteredRecordings useMemo in StreamPage.tsx:
   const filteredRecordings = useMemo(() => {
@@ -406,7 +408,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   }, [activeStream?.id, viewingRecordingsFrom?.id]);
 
   // Update the performSearchSync function to accept and check request ID:
-  const performSearchSync = (recordings: RecordingType[], requestId: number) => {
+  const performSearchSync = (recordings: Recording[], requestId: number) => {
     // Use requestIdleCallback or setTimeout to chunk the work
     if ('requestIdleCallback' in window) {
       (window as any).requestIdleCallback(() => {
@@ -419,7 +421,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
     }
   };
 
-  const processSearchChunk = (recordings: RecordingType[], startIndex: number, filtered: RecordingType[], requestId: number) => {
+  const processSearchChunk = (recordings: Recording[], startIndex: number, filtered: Recording[], requestId: number) => {
     // Check if this request was cancelled
     if (requestId !== lastSearchRequestId.current) {
       return; // Request was cancelled, stop processing
@@ -502,9 +504,21 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
 
   const { setLoading } = useLoading();
 
+  // Update the loadStream function with more aggressive live seeking
   async function loadStream() {
     if (!videoRef.current || !activeStream) return console.warn('No video ref and/or active stream set');
+
+    setIsLoadingStream(true);
     setLoading(true);
+
+    // Store current video dimensions before loading new stream
+    if (videoRef.current.clientWidth > 0 && videoRef.current.clientHeight > 0) {
+      setLastVideoSize({
+        width: videoRef.current.clientWidth,
+        height: videoRef.current.clientHeight
+      });
+    }
+
     let url = `${API_BASE}/api/signed-stream-url/${activeStream.id}`;
 
     // Fetch signed URL from API
@@ -518,47 +532,158 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
     } catch {
       console.error('Failed to fetch signed stream URL');
       setActiveStream(streams[0]);
+      setIsLoadingStream(false);
       setLoading(false);
       return;
     }
 
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
     if (isSafari) {
       videoRef.current.src = url;
       videoRef.current.load();
       videoRef.current.play().catch(() => { });
-    } else {
-      const seekToLiveAfterLoad = () => {
-        // Wait for the video to be playing and buffered before seeking to live
-        const video = videoRef.current;
-        if (!video) return;
-        const trySeekToLive = () => {
-          if (video.readyState >= 3 && !video.paused) {
-            seekToLive(videoRef);
-          } else {
-            setTimeout(trySeekToLive, 100);
-          }
-        };
-        trySeekToLive();
-      }
 
+      // Safari-specific live seeking
+      const video = videoRef.current;
+      const handleLoadedData = () => {
+        if (video.duration && Number.isFinite(video.duration)) {
+          video.currentTime = video.duration - 0.5; // Stay very close to live
+        }
+        setIsLoadingStream(false);
+      };
+
+      video.addEventListener('loadeddata', handleLoadedData, { once: true });
+    } else {
       try {
         if (Hls.isSupported()) {
-          const hls = new Hls();
-          hls.loadSource(url!);
-          hls.attachMedia(videoRef.current!);
-          hls.on(Hls.Events.MANIFEST_PARSED, seekToLiveAfterLoad);
+          const hls = new Hls({
+            // Aggressive live settings
+            liveSyncDurationCount: 3, // Keep only 3 segments in buffer
+            liveMaxLatencyDurationCount: 5, // Max 5 segments behind live
+            liveDurationInfinity: true,
+            enableWorker: true,
+            lowLatencyMode: true, // Enable low latency mode if available
+            backBufferLength: 90, // Keep 90 seconds of back buffer
+            maxBufferLength: 30, // Reduce forward buffer to 30 seconds
+            maxMaxBufferLength: 60, // Max buffer size
+            maxBufferSize: 60 * 1000 * 1000, // 60MB buffer
+            maxBufferHole: 0.5, // Small buffer holes
+
+            // Fragment loading optimizations
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 3,
+            manifestLoadingRetryDelay: 1000,
+
+            // Segment loading optimizations  
+            fragLoadingTimeOut: 20000,
+            fragLoadingMaxRetry: 3,
+            fragLoadingRetryDelay: 1000,
+
+            // Enable adaptive bitrate but prefer quality
+            startLevel: -1, // Auto start level
+            capLevelToPlayerSize: false, // Don't limit quality based on player size
+
+            // Stall detection and recovery
+            highBufferWatchdogPeriod: 2,
+            nudgeOffset: 0.1,
+            nudgeMaxRetry: 3,
+
+            // Live edge seeking
+            liveBackBufferLength: 0, // Don't keep much back buffer for live
+          });
+
+          let hasSeenLive = false;
+
+          hls.loadSource(url);
+          hls.attachMedia(videoRef.current);
+
+          // More aggressive live seeking
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log('HLS manifest parsed, seeking to live edge');
+            seekToLiveEdge(videoRef, hls);
+            setIsLoadingStream(false);
+          });
+
+          hls.on(Hls.Events.FRAG_BUFFERED, () => {
+            if (!hasSeenLive) {
+              seekToLiveEdge(videoRef, hls);
+              hasSeenLive = true;
+            }
+          });
+
+          // Handle stalls by jumping to live
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            console.log('HLS error:', data.type, data.details);
+
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  console.log('Network error, reloading...');
+                  hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  console.log('Media error, recovering...');
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  console.log('Fatal error, destroying and recreating HLS...');
+                  hls.destroy();
+                  // Restart the stream
+                  setTimeout(() => loadStream(), 1000);
+                  break;
+              }
+            } else if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
+              console.log('Buffer stalled, jumping to live edge');
+              seekToLiveEdge(videoRef, hls);
+            }
+          });
+
+          // Monitor buffer health and jump to live if falling behind
+          hls.on(Hls.Events.FRAG_LOADED, () => {
+            const video = videoRef.current;
+            if (video && hls.liveSyncPosition !== undefined) {
+              const latency = hls.liveSyncPosition! - video.currentTime;
+
+              // If we're more than 10 seconds behind live, jump forward
+              if (latency > 10) {
+                console.log(`Latency too high (${latency.toFixed(1)}s), jumping to live`);
+                seekToLiveEdge(videoRef, hls);
+              }
+            }
+          });
+
+          // Store HLS instance for cleanup
+          (videoRef.current as any)._hls = hls;
+
         } else {
-          // fallback for browsers that don't support HLS.js
+          // Fallback for browsers without HLS.js support
           videoRef.current.src = url;
           videoRef.current.load();
-          videoRef.current.play().catch(() => { }).then(seekToLiveAfterLoad);
+          videoRef.current.play().catch(() => { });
+
+          const video = videoRef.current;
+          const handleLoadedData = () => {
+            seekToLive(videoRef);
+            setIsLoadingStream(false);
+          };
+
+          video.addEventListener('loadeddata', handleLoadedData, { once: true });
         }
       } catch (err) {
-        // fallback if import fails
+        // Fallback if HLS.js import fails
+        console.error('HLS.js failed, using native video:', err);
         videoRef.current.src = url;
         videoRef.current.load();
-        videoRef.current.play().catch(() => { }).then(seekToLiveAfterLoad);
+        videoRef.current.play().catch(() => { });
+
+        const video = videoRef.current;
+        const handleLoadedData = () => {
+          seekToLive(videoRef);
+          setIsLoadingStream(false);
+        };
+
+        video.addEventListener('loadeddata', handleLoadedData, { once: true });
       }
     }
 
@@ -623,16 +748,16 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
 
   // Open/close the popout menu when the user selects/deselects recordings
   useEffect(() => {
-    if (isMobile && selected.length > 0 && !menuOpen) {
+    if (selected.length > 0 && !menuOpen) {
       setMenuOpen(true);
     }
-  }, [isMobile, selected]);
+  }, [selected]);
 
   useEffect(() => {
-    if (isMobile && selected.length === 0 && menuOpen) {
+    if (selected.length === 0 && menuOpen) {
       setMenuOpen(false);
     }
-  }, [isMobile, selected]);
+  }, [selected]);
 
   // Handle resize events to detect keyboard opening/closing
   useEffect(() => {
@@ -682,17 +807,38 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
     if (!list) return;
 
     function onScroll() {
-      // Existing infinite scroll logic...
       if (!activeStream) return;
       const recordingsStream = viewingRecordingsFrom || activeStream;
 
+      const totalRemaining = (totalRecordings[recordingsStream.id] || 0) - (cachedRecordings[recordingsStream.id]?.length || 0);
+      const isNearBottom = list!.scrollTop + list!.clientHeight >= list!.scrollHeight - 300;
+      const shouldAutoLoad = totalRemaining > 50; // Auto-load when more than 50 recordings remain
+
+      // Auto-load more recordings when scrolling near bottom (but not for the final 50)
+      if (isNearBottom && shouldAutoLoad && !isLoadingMore) {
+        const nextPage = currentPage + 1;
+        const cachedLen = cachedRecordings[recordingsStream.id]?.length || 0;
+
+        // Only load if we have more recordings to fetch
+        if (cachedLen < (totalRecordings[recordingsStream.id] || 0)) {
+          setIsLoadingMore(true);
+          setCurrentPage(nextPage);
+          setFilteredRecordingsPage(page => page + 1);
+          loadPage(recordingsStream, nextPage, true).finally(() => {
+            setIsLoadingMore(false);
+          });
+        }
+      }
+
+      // Existing filtered recordings pagination logic (for search results)
       if (
-        activeStream && list!.scrollTop + list!.clientHeight >= list!.scrollHeight - 300 &&
+        activeStream && isNearBottom &&
         filteredRecordingsPage * PAGE_SIZE < (cachedRecordings[recordingsStream.id]?.length || 0)
       ) {
         setFilteredRecordingsPage(page => page + 1);
       }
 
+      // Existing fallback logic for when we reach the end unexpectedly
       if (
         list!.scrollTop + list!.clientHeight >= list!.scrollHeight - 10 &&
         lastLoadedPageSizeRef.current[recordingsStream.id] < PAGE_SIZE && // Only reset if last page was short
@@ -713,7 +859,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
 
     list.addEventListener('scroll', onScroll, { passive: true });
     return () => list.removeEventListener('scroll', onScroll);
-  }, [filteredRecordingsPage, cachedRecordings, activeStream, viewingRecordingsFrom]);
+  }, [filteredRecordingsPage, cachedRecordings, activeStream, viewingRecordingsFrom, currentPage, totalRecordings, isLoadingMore]);
 
   // Open the recordings list when swiping up at the bottom of the page
   useEffect(() => {
@@ -1120,19 +1266,26 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
 
   // Fetch a page of recordings
   async function loadPage(stream: Stream, page: number, force = false) {
-    // Only use the cache if we've ALREADY reached the last seen recording in a previous fetch
     if ((reachedLastSeen && !force) || !activeStream) {
-      // setRecordingsPreserveScroll(cachedRecordings[activeStream.id] || []);
       return;
     }
 
     const res = await authFetch(`${API_BASE}/api/recordings/${stream.id}/${page}`);
     if (!res.ok) return;
     const data = await res.json();
-    const newRecs: RecordingType[] = (data.recordings || []).map((rec: any) => ({
+    const newRecs: Recording[] = (data.recordings || []).map((rec: any) => ({
       filename: rec.filename,
       streamId: stream.id
     }));
+
+    // Handle deleted recordings from server
+    if (data.deletedRecordings && Array.isArray(data.deletedRecordings)) {
+      setDeletedRecordings(prev => ({
+        ...prev,
+        [stream.id]: [...new Set([...(prev[stream.id] || []), ...data.deletedRecordings])]
+      }));
+    }
+
     setTotalRecordings(prev => ({ ...prev, [stream.id]: data.total || 0 }));
 
     let foundLastSeen = false;
@@ -1141,7 +1294,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
       const idx = newRecs.findIndex(r => r.filename === lastSeenRecording[stream.id]!);
       if (idx !== -1) {
         foundLastSeen = true;
-        // recsToAdd = newRecs.slice(0, idx + 1);
       } else if (
         newRecs.length > 0 &&
         newRecs[newRecs.length - 1].filename.localeCompare(lastSeenRecording[stream.id]!) < 0
@@ -1163,9 +1315,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
       return { ...prev, [stream.id]: deduped.sort((a, b) => b.filename.localeCompare(a.filename)) };
     });
 
-    // If we got less than a full page, or just now reached last seen, stop fetching more
     if (recsToAdd.length < PAGE_SIZE || foundLastSeen) {
-      setReachedLastSeen(true); // Now, on future calls, just use the cache
+      setReachedLastSeen(true);
     }
   }
 
@@ -1175,10 +1326,18 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
       const res = await authFetch(`${API_BASE}/api/latest-recordings/${stream.id}`);
       if (!res.ok) return;
       const data = await res.json();
-      const newRecs: RecordingType[] = (data.recordings || []).map((filename: string) => ({
+      const newRecs: Recording[] = (data.recordings || []).map((filename: string) => ({
         filename,
         streamId: stream.id
       }));
+
+      // Handle new deleted recordings
+      if (data.deletedRecordings && Array.isArray(data.deletedRecordings) && data.deletedRecordings.length > 0) {
+        setDeletedRecordings(prev => ({
+          ...prev,
+          [stream.id]: [...new Set([...(prev[stream.id] || []), ...data.deletedRecordings])]
+        }));
+      }
 
       if (!cancelled && newRecs.length > 0) {
         setLastSeenRecording(prev => ({ ...prev, [stream.id]: newRecs[0].filename }));
@@ -1224,6 +1383,40 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
     const interval = setInterval(pollMotionStatus, 1000);
     return () => clearInterval(interval);
   }, [activeStream]);
+
+  // Add periodic live edge monitoring
+  useEffect(() => {
+    if (!activeStream || isVideoPaused) return;
+
+    const interval = setInterval(() => {
+      const video = videoRef.current;
+      const hls = video ? (video as any)._hls : null;
+
+      if (video && hls && hls.liveSyncPosition !== undefined) {
+        const latency = hls.liveSyncPosition - video.currentTime;
+
+        // If latency is too high and video isn't buffering, jump to live
+        if (latency > 8 && video.readyState >= 3 && !video.paused) {
+          console.log(`Auto-correcting high latency: ${latency.toFixed(1)}s`);
+          seekToLiveEdge(videoRef, hls);
+        }
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [activeStream, isVideoPaused]);
+
+  // Add cleanup for HLS instance
+  useEffect(() => {
+    return () => {
+      const video = videoRef.current;
+      const hls = video ? (video as any)._hls : null;
+      if (hls) {
+        hls.destroy();
+        delete (video as any)._hls;
+      }
+    };
+  }, []);
 
   // --- Poll pause state every 3 seconds ---
   useEffect(() => {
@@ -1607,28 +1800,42 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
     };
   }, [showMaskEditor, pauseMaskPollingUntil, activeStream]);
 
+  // Update the video size effect to handle loading states
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    function updateVideoSize() {
-      setVideoSize({
-        width: video!.clientWidth,
-        height: video!.clientHeight,
-      });
+    function updateVideoSize(event: Event | null) {
+      if (!video) return;
+      // Only update if video has actual dimensions
+      if (['canplay', undefined].includes(event?.type) && video.clientWidth > 0 && video.clientHeight > 0) {
+        setTimeout(() => {
+          setVideoSize({
+            width: video.clientWidth,
+            height: video.clientHeight,
+          });
+          setLastVideoSize({
+            width: video.clientWidth,
+            height: video.clientHeight,
+          });
+          setIsLoadingStream(false); // Clear loading state when video has dimensions
+        }, 200); // Delay to ensure video is ready
+      }
     }
 
     // Initial update
-    updateVideoSize();
+    updateVideoSize(null);
 
     // Listen for loadedmetadata (in case video size changes after source set)
     video.addEventListener('loadedmetadata', updateVideoSize);
+    video.addEventListener('loadeddata', updateVideoSize);
+    video.addEventListener('canplay', updateVideoSize);
 
     // Use ResizeObserver for all resizes
     let resizeObserver: ResizeObserver | null = null;
     if ('ResizeObserver' in window) {
       resizeObserver = new ResizeObserver(() => {
-        updateVideoSize();
+        updateVideoSize(null);
       });
       resizeObserver.observe(video);
     }
@@ -1636,6 +1843,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
     // Clean up
     return () => {
       video.removeEventListener('loadedmetadata', updateVideoSize);
+      video.removeEventListener('loadeddata', updateVideoSize);
+      video.removeEventListener('canplay', updateVideoSize);
       if (resizeObserver) resizeObserver.disconnect();
     };
   }, [videoRef, activeStream]);
@@ -2040,8 +2249,52 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
                 autoPlay
                 muted
                 playsInline
-                style={{ width: '100%', background: '#000' }}
+                style={{
+                  width: '100%',
+                  background: '#000',
+                  // Maintain last known dimensions during loading to prevent flash
+                  minWidth: isLoadingStream ? lastVideoSize.width : 'auto',
+                  minHeight: isLoadingStream ? lastVideoSize.height : 'auto',
+                  aspectRatio: isLoadingStream ? `${lastVideoSize.width}/${lastVideoSize.height}` : 'auto',
+                  transition: isLoadingStream ? 'none' : 'all 0.2s ease-out'
+                }}
               />
+
+              {/* Optional: Add a loading overlay */}
+              {isLoadingStream && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: '1.1em',
+                    fontWeight: 600,
+                    pointerEvents: 'none',
+                    zIndex: 1
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 20,
+                        height: 20,
+                        border: '3px solid rgba(255, 255, 255, 0.3)',
+                        borderTop: '3px solid #fff',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }}
+                    />
+                    Loading stream...
+                  </div>
+                </div>
+              )}
 
               {/* Position StreamControlBar as overlay directly on video */}
               <StreamControlBar
@@ -2624,59 +2877,58 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
               </div>
             </>
           )}
-          {/* Load more button */}
-          {activeStream && ((cachedRecordings[activeStream.id]?.length || 0) < (totalRecordings[activeStream.id] || 0)) && (
-            <button
-              style={{
-                margin: '24px auto 32px',
-                display: 'block',
-                padding: '10px 32px',
-                fontSize: 16,
-                borderRadius: 8,
-                background: '#2196f3',
-                color: '#fff',
-                border: 'none',
-                cursor: isLoadingMore ? 'not-allowed' : 'pointer',
-                fontWeight: 600,
-                boxShadow: '0 2px 8px #1a298055',
-                opacity: isLoadingMore ? 0.7 : 1
-              }}
-              disabled={isLoadingMore}
-              onClick={async () => {
-                setIsLoadingMore(true);
-                const recordingsStream = viewingRecordingsFrom || activeStream;
-                if (!recordingsStream) {
-                  alert('No active stream to load more recordings for');
-                  setIsLoadingMore(false);
-                  return;
-                }
-                const nextPage = currentPage + 1;
-                setCurrentPage(nextPage);
-                setFilteredRecordingsPage(page => page + 1);
-                await loadPage(recordingsStream, nextPage, true);
-                setIsLoadingMore(false);
-              }}
-            >
-              {isLoadingMore ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="spinner" style={{
-                    width: 18, height: 18, border: '3px solid #fff', borderTop: '3px solid #2196f3',
-                    borderRadius: '50%', animation: 'spin 1s linear infinite', display: 'inline-block'
-                  }} />
-                  Loading...
-                </span>
-              ) : (
-                (() => {
+          {/* Load more button - only show for final 50 recordings */}
+          {activeStream && (() => {
+            const recordingsStream = viewingRecordingsFrom || activeStream;
+            const totalRemaining = (totalRecordings[recordingsStream.id] || 0) - (cachedRecordings[recordingsStream.id]?.length || 0);
+            const shouldShowButton = totalRemaining > 0 && totalRemaining <= 50;
+
+            return shouldShowButton && (
+              <button
+                style={{
+                  margin: '24px auto 32px',
+                  display: 'block',
+                  padding: '10px 32px',
+                  fontSize: 16,
+                  borderRadius: 8,
+                  background: '#2196f3',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 8px #1a298055',
+                  opacity: isLoadingMore ? 0.7 : 1
+                }}
+                disabled={isLoadingMore}
+                onClick={async () => {
+                  setIsLoadingMore(true);
                   const recordingsStream = viewingRecordingsFrom || activeStream;
-                  const streamId = recordingsStream?.id;
-                  const total = streamId ? (totalRecordings[streamId] || 0) : 0;
-                  const cached = streamId ? (cachedRecordings[streamId]?.length || 0) : 0;
-                  const remaining = total - cached;
-                  return `Load ${remaining > 0 ? remaining + ' ' : ''}more...`;
-                })()
-              )}
-            </button>
-          )}
+                  if (!recordingsStream) {
+                    alert('No active stream to load more recordings for');
+                    setIsLoadingMore(false);
+                    return;
+                  }
+                  const nextPage = currentPage + 1;
+                  setCurrentPage(nextPage);
+                  setFilteredRecordingsPage(page => page + 1);
+                  await loadPage(recordingsStream, nextPage, true);
+                  setIsLoadingMore(false);
+                }}
+              >
+                {isLoadingMore ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="spinner" style={{
+                      width: 18, height: 18, border: '3px solid #fff', borderTop: '3px solid #2196f3',
+                      borderRadius: '50%', animation: 'spin 1s linear infinite', display: 'inline-block'
+                    }} />
+                    Loading...
+                  </span>
+                ) : (
+                  `Load final ${totalRemaining} recordings...`
+                )}
+              </button>
+            );
+          })()}
 
           {/* Handle */}
           {recordingsListOpen && (
@@ -2820,7 +3072,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
             [activeStream.id]: Math.max(0, (prev[activeStream.id] || 0) - selected.length)
           }));
           handleImmediateDeleteUpdate(selected);
-          if (isMobile) setMenuOpen(false); // <-- Close menu on batch delete
+          setMenuOpen(false); // <-- Close menu on batch delete
         }}
         recordingsListRef={recordingsListRef}
         open={menuOpen}
@@ -3104,10 +3356,46 @@ export default function StreamPage({ streamId, onShowSessionMonitor }: StreamPag
   );
 }
 
+// Enhanced live seeking function
+function seekToLiveEdge(videoRef: React.RefObject<HTMLVideoElement | null>, hls?: any) {
+  const video = videoRef.current;
+  if (!video) return;
+
+  if (hls && hls.liveSyncPosition !== undefined) {
+    // Use HLS.js live sync position for most accurate live edge
+    const targetTime = hls.liveSyncPosition - 1; // 1 second behind live edge for stability
+    console.log(`Seeking to HLS live edge: ${targetTime.toFixed(2)}s`);
+    video.currentTime = Math.max(0, targetTime);
+  } else if (video.duration && Number.isFinite(video.duration) && video.duration > 0) {
+    // Fallback to duration-based seeking
+    const targetTime = video.duration - 0.5; // Very close to live
+    console.log(`Seeking to duration-based live edge: ${targetTime.toFixed(2)}s`);
+    video.currentTime = Math.max(0, targetTime);
+  } else if (video.seekable && video.seekable.length > 0) {
+    // Use seekable range if available
+    const targetTime = video.seekable.end(video.seekable.length - 1) - 0.5;
+    console.log(`Seeking to seekable live edge: ${targetTime.toFixed(2)}s`);
+    video.currentTime = Math.max(0, targetTime);
+  }
+}
+
+// Update the existing seekToLive function
 function seekToLive(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const video = videoRef.current;
-  if (video && Number.isFinite(video.duration) && video.duration > 0) {
-    video.currentTime = video.duration - 1; // Seek to the last second
+  if (!video) return;
+
+  // Get HLS instance if available
+  const hls = (video as any)._hls;
+
+  if (hls) {
+    seekToLiveEdge(videoRef, hls);
+  } else {
+    // Fallback for non-HLS streams
+    if (Number.isFinite(video.duration) && video.duration > 0) {
+      video.currentTime = video.duration - 1;
+    } else if (video.seekable && video.seekable.length > 0) {
+      video.currentTime = video.seekable.end(video.seekable.length - 1) - 1;
+    }
   }
 }
 

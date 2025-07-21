@@ -1,5 +1,5 @@
 import { authFetch } from '../main';
-import type { Recording } from '../RecordingPage';
+import type { Recording } from '../App';
 
 interface BatchDeleteButtonProps {
   streamId: string;
