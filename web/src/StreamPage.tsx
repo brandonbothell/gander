@@ -1348,6 +1348,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     (async () => {
       // Poll latest recordings every 10 seconds
       const pollLatest = async () => {
+        console.log('Polling latest recordings...');
         if (!activeStream || cancelled) return;
 
         const today = getLocalDateString(new Date());
@@ -1361,6 +1362,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         const recordingsStream = viewingRecordingsFrom || activeStream;
 
         if (shouldPoll) await pollLatestRecordings(recordingsStream, cancelled);
+        else console.log('Skipping latest recordings poll due to date range');
+
         // After 5s, try to pre-cache more pages if needed
         if (preCacheTimeout) clearTimeout(preCacheTimeout);
         preCacheTimeout = setTimeout(async () => {
@@ -1379,6 +1382,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             if (isLoadingMore) return; // Don't pre-cache if already loading more
             if (nextPage > 100) return; // Don't pre-cache too many pages
 
+            console.log(`Pre-caching page ${nextPage} for stream ${recordingsStream.id}`);
             setIsLoadingMore(true);
             setCurrentPage(nextPage);
             await loadPage(recordingsStream, nextPage, true);
@@ -1388,7 +1392,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       };
 
       preCacheInterval = setInterval(pollLatest, 10000);
-
     })();
 
     return () => {
@@ -1396,7 +1399,15 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       if (preCacheTimeout) clearTimeout(preCacheTimeout);
       if (preCacheInterval) clearInterval(preCacheInterval);
     };
-  }, [dateRange, activeStream, cachedRecordings, totalRecordings, viewingRecordingsFrom]);
+  }, [
+    // Only include dependencies that should trigger a restart of the polling
+    dateRange.from,
+    dateRange.to,
+    activeStream?.id,
+    viewingRecordingsFrom?.id
+    // Removed: cachedRecordings, totalRecordings, currentPage, isLoadingMore
+    // These change frequently and shouldn't restart the polling interval
+  ]);
 
   // Fetch a page of recordings
   async function loadPage(stream: Stream, page: number, force = false) {

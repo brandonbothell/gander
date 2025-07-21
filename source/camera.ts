@@ -1074,6 +1074,12 @@ app.get('/api/latest-recordings/:streamId', jwtAuth, async (req, res) => {
   });
   const lastSeen = seen?.lastSeen;
 
+  if (!lastSeen) {
+    // If no lastSeen, throw an error
+    res.status(400).json({ error: 'No last seen recording found' });
+    return;
+  }
+
   // Only fetch new recordings (filenames greater than lastSeen)
   const recordings = await prisma.motionRecording.findMany({
     where: {
@@ -1603,11 +1609,12 @@ app.post('/api/motion-pause/:streamId', jwtAuth, express.json(), async (req, res
       if (state.motionTimeout) clearTimeout(state.motionTimeout);
       // Save any pending segments before pausing
       if (state.motionSegments.length > 0) {
-        await saveMotionSegmentsWithRetry(streamId);
+        saveMotionSegmentsWithRetry(streamId).then(() => {
+          state.notificationSent = false;
+          state.motionRecordingActive = false;
+          state.motionRecordingTimeoutAt = 0;
+        });
       }
-      state.notificationSent = false;
-      state.motionRecordingActive = false;
-      state.motionRecordingTimeoutAt = 0;
     }
 
     await notifyMotion(streamId, {

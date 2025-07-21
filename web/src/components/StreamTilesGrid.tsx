@@ -37,7 +37,7 @@ export function StreamTilesGrid({
   const lastActiveStreamIdRef = useRef<string | undefined>(activeStreamId);
   const animationTimeoutRef = useRef<number | null>(null);
   const [deletingStreamId, setDeletingStreamId] = useState<string | null>(null);
-  const [isUpdatingMotionPaused, setIsUpdatingMotionPaused] = useState(false);
+  const [isUpdatingMotionPaused, setIsUpdatingMotionPaused] = useState<{ [streamId: string]: boolean }>({});
 
   // Capture positions and animate when active stream changes
   useEffect(() => {
@@ -391,10 +391,10 @@ export function StreamTilesGrid({
               <button
                 onClick={e => {
                   e.stopPropagation();
-                  setIsUpdatingMotionPaused(true);
-                  onToggleMotionPause(stream, motionRecordingPaused[stream.id]).then(() => setIsUpdatingMotionPaused(false));
+                  setIsUpdatingMotionPaused(prev => ({ ...prev, [stream.id]: true }));
+                  onToggleMotionPause(stream, motionRecordingPaused[stream.id]).then(() => setIsUpdatingMotionPaused(prev => ({ ...prev, [stream.id]: false })));
                 }}
-                disabled={isUpdatingMotionPaused}
+                disabled={isUpdatingMotionPaused[stream.id] || motionSaving[stream.id]}
                 style={{
                   background: 'transparent',
                   color: '#fff',
