@@ -10,10 +10,10 @@ interface StreamTilesGridProps {
   getThumbUrl: (stream: Stream) => string;
   setActiveStream: (stream: Stream) => void;
   onViewRecordings: (stream: Stream) => void;
-  onToggleMotionPause: (stream: Stream, enabled: boolean) => void;
+  onToggleMotionPause: (stream: Stream, enabled: boolean) => Promise<void>;
   onDeleteStream?: (stream: Stream) => void; // Add this prop
   motionRecordingPaused: { [streamId: string]: boolean };
-  motionActive: { [streamId: string]: boolean };
+  motionStatus: { [streamId: string]: { recording: boolean; secondsLeft: number; saving: boolean; startedRecordingAt: number } };
   motionSaving: { [streamId: string]: boolean };
   activeStreamId?: string;
 }
@@ -29,7 +29,7 @@ export function StreamTilesGrid({
   onToggleMotionPause,
   onDeleteStream,
   motionRecordingPaused,
-  motionActive,
+  motionStatus,
   motionSaving,
   activeStreamId
 }: StreamTilesGridProps) {
@@ -37,6 +37,7 @@ export function StreamTilesGrid({
   const lastActiveStreamIdRef = useRef<string | undefined>(activeStreamId);
   const animationTimeoutRef = useRef<number | null>(null);
   const [deletingStreamId, setDeletingStreamId] = useState<string | null>(null);
+  const [isUpdatingMotionPaused, setIsUpdatingMotionPaused] = useState(false);
 
   // Capture positions and animate when active stream changes
   useEffect(() => {
@@ -186,32 +187,56 @@ export function StreamTilesGrid({
             {motionSaving[stream.id] ? (
               <div className="motion-saving-indicator">
                 <div className="spinner" style={{
+                  position: 'absolute',
+                  bottom: 10,
+                  right: 10,
+                  zIndex: 3,
                   width: 16, height: 16,
                   border: '2px solid rgba(255, 193, 7, 0.3)',
                   borderTop: '2px solid #ffc107',
                   borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
+                  animation: 'spin 1s linear infinite',
+                  verticalAlign: 'middle',
                 }} />
-                <span>Saving</span>
-              </div>
-            ) : motionActive[stream.id] ? (
-              <div
-                className="stream-tile-recording-dot"
-                style={{
+                <span style={{
                   position: 'absolute',
-                  top: 10,
-                  right: 10,
+                  bottom: 10,
+                  right: 26,
+                  paddingRight: '8px',
                   zIndex: 3,
-                  width: 16,
-                  height: 16,
-                  borderRadius: '50%',
-                  background: 'red',
-                  boxShadow: '0 0 8px 2px #f00',
-                  animation: 'record-blink 1s steps(1) infinite',
-                  border: '2px solid #fff',
-                }}
-                title="Motion Recording"
-              />
+                  fontSize: '.8em',
+                  verticalAlign: 'middle',
+                }}>Saving</span>
+              </div>
+            ) : motionStatus[stream.id]?.recording ? (
+              <>
+                <span style={{
+                  paddingRight: '8px',
+                  position: 'absolute',
+                  bottom: 10,
+                  right: 26,
+                  zIndex: 3,
+                }}>
+                  {motionStatus[stream.id]?.secondsLeft ? `${motionStatus[stream.id].secondsLeft}s` : ''}
+                </span>
+                <div
+                  className="stream-tile-recording-dot"
+                  style={{
+                    position: 'absolute',
+                    bottom: 10,
+                    right: 10,
+                    zIndex: 3,
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: 'red',
+                    boxShadow: '0 0 8px 2px #f00',
+                    animation: 'record-blink 1s steps(1) infinite',
+                    border: '2px solid #fff',
+                  }}
+                  title="Motion Recording"
+                />
+              </>
             ) : <></>}
             {/* Delete button - only show on active stream */}
             {stream.id === activeStreamId && onDeleteStream && (
@@ -366,8 +391,10 @@ export function StreamTilesGrid({
               <button
                 onClick={e => {
                   e.stopPropagation();
-                  onToggleMotionPause(stream, motionRecordingPaused[stream.id]);
+                  setIsUpdatingMotionPaused(true);
+                  onToggleMotionPause(stream, motionRecordingPaused[stream.id]).then(() => setIsUpdatingMotionPaused(false));
                 }}
+                disabled={isUpdatingMotionPaused}
                 style={{
                   background: 'transparent',
                   color: '#fff',

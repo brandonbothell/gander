@@ -5,7 +5,6 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { API_BASE, authFetch } from './main';
 import { setupPushNotifications, subscribeToWebPush } from './pushNotifications';
 import { RecordingThumbItem } from './components/RecordingThumbItem';
-import { RecordingIndicator } from './components/RecordingIndicator';
 import { ReloadButton } from './components/ReloadButton';
 import { FloatingMenuButton } from './components/FloatingMenuButton';
 import { FloatingMenuPopout } from './components/FloatingMenuPopout';
@@ -88,7 +87,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const location = useLocation();
   const [cachedRecordings, setCachedRecordings] = useLocalStorageState<{ [streamId: string]: Recording[] }>('cachedRecordings', {});
   const [viewed, setViewed] = useLocalStorageState<{ filename: string; streamId: string }[]>('viewedRecordings', []);
-  const [motionStatus, setMotionStatus] = useState<{ [streamId: string]: { recording: boolean; secondsLeft: number; saving: boolean } }>({});
+  const [motionStatus, setMotionStatus] = useState<{ [streamId: string]: { recording: boolean; secondsLeft: number; saving: boolean; startedRecordingAt: number } }>({});
   const [isMotionRecordingPaused, setMotionRecordingPaused] = useState<{ [streamId: string]: boolean }>({});
   const [nicknames, setNicknames] = useState<{ [filename: string]: string }>({});
   const [shouldNotifyOnMotion, setShouldNotifyOnMotion] = useLocalStorageState<boolean>('motionNotify', false);
@@ -1494,81 +1493,28 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   }
 
   // --- Poll motion status every second ---
+  // Update the motion status polling effect to include sound playing logic
   useEffect(() => {
     if (!activeStream) return;
-    let lastRecording: { [streamId: string]: { recording: boolean } } = {};
-
-    // Create a reusable audio element with proper iOS configuration
-    const createNotificationAudio = () => {
-      const audio = new Audio('/sounds/recording-started.mp3');
-
-      // Configure for iOS to not interrupt other audio
-      if (isIOS()) {
-        // Set volume lower to be less intrusive
-        audio.volume = 0.3;
-
-        // Try to set the audio category to not interrupt other audio (iOS Safari only)
-        try {
-          // @ts-ignore - webkitAudioContext is iOS-specific
-          if (window.webkitAudioContext || window.AudioContext) {
-            // This helps hint to iOS that this is a brief notification sound
-            audio.preload = 'auto';
-
-            // Load the audio immediately but don't play yet
-            audio.load();
-          }
-        } catch (e) {
-          // Fallback if AudioContext APIs aren't available
-          console.log('AudioContext not available for audio configuration');
-        }
-      }
-
-      return audio;
-    };
 
     const pollMotionStatus = () => {
       if (!activeStream) return;
       authFetch(`${API_BASE}/api/motion-status`)
         .then(res => res.json())
-        .then((status: { [streamId: string]: { recording: boolean, secondsLeft: number, saving: boolean } }) => {
+        .then((status: { [streamId: string]: { recording: boolean, secondsLeft: number, saving: boolean, startedRecordingAt: number } }) => {
           setMotionStatus(status);
+
+          // Check for any stream that just started recording (motion detection)
           for (const [streamId, s] of Object.entries(status)) {
-            if (s.recording && s.secondsLeft > 28 && !lastRecording[streamId]?.recording) {
-              // Play sound when recording starts
-              if (isIOS()) {
-                // On iOS, use a more subtle approach
-                const audio = createNotificationAudio();
+            const recordingJustStarted = s.recording && Date.now() - s.startedRecordingAt < 1000; // 1 second threshold
 
-                // Play briefly and quietly
-                const playPromise = audio.play();
-                if (playPromise) {
-                  playPromise
-                    .then(() => {
-                      // Success - audio played without interrupting
-                      console.log('Motion notification sound played');
-                    })
-                    .catch(error => {
-                      // Failed to play - could be due to autoplay policies
-                      console.log('Motion notification sound blocked:', error);
-
-                      // Alternative: Use the Web Audio API for a brief tone
-                      try {
-                        playNotificationTone();
-                      } catch (e) {
-                        console.log('Notification tone fallback failed:', e);
-                      }
-                    });
-                }
-              } else {
-                // Non-iOS devices - use original approach
-                const audio = new Audio('/sounds/recording-started.mp3');
-                audio.play().catch(() => {
-                  console.log('Motion notification sound failed to play');
-                });
-              }
+            // Play sound when ANY stream starts recording
+            if (recordingJustStarted) {
+              console.log(`Motion detected on stream ${streamId}, playing sound`);
+              playMotionSound();
+              break; // Only play once even if multiple streams start recording simultaneously
             }
           }
-          lastRecording = status;
         })
         .catch(() => setMotionStatus({}));
     };
@@ -1578,6 +1524,61 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     return () => clearInterval(interval);
   }, [activeStream]);
 
+
+
+  // Update the stream switch effect to be simpler and more reliable
+  useEffect(() => {
+    if (!activeStream?.id) return;
+
+    // Check if we just switched to a stream that recently started recording
+    const streamStatus = motionStatus[activeStream.id];
+
+    if (streamStatus?.recording && streamStatus.startedRecordingAt > 0) {
+      const timeSinceStart = Date.now() - streamStatus.startedRecordingAt;
+
+      if (timeSinceStart <= 1000) { // 1 second
+        console.log(`Switched to stream ${activeStream.id} that recently started recording (${Math.floor(timeSinceStart / 1000)}s ago)`);
+        playMotionSound();
+      } else {
+        console.log(`Switched to stream ${activeStream.id} that started recording ${Math.floor(timeSinceStart / 1000)}s ago (too old)`);
+      }
+    } else {
+      console.log(`Switched to stream ${activeStream.id} - not recording or no start time`);
+    }
+  }, [activeStream?.id]); // Remove motionStatus dependency to only trigger on stream changes
+  // Add the playMotionSound function
+  const playMotionSound = () => {
+    console.log('Playing motion sound...');
+
+    if (isIOS()) {
+      const audio = new Audio('/sounds/recording-started.mp3');
+      audio.volume = 0.3;
+      const playPromise = audio.play();
+      if (playPromise) {
+        playPromise
+          .then(() => {
+            console.log('Motion notification sound played successfully');
+          })
+          .catch(error => {
+            console.log('Motion notification sound blocked:', error);
+            try {
+              playNotificationTone();
+            } catch (e) {
+              console.log('Notification tone fallback failed:', e);
+            }
+          });
+      }
+    } else {
+      const audio = new Audio('/sounds/recording-started.mp3');
+      audio.play()
+        .then(() => {
+          console.log('Motion notification sound played successfully');
+        })
+        .catch((error) => {
+          console.log('Motion notification sound failed to play:', error);
+        });
+    }
+  };
   // Add periodic live edge monitoring
   useEffect(() => {
     if (!activeStream || isVideoPaused) return;
@@ -2734,18 +2735,19 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           getThumbUrl={getThumbUrl}
           onViewRecordings={setViewingRecordingsFrom}
           onToggleMotionPause={async (stream, motionRecordingEnabled) => {
-            await authFetch(`${API_BASE}/api/motion-pause/${stream.id}`, {
+            const response = await authFetch(`${API_BASE}/api/motion-pause/${stream.id}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ paused: !motionRecordingEnabled }),
             });
+            const { paused } = await response.json();
             setMotionRecordingPaused(prev => ({
               ...prev,
-              [stream.id]: !motionRecordingEnabled,
+              [stream.id]: paused,
             }));
           }}
           motionRecordingPaused={isMotionRecordingPaused}
-          motionActive={Object.entries(motionStatus).reduce((prev, e) => ({ ...prev, [e[0]]: e[1].recording }), {})}
+          motionStatus={motionStatus}
           activeStreamId={activeStream?.id}
           motionSaving={Object.entries(motionStatus).reduce((prev, e) => ({ ...prev, [e[0]]: e[1].saving }), {})}
         />
@@ -3317,13 +3319,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           width: '100%',
         }}
       />
-      {activeStream &&
-        <RecordingIndicator
-          recording={motionStatus[activeStream.id]?.recording}
-          secondsLeft={motionStatus[activeStream.id]?.secondsLeft}
-          saving={motionStatus[activeStream.id]?.saving}
-        />
-      }
       {activeStream && selected.length > 0 && (
         <div className='desktop-action-buttons'>
           <BatchDeleteButton

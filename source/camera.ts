@@ -652,9 +652,10 @@ interface StreamMotionState {
   recentSegments: string[];
   motionPaused: boolean;
   startupTime: number;
-  savingInProgress: boolean; // New field to track saving state
-  currentSaveProcess: any | null; // Track the current ffmpeg process
-  saveRetryCount: number; // Track retry attempts
+  savingInProgress: boolean;
+  currentSaveProcess: any | null;
+  saveRetryCount: number;
+  startedRecordingAt: number; // New field - timestamp when recording started
 }
 
 const streamStates: Record<string, StreamMotionState> = {};
@@ -684,7 +685,8 @@ async function setupStreamMotionMonitoring() {
       startupTime: Date.now(),
       savingInProgress: false,
       currentSaveProcess: null,
-      saveRetryCount: 0
+      saveRetryCount: 0,
+      startedRecordingAt: 0 // Initialize to 0
     };
 
     console.log(`[${streamId}] [Motion] Monitoring started at ${new Date().toLocaleString()}`);
@@ -722,10 +724,7 @@ async function setupStreamMotionMonitoring() {
 
           if (!state.motionRecordingActive) {
             state.motionRecordingActive = true;
-            // Don't reset motionSegments if we were saving - keep the existing ones
-            if (!state.savingInProgress) {
-              state.motionSegments = [];
-            }
+            state.startedRecordingAt = Date.now(); // Set when recording starts
             state.notificationSent = false;
             if (state.motionTimeout) clearTimeout(state.motionTimeout);
             state.recentSegments.forEach(recentPath => {
@@ -757,6 +756,7 @@ async function setupStreamMotionMonitoring() {
               state.notificationSent = false;
             });
             state.motionRecordingActive = false;
+            state.startedRecordingAt = 0; // Reset when recording stops
             state.motionRecordingTimeoutAt = 0;
           }, motionRecordingTimeoutMs);
           state.motionRecordingTimeoutAt = Date.now() + motionRecordingTimeoutMs;
@@ -1549,11 +1549,11 @@ app.get('/signed/stream/:streamId/:segment', (req, res) => {
 
 // --- Motion status ---
 app.get('/api/motion-status', jwtAuth, (req, res) => {
-  const states: { [streamId: string]: { recording: boolean, secondsLeft: number, saving: boolean } } = {};
+  const states: { [streamId: string]: { recording: boolean, secondsLeft: number, saving: boolean, startedRecordingAt: number } } = {};
   for (const streamId in streamStates) {
     const state = streamStates[streamId];
     if (!state) {
-      states[streamId] = { recording: false, secondsLeft: 0, saving: false };
+      states[streamId] = { recording: false, secondsLeft: 0, saving: false, startedRecordingAt: 0 };
       continue;
     }
     let secondsLeft = 0;
@@ -1563,7 +1563,8 @@ app.get('/api/motion-status', jwtAuth, (req, res) => {
     states[streamId] = {
       recording: state.motionRecordingActive,
       secondsLeft,
-      saving: state.savingInProgress || false
+      saving: state.savingInProgress || false,
+      startedRecordingAt: state.startedRecordingAt
     };
   }
   res.json(states);
