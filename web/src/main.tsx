@@ -44,31 +44,62 @@ export function setAuthHandlers(logout: () => Promise<void>, tryRefreshToken: ()
 }
 
 // Track ongoing refresh attempts to prevent multiple simultaneous refreshes
-let refreshPromise: Promise<boolean> | null = null;
+let tokenRefreshPromise: Promise<boolean> | null = null;
 
 export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   const token = getToken();
+
+  // Always get the latest JWT from localStorage (in case another tab updated it)
+  const jwt = localStorage.getItem('jwt');
+
+  if (!jwt && globalTryRefreshToken && globalLogout) {
+    // No JWT available, try to refresh
+    const refreshed = await globalTryRefreshToken();
+    if (!refreshed) {
+      await globalLogout();
+      throw new Error('Authentication failed');
+    }
+    // Get the new JWT after refresh
+    const newJwt = localStorage.getItem('jwt');
+    if (!newJwt) {
+      await globalLogout();
+      throw new Error('Authentication failed');
+    }
+  }
+
+  // Use the latest JWT
+  const finalJwt = localStorage.getItem('jwt') || undefined;
 
   const makeRequest = (authToken?: string) => {
     return fetch(input, {
       ...init,
       headers: {
         ...(init.headers || {}),
-        Authorization: authToken ? `Bearer ${authToken}` : (token ? `Bearer ${token}` : ''),
+        Authorization: authToken ? `Bearer ${authToken}` : (token ? `Bearer ${finalJwt}` : ''),
       },
     });
   };
 
   try {
     const response = await makeRequest();
-
+    // Try the request up to 3 times before attempting token refresh
+    let attempt = 1;
+    let resp = response;
+    while (resp.status >= 500 && resp.status !== 401 && attempt < 3) {
+      await new Promise(res => setTimeout(res, 300 * attempt)); // Exponential backoff
+      attempt++;
+      resp = await makeRequest();
+      if (resp.status < 500 && resp.status !== 401) {
+        return resp;
+      }
+    }
     // If we get a 401 and we have refresh handlers, try to refresh the token
-    if (response.status === 401 && globalTryRefreshToken && globalLogout) {
+    if (resp.status === 401 && globalTryRefreshToken && globalLogout) {
       console.log('Received 401, attempting token refresh...');
 
       // If there's already a refresh in progress, wait for it
-      if (refreshPromise) {
-        const refreshSuccess = await refreshPromise;
+      if (tokenRefreshPromise) {
+        const refreshSuccess = await tokenRefreshPromise;
         if (refreshSuccess) {
           // Retry the original request with the new token
           const newToken = getToken();
@@ -81,12 +112,11 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
       }
 
       // Start a new refresh attempt
-      refreshPromise = globalTryRefreshToken();
+      tokenRefreshPromise = globalTryRefreshToken();
 
       try {
-        const refreshSuccess = await refreshPromise;
-
-        if (refreshSuccess) {
+        const tokenRefreshSuccess = await tokenRefreshPromise.catch(() => tokenRefreshPromise = null);
+        if (tokenRefreshSuccess) {
           console.log('Token refresh successful, retrying request...');
           // Retry the original request with the new token
           const newToken = getToken();
@@ -107,14 +137,12 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
         }
       } finally {
         // Clear the refresh promise when done
-        refreshPromise = null;
+        tokenRefreshPromise = null;
       }
     }
 
     return response;
   } catch (error) {
-    // Clear refresh promise on any error
-    refreshPromise = null;
     throw error;
   }
 }

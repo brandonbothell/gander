@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FiCircle, FiPause, FiPlay, FiX } from 'react-icons/fi';
-import { type Stream } from '../../../types/shared'
+import { type Stream } from '../../../source/types/shared'
 
 interface StreamTilesGridProps {
   streams: Stream[];
@@ -67,6 +67,9 @@ export function StreamTilesGrid({
       const streamId = tile.getAttribute('data-stream-id');
       if (streamId) {
         currentPositions.set(streamId, tile.getBoundingClientRect());
+        console.log(`Captured position for ${streamId}:`, tile.getBoundingClientRect());
+      } else {
+        console.warn('Tile missing data-stream-id attribute:', tile);
       }
     });
 

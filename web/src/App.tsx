@@ -7,7 +7,8 @@ import StreamPage from './StreamPage';
 import { RouterLoadingHandler } from './components/RouterLoadingHandler';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import SecureStorage from './utils/secureStorage';
-import { geolocateIP, SessionMonitor } from './components/SessionMonitor';
+import { geolocateIP, getSessionId, SessionMonitor } from './components/SessionMonitor';
+import { getDeviceFingerprint, type TrustedDevice } from '../../source/types/deviceInfo';
 
 export type Recording = { streamId: string, filename: string };
 
@@ -17,7 +18,7 @@ export default function App() {
   const [____, setTotalRecordings] = useLocalStorageState<{ [streamId: string]: number }>('totalRecordings', {});
   const [__, setCachedRecordingRanges] = useLocalStorageState<{ [streamId: string]: Array<{ from: string, to: string }> }>('cachedRecordingRanges', {});
   const [_, setCachedPages] = useLocalStorageState<{ [streamId: string]: number[] }>('cachedPages', {});
-  const [knownSessions] = useLocalStorageState<string[]>('knownSessions', []);
+  const [knownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
   const [showSessionMonitor, setShowSessionMonitor] = useState(false);
   const [hasCheckedSessions, setHasCheckedSessions] = useState(false);
 
@@ -26,49 +27,115 @@ export default function App() {
     try {
       const refreshToken = await SecureStorage.getRefreshToken();
       if (!refreshToken) {
-        console.log('No refresh token found');
         setAuthenticated(false);
         return false;
       }
+
+      // Check if another tab is already refreshing
+      const refreshInProgress = localStorage.getItem('tokenRefreshInProgress');
+      if (refreshInProgress) {
+        const startTime = parseInt(refreshInProgress);
+        // If refresh has been in progress for more than 10 seconds, assume it failed
+        if (Date.now() - startTime < 10000) {
+          console.log('Another tab is refreshing, waiting...');
+          // Wait for the other tab to finish
+          return new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 100; // 10 seconds max wait
+
+            const tokenChannel = new BroadcastChannel('tokenUpdates');
+
+            const handleTokenUpdate = (event: MessageEvent) => {
+              if (event.data.type === 'TOKEN_UPDATED') {
+                console.log('Another tab successfully refreshed token via broadcast');
+                setAuthenticated(true);
+                tokenChannel.close();
+                resolve(true);
+              }
+            };
+
+            tokenChannel.addEventListener('message', handleTokenUpdate);
+
+            const checkComplete = () => {
+              attempts++;
+              const stillInProgress = localStorage.getItem('tokenRefreshInProgress');
+              const newToken = localStorage.getItem('jwt');
+
+              if (!stillInProgress && newToken) {
+                // Another tab successfully refreshed
+                console.log('Another tab successfully refreshed token via localStorage check');
+                setAuthenticated(true);
+                tokenChannel.close();
+                resolve(true);
+              } else if (!stillInProgress || attempts >= maxAttempts) {
+                // Refresh failed in other tab or timeout
+                console.log('Token refresh failed or timed out in other tab');
+                setAuthenticated(false);
+                tokenChannel.close();
+                resolve(false);
+              } else {
+                // Still in progress, check again
+                setTimeout(checkComplete, 100);
+              }
+            };
+            setTimeout(checkComplete, 100);
+          });
+        }
+      }
+
+      // Mark refresh as in progress
+      console.log('This tab is performing token refresh');
+      localStorage.setItem('tokenRefreshInProgress', Date.now().toString());
+
+      const deviceInfo = getDeviceFingerprint();
 
       const res = await fetch(`${API_BASE}/api/refresh-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'refresh-token': refreshToken
-        }
+        },
+        body: JSON.stringify({ deviceInfo })
       });
 
       if (res.status === 200) {
         const data = await res.json();
         if (data && data.token && data.refreshToken) {
-          setAuthenticated(true);
-
-          // Store new refresh token securely
           await SecureStorage.setRefreshToken(data.refreshToken);
-          localStorage.setItem('jwt', data.token);
 
-          // console.log('Token refreshed successfully');
+          // Update JWT in localStorage
+          localStorage.setItem('jwt', data.token);
+          localStorage.removeItem('tokenRefreshInProgress'); // Clear flag
+
+          // Broadcast to all tabs immediately (listeners should be ready now)
+          const tokenChannel = new BroadcastChannel('tokenUpdates');
+          tokenChannel.postMessage({
+            type: 'TOKEN_UPDATED',
+            token: data.token,
+            timestamp: Date.now()
+          });
+          console.log('Token refresh successful, broadcasted to all tabs');
+          tokenChannel.close();
+
+          setAuthenticated(true);
           return true;
         }
-      } else {
-        console.error('Failed to refresh token:', res.status);
-        const errorData = await res.json().catch(() => ({}));
-        console.error('Error details:', errorData);
       }
+
+      console.log('Token refresh failed - invalid response');
     } catch (error) {
       console.error('Error during token refresh:', error);
     }
 
-    // Clear invalid tokens
-    setAuthenticated(false);
     await SecureStorage.removeRefreshToken();
     localStorage.removeItem('jwt');
+    localStorage.removeItem('tokenRefreshInProgress'); // Clear flag on failure
+    setAuthenticated(false);
     return false;
   };
 
-  // Enhanced logout function
-  const logout = async (): Promise<void> => {
+  // Enhanced logout function - PREVENT INFINITE LOOP
+  const logout = async (skipBroadcast = false): Promise<void> => {
     try {
       const refreshToken = await SecureStorage.getRefreshToken();
       if (refreshToken) {
@@ -78,7 +145,8 @@ export default function App() {
           headers: {
             'Content-Type': 'application/json',
             'refresh-token': refreshToken
-          }
+          },
+          body: JSON.stringify({ clientId: localStorage.getItem('clientId') })
         }).catch(console.error);
       }
     } catch (error) {
@@ -88,26 +156,87 @@ export default function App() {
       await SecureStorage.clearAll();
       localStorage.removeItem('jwt');
       setAuthenticated(false);
+
+      // Only broadcast if not called from a broadcast event (prevent infinite loop)
+      if (!skipBroadcast) {
+        console.log('Broadcasting logout to other tabs');
+        const tokenChannel = new BroadcastChannel('tokenUpdates');
+        tokenChannel.postMessage({
+          type: 'LOGOUT',
+          timestamp: Date.now()
+        });
+        tokenChannel.close();
+      } else {
+        console.log('Logout called from broadcast, skipping broadcast');
+      }
     }
   };
 
-  // Set global auth handlers for authFetch
+  // 1. FIRST: Set up BroadcastChannel listener (before any token operations)
   useEffect(() => {
-    setAuthHandlers(logout, tryRefreshToken);
+    const tokenChannel = new BroadcastChannel('tokenUpdates');
+
+    const handleTokenUpdate = (event: MessageEvent) => {
+      console.log('Token update received via broadcast:', event.data);
+
+      if (event.data.type === 'TOKEN_UPDATED') {
+        const newToken = event.data.token;
+        if (newToken) {
+          // Update localStorage if it's different (in case this tab missed it)
+          const currentToken = localStorage.getItem('jwt');
+          if (currentToken !== newToken) {
+            localStorage.setItem('jwt', newToken);
+          }
+
+          console.log('JWT updated via broadcast, staying authenticated');
+          setAuthenticated(true);
+
+          // Clear any pending refresh operations in this tab
+          localStorage.removeItem('tokenRefreshInProgress');
+        }
+      } else if (event.data.type === 'LOGOUT') {
+        console.log('Logout broadcast received - logging out this tab');
+        // Call logout with skipBroadcast=true to prevent infinite loop
+        logout(true);
+      }
+    };
+
+    tokenChannel.addEventListener('message', handleTokenUpdate);
+    console.log('BroadcastChannel listener set up');
+
+    return () => {
+      tokenChannel.removeEventListener('message', handleTokenUpdate);
+      tokenChannel.close();
+    };
+  }, []); // Set up once on mount
+
+  // 2. SECOND: Set up global auth handlers
+  useEffect(() => {
+    const logoutWrapper = () => logout(false); // Always broadcast from explicit logouts
+    setAuthHandlers(logoutWrapper, tryRefreshToken);
+    console.log('Global auth handlers set up');
   }, []);
 
-  // Enhanced login function
-  const handleLogin = async (token: string, refreshToken: string) => {
-    try {
-      await SecureStorage.setRefreshToken(refreshToken);
-      localStorage.setItem('jwt', token);
-      setAuthenticated(true);
-    } catch (error) {
-      console.error('Error storing tokens:', error);
-      // Fallback to not authenticated if storage fails
-      setAuthenticated(false);
-    }
-  };
+  // 3. THIRD: Handle initial authentication (after listeners are ready)
+  useEffect(() => {
+    const initAuth = async () => {
+      // Add a small delay to ensure BroadcastChannel is fully set up
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      const token = localStorage.getItem('jwt');
+      if (token) {
+        console.log('Found existing JWT, assuming authenticated');
+        // If we have a JWT, assume authenticated (it will be validated on first API call)
+        setAuthenticated(true);
+      } else {
+        console.log('No JWT found, attempting token refresh');
+        // No JWT, try to refresh
+        await tryRefreshToken();
+      }
+    };
+
+    initAuth();
+  }, []); // Run once on mount
 
   // Check for new sessions on mount
   const checkForNewSessions = async () => {
@@ -117,12 +246,16 @@ export default function App() {
       const response = await authFetch(`${API_BASE}/api/user/sessions`);
       if (!response.ok) return;
 
-      const ips: string[] = await response.json();
+      const trustedDevices: TrustedDevice[] = await response.json();
       const currentSession = await geolocateIP(knownSessions)
+      const deviceInfo = getDeviceFingerprint();
 
-      const newSessions = ips.filter(ip => ip !== currentSession.ip && !knownSessions.includes(ip));
+      const newSessions = trustedDevices.some(device =>
+        device.ip !== currentSession.ip &&
+        device.deviceInfo.userAgent !== deviceInfo.userAgent &&
+        !knownSessions.includes(getSessionId(device.ip, device.deviceInfo)));
 
-      if (newSessions.length > 0) {
+      if (newSessions) {
         // Show session monitor automatically if there are new sessions
         setShowSessionMonitor(true);
       }
@@ -166,11 +299,6 @@ export default function App() {
     checkLocalStorageStateConsistency();
   }, []);
 
-  // Refresh token on mount
-  useEffect(() => {
-    tryRefreshToken();
-  }, []);
-
   // Check for new sessions when authenticated
   useEffect(() => {
     if (authenticated === true) {
@@ -185,19 +313,6 @@ export default function App() {
     const interval = setInterval(tryRefreshToken, 60000);
     return () => clearInterval(interval);
   }, [authenticated]);
-
-  // Add event listener for storage changes (multi-tab logout)
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'jwt' && e.newValue === null) {
-        // JWT was removed in another tab, logout this tab too
-        logout();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 
   // Add beforeunload event to clear sensitive data (optional)
   useEffect(() => {
@@ -220,6 +335,18 @@ export default function App() {
     // Call the global handler if it exists (for mobile logout button)
     if ((window as any).handleSessionMonitorClose) {
       (window as any).handleSessionMonitorClose();
+    }
+  };
+
+  const handleLogin = async (token: string, refreshToken: string) => {
+    try {
+      await SecureStorage.setRefreshToken(refreshToken);
+      localStorage.setItem('jwt', token);
+      setAuthenticated(true);
+    } catch (error) {
+      console.error('Error storing tokens:', error);
+      // Fallback to not authenticated if storage fails
+      setAuthenticated(false);
     }
   };
 

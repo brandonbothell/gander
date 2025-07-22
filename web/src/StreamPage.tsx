@@ -16,13 +16,14 @@ import Hls from 'hls.js';
 import { useLoading } from './LoadingContext';
 import { SearchTools } from './components/SearchTools';
 import { MaskEditorOverlay } from './components/MaskEditorOverlay';
-import { type StreamMask, type Stream } from '../../types/shared';
+import { type StreamMask, type Stream } from '../../source/types/shared';
 import { FiBell, FiBellOff, FiChevronDown, FiChevronUp, FiLogOut, FiRefreshCw, FiUsers } from 'react-icons/fi';
 import { StreamTilesGrid } from './components/StreamTilesGrid';
 import { RecordingBar } from './components/RecordingBar';
 import { StreamControlBar } from './components/StreamControlBar';
 import type { Recording } from './App';
 import SecureStorage from './utils/secureStorage';
+import { Preferences } from '@capacitor/preferences';
 
 export type ClientMask = StreamMask & { pendingUpdate?: boolean, pendingUpdateSince?: number };
 
@@ -33,31 +34,30 @@ interface StreamPageProps {
   logout: () => Promise<void>;
 }
 
+
 /**
- * StreamPage component displays the live stream and motion recordings for a selected camera stream.
+ * StreamPage component
  *
- * This page provides:
- * - Live video streaming for the selected camera.
- * - Stream selector for switching between available camera streams.
- * - Mask editor for defining motion detection zones.
- * - Motion recordings list with infinite scroll, search, filtering, and batch actions.
- * - Pull-to-refresh and sticky search tools for mobile and desktop.
- * - Motion recording status indicator and controls to pause/resume motion detection.
- * - Push notification toggle for motion events.
- * - Batch delete and deselect actions for recordings.
- * - Responsive UI with touch and keyboard accessibility.
+ * The main page for managing and viewing live streams and motion recordings in the SecurityCam web application.
+ * 
+ * Features:
+ * - Displays a grid of available streams with live video, thumbnails, and status indicators.
+ * - Allows switching between streams, adding new streams, editing stream nicknames, and deleting streams.
+ * - Shows the currently active stream with live HLS playback, mask editing overlay, and motion status.
+ * - Provides a searchable, filterable, and paginated list of motion-triggered recordings for the selected stream.
+ * - Supports batch selection and deletion of recordings, as well as marking recordings as viewed.
+ * - Integrates with push notification settings for motion events.
+ * - Handles mobile and desktop layouts, including sticky search/filter bars and touch-friendly controls.
+ * - Manages stream order, caching, and efficient polling for new recordings, thumbnails, and motion status.
+ * - Includes advanced features such as mask editing, session monitoring, and pull-to-refresh on mobile.
  *
- * @param {StreamPageProps} props - The props for the StreamPage component.
- * @param {string} [props.streamId] - Optional initial stream ID to display.
- * @param {boolean} [props.signedUrl] - Whether to use signed URLs for stream and thumbnails.
+ * Props:
+ * @param streamId - (optional) The ID of the stream to select initially.
+ * @param onShowSessionMonitor - (optional) Callback to open the session monitor dialog.
+ * @param onSessionMonitorClosed - (optional) Callback when the session monitor is closed.
+ * @param logout - Function to log out the current user.
  *
- * @returns {JSX.Element} The rendered StreamPage component.
- *
- * @remarks
- * - Uses local storage for caching recordings, nicknames, and user preferences.
- * - Handles both web and native mobile platforms (Capacitor).
- * - Integrates with APIs for live streaming, recordings, thumbnails, masks, and notifications.
- * - Designed for use in a security camera web application.
+ * @returns The main StreamPage React component.
  */
 export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMonitorClosed, logout }: StreamPageProps) {
   // --- New state for dynamic streams ---
@@ -168,7 +168,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         console.error('Error during logout:', error);
         // Fallback: just clear storage and reload
         localStorage.removeItem('jwt');
-        await SecureStorage.clearAll();
+        if (Capacitor.isNativePlatform()) await Preferences.remove({ key: 'refreshToken' });
+        else await SecureStorage.removeRefreshToken();
         window.location.reload();
       }
     }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FiPlay, FiPause, FiVolume2, FiVolumeX } from 'react-icons/fi';
-import { type Stream } from '../../../types/shared'
+import { type Stream } from '../../../source/types/shared'
 
 interface StreamControlBarProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;

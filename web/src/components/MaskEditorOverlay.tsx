@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { type StreamMask } from '../../../types/shared';
+import { type StreamMask } from '../../../source/types/shared';
 import { authFetch } from '../main';
 import type { ClientMask } from '../StreamPage';
 

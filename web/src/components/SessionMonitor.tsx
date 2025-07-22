@@ -1,8 +1,10 @@
+// Update the SessionMonitor.tsx
 import React, { useEffect, useState } from 'react';
 import { FiChevronLeft, FiChevronRight, FiMapPin, FiClock, FiGlobe } from 'react-icons/fi';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { authFetch, API_BASE } from '../main';
 import { GOOGLE_MAPS_API_KEY } from '../../config.json';
+import { type TrustedDevice, type DeviceInfo, getDeviceDisplayName } from '../../../source/types/deviceInfo';
 
 interface Session {
   ip: string;
@@ -35,9 +37,15 @@ declare global {
   }
 }
 
+// Helper function to create a unique session identifier
+export const getSessionId = (ip: string, deviceInfo: DeviceInfo): string => {
+  return `${ip}|${deviceInfo.userAgent}`;
+};
+
 export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [knownSessions, setKnownSessions] = useLocalStorageState<string[]>('knownSessions', []);
+  const [sessions, setSessions] = useState<(Session & TrustedDevice)[]>([]);
+  // Update to store session IDs instead of just IPs
+  const [knownSessions, setKnownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
   const [currentSessionIndex, setCurrentSessionIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,24 +116,32 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
           throw new Error('Failed to fetch sessions');
         }
 
-        const ips: string[] = await response.json();
-        console.log(`Fetched ${ips.length} IP addresses`);
+        const trustedDevices: TrustedDevice[] = await response.json();
+        console.log(`Fetched ${trustedDevices.length} trusted devices`);
 
         // Create sessions without geolocation data
-        const sessionsList: Session[] = ips.map(ip => ({
-          ip,
-          firstSeen: new Date().toISOString(),
-          lastSeen: new Date().toISOString(),
-          isNew: !knownSessions.includes(ip),
-          geolocated: false,
-          isGeolocating: false,
-        }));
+        const sessionsList: (Session & TrustedDevice)[] = trustedDevices.map(device => {
+          const sessionId = getSessionId(device.ip, device.deviceInfo);
+          console.log(`Processing device: ${device.ip} with session ID: ${sessionId}`);
+          return {
+            ip: device.ip,
+            firstSeen: device.firstSeen,
+            lastSeen: device.lastSeen,
+            isNew: !knownSessions.includes(sessionId), // Check by session ID, not just IP
+            geolocated: false,
+            isGeolocating: false,
+            location: undefined,
+            deviceInfo: device.deviceInfo,
+            loginCount: device.loginCount,
+          };
+        });
 
         // Sort sessions with new ones first
         setSessions(sessionsList.sort((a, b) => a.isNew === b.isNew ? 0 : a.isNew ? -1 : 1));
 
-        const allIps = sessionsList.map(s => s.ip);
-        setKnownSessions(prev => Array.from(new Set([...prev, ...allIps])));
+        // Update known sessions with session IDs
+        const allSessionIds = sessionsList.map(s => getSessionId(s.ip, s.deviceInfo));
+        setKnownSessions(prev => Array.from(new Set([...prev, ...allSessionIds])));
 
         setHasLoadedSessions(true);
         setLoading(false);
@@ -138,7 +154,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
     };
 
     fetchSessions();
-  }, [hasLoadedSessions, knownSessions]);
+  }, [hasLoadedSessions]);
 
   // Geolocate current session
   useEffect(() => {
@@ -160,7 +176,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
       ));
 
       try {
-        const updatedSession = await geolocateIP(knownSessions, currentSession.ip);
+        const updatedSession = await geolocateIP(knownSessions, currentSession);
 
         // Update the session with geolocation data
         setSessions(prev => prev.map((session, index) =>
@@ -236,6 +252,9 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
 
   const currentSession = sessions[currentSessionIndex];
   const newSessions = sessions.filter(s => s.isNew);
+
+  // Rest of the component remains the same...
+  // (keeping all the existing JSX and render logic)
 
   if (loading) {
     return (
@@ -595,6 +614,115 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
               boxSizing: 'border-box',
               background: '#232b4a',
             }}>
+              {/* Device Information Section */}
+              <h3 style={{
+                margin: '0 0 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                wordWrap: 'break-word'
+              }}>
+                <FiGlobe /> Device Information
+              </h3>
+
+              <div style={{ marginBottom: 24, minWidth: 0 }}>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{
+                    color: '#1cf1d1',
+                    fontWeight: 600,
+                    marginBottom: 4,
+                    wordWrap: 'break-word',
+                    wordBreak: 'break-word'
+                  }}>
+                    {getDeviceDisplayName(currentSession.deviceInfo)}
+                  </div>
+                  <div style={{
+                    color: '#ccc',
+                    fontSize: '0.9em',
+                    wordWrap: 'break-word',
+                    wordBreak: 'break-word'
+                  }}>
+                    {currentSession.deviceInfo.platform}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{
+                    color: '#fff',
+                    fontSize: '0.9em',
+                    marginBottom: 2,
+                    wordWrap: 'break-word'
+                  }}>
+                    Browser Details
+                  </div>
+                  <div style={{
+                    color: '#ccc',
+                    fontSize: '0.8em',
+                    wordWrap: 'break-word',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word'
+                  }}>
+                    {currentSession.deviceInfo.userAgent}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{
+                    color: '#fff',
+                    fontSize: '0.9em',
+                    marginBottom: 2,
+                    wordWrap: 'break-word'
+                  }}>
+                    Screen Resolution
+                  </div>
+                  <div style={{
+                    color: '#ccc',
+                    fontSize: '0.8em',
+                    wordBreak: 'break-all',
+                    fontFamily: 'monospace'
+                  }}>
+                    {currentSession.deviceInfo.screen}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{
+                    color: '#fff',
+                    fontSize: '0.9em',
+                    marginBottom: 2,
+                    wordWrap: 'break-word'
+                  }}>
+                    Language & Timezone
+                  </div>
+                  <div style={{
+                    color: '#ccc',
+                    fontSize: '0.8em',
+                    wordWrap: 'break-word',
+                    wordBreak: 'break-word'
+                  }}>
+                    {currentSession.deviceInfo.language} • {currentSession.deviceInfo.timezone}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{
+                    color: '#fff',
+                    fontSize: '0.9em',
+                    marginBottom: 2,
+                    wordWrap: 'break-word'
+                  }}>
+                    Login Count
+                  </div>
+                  <div style={{
+                    color: '#ccc',
+                    fontSize: '0.8em'
+                  }}>
+                    {currentSession.loginCount} time{currentSession.loginCount !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              </div>
+
+              {/* Location Details Section */}
               <h3 style={{
                 margin: '0 0 16px',
                 display: 'flex',
@@ -623,6 +751,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
+                  marginBottom: 24,
                 }}>
                   <div style={{
                     width: 16,
@@ -635,7 +764,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
                   Loading location data...
                 </div>
               ) : currentSession.location ? (
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, marginBottom: 24 }}>
                   <div style={{ marginBottom: 12 }}>
                     <div style={{
                       color: '#1cf1d1',
@@ -733,13 +862,14 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
                 <div style={{
                   color: '#ccc',
                   fontStyle: 'italic',
-                  wordWrap: 'break-word'
+                  wordWrap: 'break-word',
+                  marginBottom: 24,
                 }}>
                   Location information unavailable
                 </div>
               )}
 
-              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #444' }}>
+              <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid #444' }}>
                 <div style={{
                   color: '#fff',
                   fontSize: '0.9em',
@@ -768,6 +898,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
               flex: 1,
               position: 'relative',
               minHeight: window.innerWidth <= 600 ? '300px' : '400px',
+              maxHeight: 'calc(90vh - 180px)', // Ensures map fits modal without scrolling
               minWidth: 0,
             }}>
               {currentSession.isGeolocating ? (
@@ -777,6 +908,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
                   justifyContent: 'center',
                   height: '100%',
                   minHeight: window.innerWidth <= 600 ? '300px' : '400px',
+                  maxHeight: 'calc(90vh - 180px)',
                   background: '#1a1f35',
                   color: '#ccc',
                   fontSize: '1.1em',
@@ -810,6 +942,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
                     width: '100%',
                     height: '100%',
                     minHeight: window.innerWidth <= 600 ? '300px' : '400px',
+                    maxHeight: 'calc(90vh - 180px)',
                     background: '#1a1f35',
                   }}
                 />
@@ -820,6 +953,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
                   justifyContent: 'center',
                   height: '100%',
                   minHeight: window.innerWidth <= 600 ? '300px' : '400px',
+                  maxHeight: 'calc(90vh - 180px)',
                   background: '#1a1f35',
                   color: '#ccc',
                   fontSize: '1.1em',
@@ -872,10 +1006,10 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
   );
 };
 
-export const geolocateIP = async (knownSessions?: string[], ip?: string) => {
+export const geolocateIP = async (knownSessions?: string[], device?: TrustedDevice) => {
+  const ip = device?.ip || null;
   try {
     // console.log(`Geolocating IP ${ip || 'local'}...`);
-
     const geoResponse = await fetchWithRetry(`https://ipinfo.io/${ip ? ip + '/' : ''}json`);
     const geoData = await geoResponse.json();
 
@@ -905,7 +1039,9 @@ export const geolocateIP = async (knownSessions?: string[], ip?: string) => {
         },
         firstSeen: new Date().toISOString(),
         lastSeen: new Date().toISOString(),
-        isNew: knownSessions ? !knownSessions.includes(geoIp) : true,
+        isNew: knownSessions
+          ? device ? !knownSessions.includes(getSessionId(device.ip, device.deviceInfo)) : false
+          : true,
         geolocated: true,
         isGeolocating: false,
       };

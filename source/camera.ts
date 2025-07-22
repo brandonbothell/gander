@@ -15,6 +15,7 @@ import admin from 'firebase-admin';
 import jwt from 'jsonwebtoken';
 import { clearMotionHistory, detectMotion } from './motionDetector';
 import { StreamManager } from './streamManager';
+import { DeviceInfo, getDeviceDisplayName, TrustedDevice } from './types/deviceInfo'
 
 dotenv.config();
 process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(__dirname, '..', 'security-cam-credentials.json');
@@ -67,7 +68,7 @@ async function loadStreamsFromDb() {
     }
   }
 }
-loadStreamsFromDb().then(setupStreamMotionMonitoring).then(() => {
+loadStreamsFromDb().then(cleanupExpiredTokensAndDevices).then(setupStreamMotionMonitoring).then(() => {
   // --- Start server ---
   // Use Greenlock for production
   Greenlock.init({
@@ -91,6 +92,71 @@ loadStreamsFromDb().then(setupStreamMotionMonitoring).then(() => {
     });
   }
 });
+
+/**
+ * Periodically clean up expired JWTs, refresh tokens, and old trusted devices.
+ * - Runs every hour.
+ * - Removes expired JWTs and refresh tokens from users.
+ * - Removes trusted devices not seen in 7+ days.
+ * - Deletes users with no trusted devices left.
+ */
+async function cleanupExpiredTokensAndDevices() {
+  const now = Date.now();
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+  const users = await prisma.user.findMany();
+  for (const user of users) {
+    let changed = false;
+
+    // --- JWTs ---
+    let jwts: string[] = [];
+    try { jwts = JSON.parse(user.jwts || '[]'); } catch { jwts = []; }
+    const validJwts = jwts.filter(token => {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        return decoded && decoded.exp && decoded.exp * 1000 > now;
+      } catch { return false; }
+    });
+    if (validJwts.length !== jwts.length) changed = true;
+
+    // --- Refresh Tokens ---
+    let refreshTokens: string[] = [];
+    try { refreshTokens = JSON.parse(user.refreshTokens || '[]'); } catch { refreshTokens = []; }
+    const validRefreshTokens = refreshTokens.filter(token => {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        return decoded && decoded.exp && decoded.exp * 1000 > now;
+      } catch { return false; }
+    });
+    if (validRefreshTokens.length !== refreshTokens.length) changed = true;
+
+    // --- Trusted Devices ---
+    let trustedDevices: TrustedDevice[] = [];
+    try { trustedDevices = JSON.parse(user.trustedIps || '[]'); } catch { trustedDevices = []; }
+    const filteredDevices = trustedDevices.filter(device => {
+      const lastSeen = new Date(device.lastSeen).getTime();
+      return !isNaN(lastSeen) && now - lastSeen < SEVEN_DAYS_MS;
+    });
+    if (filteredDevices.length !== trustedDevices.length) changed = true;
+
+    if (changed) {
+      await prisma.user.update({
+        where: { username: user.username },
+        data: {
+          jwts: JSON.stringify(validJwts),
+          refreshTokens: JSON.stringify(validRefreshTokens),
+          trustedIps: JSON.stringify(filteredDevices)
+        }
+      }).catch(() => { });
+
+      console.log(`[Cleanup] Updated user ${user.username} - removed ${(jwts.length - validJwts.length) + (refreshTokens.length - validRefreshTokens.length)
+        } expired tokens and ${(trustedDevices.length - filteredDevices.length)} old devices.`);
+    }
+
+    // Run every hour
+    setTimeout(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
+  }
+};
 
 // --- CORS ---
 app.use(cors({
@@ -218,10 +284,27 @@ app.get(/^\/recordings(\/[^\/]+)(\/[^\/]+)?$/, (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'));
 });
 
+// Update the login endpoint in camera.ts
 app.post('/api/login', express.json(), async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, deviceInfo }: { username: string, password: string, deviceInfo: DeviceInfo } = req.body;
 
   console.log(`[Login] User ${username} attempting log in from IP: ${req.ip}`);
+
+  if (!username || !password || !deviceInfo) {
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+
+  // Sanitize deviceInfo fields to avoid prototype pollution and ensure only expected keys
+  const safeDeviceInfo: DeviceInfo = {
+    userAgent: typeof deviceInfo?.userAgent === 'string' ? deviceInfo.userAgent : (req.headers['user-agent'] || 'Unknown'),
+    platform: typeof deviceInfo?.platform === 'string' ? deviceInfo.platform : 'Unknown',
+    vendor: typeof deviceInfo?.vendor === 'string' ? deviceInfo.vendor : 'Unknown',
+    language: typeof deviceInfo?.language === 'string' ? deviceInfo.language : 'Unknown',
+    timezone: typeof deviceInfo?.timezone === 'string' ? deviceInfo.timezone : 'Unknown',
+    screen: typeof deviceInfo?.screen === 'string' ? deviceInfo.screen : 'Unknown',
+    clientId: typeof deviceInfo?.clientId === 'string' ? deviceInfo.clientId : 'Unknown',
+  };
 
   if (config.users.some(user => user.username === username && user.password === password)) {
     const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '5m' });
@@ -234,26 +317,88 @@ app.post('/api/login', express.json(), async (req, res) => {
 
     // Create user if not exists, or update tokens if exists
     if (!user) {
-      user = await prisma.user.create({ data: { username, jwts: JSON.stringify([token]), refreshTokens: JSON.stringify([refreshToken]) } });
+      const newDevice = {
+        ip: req.ip,
+        deviceInfo: safeDeviceInfo,
+        firstSeen: new Date().toISOString(),
+        lastSeen: new Date().toISOString(),
+        loginCount: 1
+      };
+
+      user = await prisma.user.create({
+        data: {
+          username,
+          jwts: JSON.stringify([token]),
+          refreshTokens: JSON.stringify([refreshToken]),
+          trustedIps: JSON.stringify([newDevice])
+        }
+      });
     } else {
+      // Update existing user
+      let trustedDevices: TrustedDevice[] = [];
+      try {
+        trustedDevices = JSON.parse(user.trustedIps || '[]');
+      } catch {
+        trustedDevices = [];
+      }
+
+
+      // Find existing device or create new one
+      const ipIsTrusted = trustedDevices.some(device => device.ip === req.ip)
+      const existingDeviceIndex = trustedDevices.findIndex(device => {
+        // Primary match: same client ID
+        if (device.deviceInfo.clientId && safeDeviceInfo.clientId) {
+          return device.deviceInfo.clientId === safeDeviceInfo.clientId;
+        }
+        // Fallback match: same IP and userAgent (for migration)
+        return ipIsTrusted ?
+          device.ip === req.ip && device.deviceInfo.userAgent === safeDeviceInfo.userAgent :
+          device.deviceInfo.userAgent === safeDeviceInfo.userAgent;
+      });
+      const now = new Date().toISOString();
+
+      if (existingDeviceIndex >= 0) {
+        // Existing device - update info
+        const device = trustedDevices[existingDeviceIndex];
+        device.lastSeen = now;
+        device.loginCount++;
+
+        // Update IP if it changed (network switching)
+        if (device.ip !== (req.ip || 'Unknown')) {
+          console.log(`[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${req.ip}`);
+          device.ip = req.ip || 'Unknown';
+        }
+
+        // Update device info if provided
+        if (safeDeviceInfo) {
+          device.deviceInfo = { ...device.deviceInfo, ...safeDeviceInfo };
+        }
+      } else {
+        await notifyMotion('login', {
+          title: 'New Device Detected',
+          body: `A login from a new ${getDeviceDisplayName(safeDeviceInfo)} device was detected from IP: ${req.ip}`,
+          icon: 'push_icon',
+          sound: 'default',
+          channelId: 'security_event_channel'
+        }, user.username);
+        trustedDevices.push({
+          ip: req.ip || 'Unknown',
+          deviceInfo: safeDeviceInfo,
+          firstSeen: now,
+          lastSeen: now,
+          loginCount: 1
+        });
+      }
+
       await prisma.user.update({
         where: { username },
         data: {
-          jwts: { set: JSON.stringify(Array.from(new Set([...(JSON.parse(user.jwts)), token]))) },
-          refreshTokens: { set: JSON.stringify(Array.from(new Set([...(JSON.parse(user.refreshTokens)), refreshToken]))) },
+          jwts: JSON.stringify(Array.from(new Set([...(JSON.parse(user.jwts)), token]))),
+          refreshTokens: JSON.stringify(Array.from(new Set([...(JSON.parse(user.refreshTokens)), refreshToken]))),
+          trustedIps: JSON.stringify(trustedDevices)
         }
       });
     }
-
-    // Update trusted IPs
-    await prisma.user.update({
-      where: { username },
-      data: {
-        trustedIps: {
-          set: JSON.stringify(Array.from(new Set([...(JSON.parse(user.trustedIps)), req.ip])))
-        }
-      }
-    });
 
     console.log(`[Login] User ${username} logged in successfully from IP: ${req.ip}`);
     await notifyMotion('login', {
@@ -270,19 +415,33 @@ app.post('/api/login', express.json(), async (req, res) => {
   }
 });
 
+// Update the refresh token endpoint
 app.post('/api/refresh-token', async (req, res) => {
   const refreshToken = String(req.headers['refresh-token'] || '');
-  if (!refreshToken) {
-    console.error('No refresh token provided');
-    res.status(401).json({ error: 'No refresh token' });
+  const { deviceInfo }: { deviceInfo?: DeviceInfo } = req.body;
+
+  if (!refreshToken || !deviceInfo) {
+    console.error('No refresh token and/or device info provided');
+    res.status(401).json({ error: 'No refresh token and/or device info provided' });
     return;
   }
+
+  // Sanitize deviceInfo fields to avoid prototype pollution and ensure only expected keys
+  const safeDeviceInfo: DeviceInfo = {
+    userAgent: typeof deviceInfo?.userAgent === 'string' ? deviceInfo.userAgent : (req.headers['user-agent'] || 'Unknown'),
+    platform: typeof deviceInfo?.platform === 'string' ? deviceInfo.platform : 'Unknown',
+    vendor: typeof deviceInfo?.vendor === 'string' ? deviceInfo.vendor : 'Unknown',
+    language: typeof deviceInfo?.language === 'string' ? deviceInfo.language : 'Unknown',
+    timezone: typeof deviceInfo?.timezone === 'string' ? deviceInfo.timezone : 'Unknown',
+    screen: typeof deviceInfo?.screen === 'string' ? deviceInfo.screen : 'Unknown',
+    clientId: typeof deviceInfo?.clientId === 'string' ? deviceInfo.clientId : 'Unknown',
+  };
 
   // Find the user whose refreshTokens array contains the given refreshToken
   const user = await prisma.user.findFirst({
     where: {
       refreshTokens: {
-        contains: `"${refreshToken}"` // match the token as a JSON string element
+        contains: `"${refreshToken}"`
       }
     }
   });
@@ -304,21 +463,17 @@ app.post('/api/refresh-token', async (req, res) => {
     return;
   }
 
-  // Generate a new refresh token here for rotation
-  // Replace the old refresh token with the new one in the user's refreshTokens array
-  // Check if the refresh token is expired (older than 7 days)
   const newRefreshToken = (() => {
     try {
-      // Decode the old refresh token to check expiration
       const decoded = jwt.verify(refreshToken, JWT_SECRET) as { exp?: number };
       if (!decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) {
         console.error('Refresh token expired for user:', user.username);
         res.status(401).json({ error: 'Refresh token expired' });
         return null;
       }
-      // Generate a new refresh token the same way as on sign in
+
       const newRefreshToken = jwt.sign(
-        { username: user.username, type: 'refresh', exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 }, // 7 days expiration
+        { username: user.username, type: 'refresh', exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 },
         JWT_SECRET
       );
       tokens = tokens.filter((t: string) => t !== refreshToken);
@@ -337,22 +492,58 @@ app.post('/api/refresh-token', async (req, res) => {
     return;
   }
 
+  // Update trusted devices
+  let trustedDevices: TrustedDevice[] = [];
+  try {
+    trustedDevices = JSON.parse(user.trustedIps || '[]');
+  } catch {
+    trustedDevices = [];
+  }
+
+  const ipIsTrusted = trustedDevices.some(device => device.ip === req.ip)
+  const existingDeviceIndex = trustedDevices.findIndex(device => {
+    if (device.deviceInfo.clientId && safeDeviceInfo.clientId) {
+      return device.deviceInfo.clientId === safeDeviceInfo.clientId;
+    }
+    return ipIsTrusted ?
+      device.ip === req.ip && device.deviceInfo.userAgent === safeDeviceInfo.userAgent :
+      device.deviceInfo.userAgent === safeDeviceInfo.userAgent;
+  });
+  const now = new Date().toISOString();
+
+  if (existingDeviceIndex >= 0) {
+    // Existing device - update info
+    const device = trustedDevices[existingDeviceIndex];
+    device.lastSeen = now;
+    device.loginCount++;
+
+    // Update IP if it changed (network switching)
+    if (device.ip !== (req.ip || 'Unknown')) {
+      console.log(`[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${req.ip}`);
+      device.ip = req.ip || 'Unknown';
+    }
+
+    // Update device info if provided
+    if (safeDeviceInfo) {
+      device.deviceInfo = { ...device.deviceInfo, ...safeDeviceInfo };
+    }
+  } else {
+    await notifyMotion('login', {
+      title: 'Suspicious Activity Detected',
+      body: `Unauthorized activity detected from IP: ${req.ip}`,
+      icon: 'push_icon',
+      sound: 'default',
+      channelId: 'security_event_channel'
+    }, user.username);
+    res.status(403).json({ error: 'Unauthorized activity detected' });
+    return;
+  }
+
   await prisma.user.update({
     where: { username: user.username },
     data: {
       refreshTokens: JSON.stringify(tokens),
-      trustedIps: {
-        set: JSON.stringify(Array.from(new Set([...(JSON.parse(user.trustedIps)), req.ip])))
-      }
-    }
-  });
-  // Update trusted IPs
-  await prisma.user.update({
-    where: { username: user.username },
-    data: {
-      trustedIps: {
-        set: JSON.stringify(Array.from(new Set([...(JSON.parse(user.trustedIps)), req.ip])))
-      }
+      trustedIps: JSON.stringify(trustedDevices)
     }
   });
 
@@ -360,11 +551,34 @@ app.post('/api/refresh-token', async (req, res) => {
   res.json({ success: true, token, refreshToken: newRefreshToken });
 });
 
+// Update the sessions endpoint to return device info
+app.get('/api/user/sessions', jwtAuth, async (req: RequestWithUser, res) => {
+  const username = req.user!.username;
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: { trustedIps: true }
+  });
+
+  if (!user) {
+    res.json([]);
+    return;
+  }
+
+  try {
+    const trustedDevices: TrustedDevice[] = JSON.parse(user.trustedIps || '[]');
+    res.json(trustedDevices);
+  } catch {
+    res.json([]);
+  }
+});
+
 app.post('/api/logout', async (req, res) => {
   const refreshToken = req.headers['refresh-token'];
+  const { clientId }: { clientId?: string } = req.body;
+
   if (refreshToken) {
     // Remove the refreshToken from the user's refreshTokens array
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({ where: { refreshTokens: { contains: `"${refreshToken}"` } } });
     for (const user of users) {
       try {
         const tokens = JSON.parse(user.refreshTokens || '[]');
@@ -372,9 +586,16 @@ app.post('/api/logout', async (req, res) => {
           const newTokens = tokens.filter((t: string) => t !== refreshToken);
           await prisma.user.update({
             where: { username: user.username },
-            data: { refreshTokens: JSON.stringify(newTokens) }
+            data: {
+              refreshTokens: JSON.stringify(newTokens),
+              trustedIps: JSON.stringify(
+                (JSON.parse(user.trustedIps || '[]') as TrustedDevice[])
+                  .filter(device => device.deviceInfo.clientId ? device.deviceInfo.clientId !== clientId : true)
+              )
+            }
           });
 
+          console.log(`[Logout] User ${user.username} logged out from IP: ${req.ip}`);
           res.json({ success: true });
           return
         }

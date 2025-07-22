@@ -1,42 +1,37 @@
 import { useState } from 'react';
 import { API_BASE } from './main';
-import { Preferences } from '@capacitor/preferences';
-import { Capacitor } from '@capacitor/core';
+import { getDeviceFingerprint } from '../../source/types/deviceInfo';
 
 export default function LoginPage({ onLogin }: { onLogin: (token: string, refreshToken: string) => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     setError('');
-    setLoading(true);
+
     try {
-      const res = await fetch(`${API_BASE}/api/login`, {
+      const deviceInfo = getDeviceFingerprint();
+
+      const response = await fetch(`${API_BASE}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, deviceInfo })
       });
-      if (!res.ok) {
-        setError('Invalid username or password');
-        setLoading(false);
-        return;
-      }
-      const data = await res.json();
-      if (data.success && data.token && data.refreshToken) {
-        localStorage.setItem('jwt', data.token);
-        if (Capacitor.isNativePlatform()) await Preferences.set({ key: 'refreshToken', value: data.refreshToken });
-        setLoading(false);
+
+      const data = await response.json();
+      if (data.success) {
         onLogin(data.token, data.refreshToken);
       } else {
-        setError('Invalid username or password');
-        setLoading(false);
+        setError(data.message || 'Login failed');
       }
     } catch {
-      setError('Network error');
-      setLoading(false);
+      setError('Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
