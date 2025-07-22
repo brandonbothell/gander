@@ -7,7 +7,7 @@ import StreamPage from './StreamPage';
 import { RouterLoadingHandler } from './components/RouterLoadingHandler';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import SecureStorage from './utils/secureStorage';
-import { geolocateIP, getSessionId, SessionMonitor } from './components/SessionMonitor';
+import { getSessionId, SessionMonitor, type Session } from './components/SessionMonitor';
 import { getDeviceFingerprint, type TrustedDevice } from '../../source/types/deviceInfo';
 
 export type Recording = { streamId: string, filename: string };
@@ -18,9 +18,10 @@ export default function App() {
   const [____, setTotalRecordings] = useLocalStorageState<{ [streamId: string]: number }>('totalRecordings', {});
   const [__, setCachedRecordingRanges] = useLocalStorageState<{ [streamId: string]: Array<{ from: string, to: string }> }>('cachedRecordingRanges', {});
   const [_, setCachedPages] = useLocalStorageState<{ [streamId: string]: number[] }>('cachedPages', {});
-  const [knownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
+  const [knownSessions, setKnownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
   const [showSessionMonitor, setShowSessionMonitor] = useState(false);
   const [hasCheckedSessions, setHasCheckedSessions] = useState(false);
+  const [sessions, setSessions] = useState<(Session & TrustedDevice)[]>([]);
 
   // Helper: Try to refresh token
   const tryRefreshToken = async (): Promise<boolean> => {
@@ -238,25 +239,44 @@ export default function App() {
     initAuth();
   }, []); // Run once on mount
 
-  // Check for new sessions on mount
+  // Enhanced session checking function
   const checkForNewSessions = async () => {
-    if (hasCheckedSessions) return;
+    if (hasCheckedSessions || !authenticated) return;
 
     try {
+      console.log('Checking for new sessions...');
       const response = await authFetch(`${API_BASE}/api/user/sessions`);
       if (!response.ok) return;
 
       const trustedDevices: TrustedDevice[] = await response.json();
-      const currentSession = await geolocateIP(knownSessions)
-      const deviceInfo = getDeviceFingerprint();
+      console.log(`Fetched ${trustedDevices.length} trusted devices`);
 
-      const newSessions = trustedDevices.some(device =>
-        device.ip !== currentSession.ip &&
-        device.deviceInfo.userAgent !== deviceInfo.userAgent &&
-        !knownSessions.includes(getSessionId(device.ip, device.deviceInfo)));
+      // Create sessions list
+      const sessionsList: (Session & TrustedDevice)[] = trustedDevices.map(device => {
+        // Use the proper getSessionId function from SessionMonitor
+        const sessionId = getSessionId(device.ip, device.deviceInfo);
+        return {
+          ip: device.ip,
+          firstSeen: device.firstSeen,
+          lastSeen: device.lastSeen,
+          isNew: !knownSessions.includes(sessionId),
+          geolocated: false, // Mark as not geolocated so SessionMonitor can handle it
+          isGeolocating: false,
+          location: undefined,
+          deviceInfo: device.deviceInfo,
+          loginCount: device.loginCount,
+        };
+      });
 
-      if (newSessions) {
-        // Show session monitor automatically if there are new sessions
+      // Sort sessions with new ones first
+      const sortedSessions = sessionsList.sort((a, b) => a.isNew === b.isNew ? 0 : a.isNew ? -1 : 1);
+      setSessions(sortedSessions);
+
+      // Check if there are new sessions
+      const newSessionsDetected = sortedSessions.some(s => s.isNew);
+
+      if (newSessionsDetected) {
+        console.log('New sessions detected, auto-showing session monitor');
         setShowSessionMonitor(true);
       }
 
@@ -307,6 +327,18 @@ export default function App() {
     }
   }, [authenticated, hasCheckedSessions, knownSessions]);
 
+  // Add periodic session checking (every 5 minutes)
+  useEffect(() => {
+    if (!authenticated) return;
+
+    const interval = setInterval(() => {
+      // Reset hasCheckedSessions to allow periodic checks
+      setHasCheckedSessions(false);
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [authenticated]);
+
   // --- Refresh JWT token every minute ---
   useEffect(() => {
     if (!authenticated) return;
@@ -332,6 +364,18 @@ export default function App() {
   // In App.tsx, add this function to handle session monitor closing
   const handleSessionMonitorClose = () => {
     setShowSessionMonitor(false);
+
+    // Mark all sessions as known when closing
+    if (sessions.length > 0) {
+      const allSessionIds = sessions.map(s => getSessionId(s.ip, s.deviceInfo));
+      setKnownSessions(prev => Array.from(new Set([...prev, ...allSessionIds])));
+
+      // Update sessions state to reflect they're no longer new
+      setSessions(prevSessions =>
+        prevSessions.map(session => ({ ...session, isNew: false }))
+      );
+    }
+
     // Call the global handler if it exists (for mobile logout button)
     if ((window as any).handleSessionMonitorClose) {
       (window as any).handleSessionMonitorClose();
@@ -361,12 +405,36 @@ export default function App() {
     <Router>
       <RouterLoadingHandler />
       <Routes>
-        <Route path="/" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} onSessionMonitorClosed={handleSessionMonitorClose} logout={logout} />} />
-        <Route path="/stream/:streamId" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} onSessionMonitorClosed={handleSessionMonitorClose} logout={logout} />} />
-        <Route path="/recordings/:streamId/:filename" element={<StreamPage onShowSessionMonitor={() => setShowSessionMonitor(true)} onSessionMonitorClosed={handleSessionMonitorClose} logout={logout} />} />
+        <Route path="/" element={
+          <StreamPage
+            onShowSessionMonitor={() => setShowSessionMonitor(true)}
+            onSessionMonitorClosed={handleSessionMonitorClose}
+            logout={logout}
+          />
+        } />
+        <Route path="/stream/:streamId" element={
+          <StreamPage
+            onShowSessionMonitor={() => setShowSessionMonitor(true)}
+            onSessionMonitorClosed={handleSessionMonitorClose}
+            logout={logout}
+          />
+        } />
+        <Route path="/recordings/:streamId/:filename" element={
+          <StreamPage
+            onShowSessionMonitor={() => setShowSessionMonitor(true)}
+            onSessionMonitorClosed={handleSessionMonitorClose}
+            logout={logout}
+          />
+        } />
       </Routes>
       {showSessionMonitor && (
-        <SessionMonitor onClose={() => handleSessionMonitorClose()} />
+        <SessionMonitor
+          onClose={handleSessionMonitorClose}
+          sessions={sessions} // Pass pre-fetched sessions
+          knownSessions={knownSessions}
+          setKnownSessions={setKnownSessions}
+          setSessions={setSessions}
+        />
       )}
     </Router>
   );

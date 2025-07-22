@@ -2,11 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import { FiChevronLeft, FiChevronRight, FiMapPin, FiClock, FiGlobe } from 'react-icons/fi';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
-import { authFetch, API_BASE } from '../main';
 import { GOOGLE_MAPS_API_KEY } from '../../config.json';
 import { type TrustedDevice, type DeviceInfo, getDeviceDisplayName } from '../../../source/types/deviceInfo';
 
-interface Session {
+export interface Session {
   ip: string;
   location?: {
     country: string;
@@ -29,6 +28,10 @@ interface Session {
 
 interface SessionMonitorProps {
   onClose: () => void;
+  sessions?: (Session & TrustedDevice)[]; // Pre-fetched sessions
+  knownSessions?: string[];
+  setKnownSessions?: (sessions: string[] | ((prev: string[]) => string[])) => void;
+  setSessions?: (sessions: (Session & TrustedDevice)[] | ((prev: (Session & TrustedDevice)[]) => (Session & TrustedDevice)[])) => void;
 }
 
 declare global {
@@ -38,19 +41,32 @@ declare global {
 }
 
 // Helper function to create a unique session identifier
-export const getSessionId = (ip: string, deviceInfo: DeviceInfo): string => {
-  return `${ip}|${deviceInfo.userAgent}`;
+export const getSessionId = (_: string, deviceInfo: DeviceInfo): string => {
+  return deviceInfo.clientId;
 };
 
-export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
-  const [sessions, setSessions] = useState<(Session & TrustedDevice)[]>([]);
-  // Update to store session IDs instead of just IPs
-  const [knownSessions, setKnownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
+export const SessionMonitor: React.FC<SessionMonitorProps> = ({
+  onClose,
+  sessions: propSessions,
+  knownSessions: propKnownSessions,
+  setKnownSessions: propSetKnownSessions,
+  setSessions: propSetSessions
+}) => {
+  const [localSessions, setLocalSessions] = useState<(Session & TrustedDevice)[]>([]);
+  const [localKnownSessions, setLocalKnownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
+
+  const sessions = propSessions || localSessions;
+  const knownSessions = propKnownSessions || localKnownSessions;
+  const setSessions = propSetSessions || setLocalSessions;
+  const setKnownSessions = propSetKnownSessions || setLocalKnownSessions;
   const [currentSessionIndex, setCurrentSessionIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!propSessions); // Don't show loading if sessions provided
   const [error, setError] = useState<string | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
-  const [hasLoadedSessions, setHasLoadedSessions] = useState(false);
+  const [hasLoadedSessions, setHasLoadedSessions] = useState(!!propSessions); // Mark as loaded if sessions provided
+
+  // Only fetch sessions if not provided via props
+  const shouldFetchSessions = !propSessions;
 
   // Prevent document scroll when modal is open
   useEffect(() => {
@@ -61,6 +77,14 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
       document.body.style.overflow = originalOverflow;
     };
   }, []);
+
+  // Skip initial loading if sessions are provided
+  useEffect(() => {
+    if (propSessions && propSessions.length > 0) {
+      setLoading(false);
+      setHasLoadedSessions(true);
+    }
+  }, [propSessions]);
 
   // Load Google Maps API
   useEffect(() => {
@@ -104,57 +128,9 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
 
   // Fetch sessions (without geolocation)
   useEffect(() => {
-    if (hasLoadedSessions) return;
-
-    const fetchSessions = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await authFetch(`${API_BASE}/api/user/sessions`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch sessions');
-        }
-
-        const trustedDevices: TrustedDevice[] = await response.json();
-        console.log(`Fetched ${trustedDevices.length} trusted devices`);
-
-        // Create sessions without geolocation data
-        const sessionsList: (Session & TrustedDevice)[] = trustedDevices.map(device => {
-          const sessionId = getSessionId(device.ip, device.deviceInfo);
-          console.log(`Processing device: ${device.ip} with session ID: ${sessionId}`);
-          return {
-            ip: device.ip,
-            firstSeen: device.firstSeen,
-            lastSeen: device.lastSeen,
-            isNew: !knownSessions.includes(sessionId), // Check by session ID, not just IP
-            geolocated: false,
-            isGeolocating: false,
-            location: undefined,
-            deviceInfo: device.deviceInfo,
-            loginCount: device.loginCount,
-          };
-        });
-
-        // Sort sessions with new ones first
-        setSessions(sessionsList.sort((a, b) => a.isNew === b.isNew ? 0 : a.isNew ? -1 : 1));
-
-        // Update known sessions with session IDs
-        const allSessionIds = sessionsList.map(s => getSessionId(s.ip, s.deviceInfo));
-        setKnownSessions(prev => Array.from(new Set([...prev, ...allSessionIds])));
-
-        setHasLoadedSessions(true);
-        setLoading(false);
-
-      } catch (error: any) {
-        console.error('Error fetching sessions:', error);
-        setError(error.message || 'Failed to load session data');
-        setLoading(false);
-      }
-    };
-
-    fetchSessions();
-  }, [hasLoadedSessions]);
+    if (hasLoadedSessions || !shouldFetchSessions) return;
+    console.warn('Missing session details from main thread, please contact the developer to fix this bug')
+  }, [hasLoadedSessions, shouldFetchSessions]);
 
   // Geolocate current session
   useEffect(() => {
@@ -208,6 +184,44 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
 
     geolocateCurrentSession();
   }, [sessions, currentSessionIndex, knownSessions]);
+
+  // Add a new effect to handle marking sessions as known when navigating away
+  useEffect(() => {
+    // When currentSessionIndex changes, mark the PREVIOUS session as known
+    // (not the current one we're navigating to)
+    const markPreviousSessionAsKnown = () => {
+      if (sessions.length === 0) return;
+
+      // Find sessions that are currently "new" but not the current session
+      const sessionsToMarkAsKnown = sessions
+        .map((session, index) => ({ session, index }))
+        .filter(({ session, index }) =>
+          session.isNew && index !== currentSessionIndex
+        )
+        .map(({ session }) => getSessionId(session.ip, session.deviceInfo));
+
+      if (sessionsToMarkAsKnown.length > 0) {
+        console.log('Marking sessions as known:', sessionsToMarkAsKnown);
+        setKnownSessions(prev => Array.from(new Set([...prev, ...sessionsToMarkAsKnown])));
+
+        // Update the sessions state to reflect the change
+        setSessions(prevSessions =>
+          prevSessions.map(session => {
+            const sessionId = getSessionId(session.ip, session.deviceInfo);
+            if (sessionsToMarkAsKnown.includes(sessionId)) {
+              return { ...session, isNew: false };
+            }
+            return session;
+          })
+        );
+      }
+    };
+
+    // Only run this after initial load and when user actually changes sessions
+    if (hasLoadedSessions && sessions.length > 0) {
+      markPreviousSessionAsKnown();
+    }
+  }, [currentSessionIndex, hasLoadedSessions]);
 
   // Initialize map when both maps API and current session location are loaded
   useEffect(() => {
@@ -484,6 +498,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({ onClose }) => {
               }}>
                 {currentSession.ip}
               </span>
+              {/* Show NEW indicator for current session if it's new */}
               {currentSession.isNew && (
                 <span style={{
                   background: '#ff6b6b',
@@ -1053,7 +1068,9 @@ export const geolocateIP = async (knownSessions?: string[], device?: TrustedDevi
         ip: geoIp,
         firstSeen: new Date().toISOString(),
         lastSeen: new Date().toISOString(),
-        isNew: knownSessions ? !knownSessions.includes(geoIp) : true,
+        isNew: knownSessions
+          ? device ? !knownSessions.includes(getSessionId(device.ip, device.deviceInfo)) : false
+          : true,
         geolocated: true,
         isGeolocating: false,
       };
@@ -1064,7 +1081,9 @@ export const geolocateIP = async (knownSessions?: string[], device?: TrustedDevi
       ip: ip || 'local',
       firstSeen: new Date().toISOString(),
       lastSeen: new Date().toISOString(),
-      isNew: knownSessions ? ip ? !knownSessions.includes(ip) : false : true,
+      isNew: knownSessions
+        ? device ? !knownSessions.includes(getSessionId(device.ip, device.deviceInfo)) : false
+        : false,
       geolocated: true,
       isGeolocating: false,
     };
