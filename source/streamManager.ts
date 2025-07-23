@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
+import { logMotion } from './camera';
 
 export interface StreamConfig {
   id: string;
@@ -276,7 +277,7 @@ export class StreamManager {
 
         // Log if segments are taking too long (indicates stuttering)
         if (segmentCount > 1 && timeSinceLastSegment > 3000) {
-          console.log(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`);
+          logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`);
         }
       }
 
