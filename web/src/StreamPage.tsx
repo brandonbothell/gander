@@ -2248,7 +2248,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             alignItems: 'center',
             width: '100%',
             maxWidth: 900,
-            margin: `calc(env(safe-area-inset-top, 0px) + ${isIOS() && !isMobileWidth ? '40px' : '25px'}) auto auto`
+            margin: '0 auto',
+            paddingTop: 'max(25px, env(safe-area-inset-top, 0px))',
+            paddingLeft: 'env(safe-area-inset-left, 0px)',
+            paddingRight: 'env(safe-area-inset-right, 0px)',
           }}
         >
           <RecordingBar
@@ -2699,7 +2702,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         <div ref={recordingsListBottomSentinelRef} style={{ height: 1 }} />
       </div>
       {/* Overlay to block touch scrolls below the recordings list on touch devices */}
-      {isTouchInput && (
+      {isTouchInput && recordingsListOpen && (
         <div
           style={{
             position: 'fixed',
@@ -2714,18 +2717,14 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             opacity: recordingsListOpen ? 1 : 0,
           }}
           onTouchStart={e => {
-            if (recordingsListOpen && selected.length === 0) {
+            if (selected.length === 0) {
               e.preventDefault()
               handleCopyrightTouchStart()
             }
           }}
-          onTouchMove={e => {
-            if (recordingsListOpen) {
-              e.preventDefault()
-            }
-          }}
+          onTouchMove={e => e.preventDefault()}
           onTouchEnd={() => {
-            if (recordingsListOpen && selected.length === 0) {
+            if (selected.length === 0) {
               handleCopyrightTouchEnd()
             }
           }}
