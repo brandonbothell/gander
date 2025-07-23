@@ -24,6 +24,7 @@ import { StreamControlBar } from './components/StreamControlBar';
 import type { Recording } from './App';
 import SecureStorage from './utils/secureStorage';
 import { Preferences } from '@capacitor/preferences';
+import { DebugInfo } from './components/DebugInfo';
 
 export type ClientMask = StreamMask & { pendingUpdate?: boolean, pendingUpdateSince?: number };
 
@@ -149,7 +150,27 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [lastVideoSize, setLastVideoSize] = useState({ width: 640, height: 360 });
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [showMobileLogout, setShowMobileLogout] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  // --- Debug overlay state ---
+  const [debugLongPressActive, setDebugLongPressActive] = useState(false);
+  const debugLongPressTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Handler for copyright long-press (touch devices)
+  function handleCopyrightTouchStart() {
+    if (!isTouchInput) return;
+    setDebugLongPressActive(true);
+    debugLongPressTimeout.current = setTimeout(() => {
+      if (debugLongPressActive) setShowDebug(true);
+      setDebugLongPressActive(false);
+    }, 800); // 800ms long-press
+  }
+  function handleCopyrightTouchEnd() {
+    setDebugLongPressActive(false);
+    if (debugLongPressTimeout.current) {
+      clearTimeout(debugLongPressTimeout.current);
+      debugLongPressTimeout.current = null;
+    }
+  }
 
   // Filtered recordings
   const [isSearching, setIsSearching] = useState(false);
@@ -2245,6 +2266,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
   return (
     <div className="App with-side-padding">
+      {showDebug && <DebugInfo onClose={() => setShowDebug(false)} />}
       <div style={{ userSelect: 'none' }}>
         {/* Main video and mask editor remain unchanged, but use activeStream */}
         <div
@@ -3342,6 +3364,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           letterSpacing: 1,
           userSelect: 'none'
         }}
+        onTouchStart={handleCopyrightTouchStart}
+        onTouchEnd={handleCopyrightTouchEnd}
       >
         gander © {new Date().getFullYear()} Brandon Bothell. All rights reserved.
       </div>
