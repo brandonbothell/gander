@@ -695,7 +695,7 @@ label[style*="align-items: center"] {
 
 @media screen and (orientation: landscape) and (max-height: 500px) {
   .main-video-container {
-    margin-top: calc(env(safe-area-inset-top, 0px) + 40px) !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 40px) !important;
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
   }
@@ -703,7 +703,7 @@ label[style*="align-items: center"] {
 
 @media screen and (orientation: portrait) {
   .main-video-container {
-    margin-top: calc(env(safe-area-inset-top, 0px) + 25px);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 60px);
   }
 }
 
