@@ -535,6 +535,14 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         width: videoRef.current.clientWidth,
         height: videoRef.current.clientHeight
       });
+
+      // Apply the current dimensions to prevent flashing to small size
+      videoRef.current.style.width = `100%`;
+      videoRef.current.style.height = `${videoRef.current.clientHeight}px`;
+    } else if (lastVideoSize.width > 0 && lastVideoSize.height > 0) {
+      // Use last known dimensions if current dimensions aren't available
+      videoRef.current.style.width = `$100%`;
+      videoRef.current.style.height = `${lastVideoSize.height}px`;
     }
 
     // IMPORTANT: Cleanup existing HLS instance first to prevent buffer conflicts
@@ -566,8 +574,11 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     } catch {
       console.error('Failed to fetch signed stream URL');
       setActiveStream(streams[0]);
-      setIsLoadingStream(false);
-      setLoading(false);
+      // Add timeout for consistent loading state behavior
+      setTimeout(() => {
+        setIsLoadingStream(false);
+        setLoading(false);
+      }, 100);
       return;
     }
 
@@ -813,7 +824,11 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     fetchSignedThumbUrls();
     fetchMasks();
 
-    setLoading(false);
+    // Add a small delay before hiding loading state to prevent flickering
+    setTimeout(() => {
+      setIsLoadingStream(false);
+      setLoading(false);
+    }, 100);
   }
 
   // Also update the cleanup effect to be more thorough
@@ -2047,6 +2062,11 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             width: video.clientWidth,
             height: video.clientHeight,
           });
+
+          // Clear fixed dimensions once video has loaded properly to allow responsive behavior
+          video.style.width = '100%';
+          video.style.height = '';
+
           setIsLoadingStream(false); // Clear loading state when video has dimensions
         }, 200); // Delay to ensure video is ready
       }
