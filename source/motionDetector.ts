@@ -7,7 +7,7 @@ import { Jimp, diff as getDiff } from 'jimp';
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
-import { prisma } from './camera';
+import { prisma, logMotion } from './camera';
 
 const STANDARD_WIDTH = 160;   // Much smaller for performance
 const STANDARD_HEIGHT = 90;
@@ -17,7 +17,7 @@ const DEBUG_MOTION = process.env.DEBUG_MOTION === 'true';
 
 function debugLog(message: string) {
   if (DEBUG_MOTION) {
-    console.log(message);
+    logMotion(message);
   }
 }
 
@@ -150,7 +150,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
                     reject(new Error('Rename failed'));
                   }
                 } else {
-                  console.error(`[Motion] Both JPG and PNG extraction failed`);
+                  logMotion(`Both JPG and PNG extraction failed`);
                   reject(new Error('Both formats failed'));
                 }
               });
@@ -298,7 +298,7 @@ export async function detectMotion(
 
         // Log motion detection results - always show actual motion, debug for all attempts
         if (motionDetected || diffPercent > 0.02) {
-          console.log(`[${streamId}] [Motion] diff=${(diffPercent * 100).toFixed(2)}% motion=${motionDetected} threshold=${isAboveDiffThreshold} camMove=${aboveCameraMovementThreshold} (mov:${movementCount}/${streamMovementHistory[streamId].length}, mot:${motionCount}/${streamMotionHistory[streamId].length})`);
+          logMotion(`[${streamId}] diff=${(diffPercent * 100).toFixed(2)}% motion=${motionDetected} threshold=${isAboveDiffThreshold} camMove=${aboveCameraMovementThreshold} (mov:${movementCount}/${streamMovementHistory[streamId].length}, mot:${motionCount}/${streamMotionHistory[streamId].length})`);
         } else if (DEBUG_MOTION) {
           debugLog(`[${streamId}] [Motion] diff=${(diffPercent * 100).toFixed(2)}% motion=${motionDetected} threshold=${isAboveDiffThreshold} camMove=${aboveCameraMovementThreshold} (mov:${movementCount}/${streamMovementHistory[streamId].length}, mot:${motionCount}/${streamMotionHistory[streamId].length})`);
         }

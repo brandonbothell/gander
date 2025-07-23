@@ -1,26 +1,47 @@
-import express from 'express';
-import { exec, execSync } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import chokidar from 'chokidar';
-import crypto from 'crypto';
-import Greenlock from 'greenlock-express';
-import open from 'open';
-import config from '../config.json';
-import webpush from 'web-push';
 import dotenv from 'dotenv';
-import { PrismaClient } from './generated/prisma';
-import cors from 'cors';
-import admin from 'firebase-admin';
+import express from 'express';
 import jwt from 'jsonwebtoken';
-import { clearMotionHistory, detectMotion } from './motionDetector';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import open from 'open'
+import { exec, execSync } from 'child_process';
+import * as admin from 'firebase-admin';
+import webpush from 'web-push';
+import * as chokidar from 'chokidar';
+import { PrismaClient } from './generated/prisma';
 import { StreamManager } from './streamManager';
-import { DeviceInfo, getDeviceDisplayName, TrustedDevice } from './types/deviceInfo'
+import { detectMotion, clearMotionHistory } from './motionDetector';
+import { DeviceInfo, TrustedDevice, getDeviceDisplayName } from './types/deviceInfo';
+import Greenlock from 'greenlock-express';
+import config from '../config.json'
 
 dotenv.config();
 process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(__dirname, '..', 'security-cam-credentials.json');
 
 export const prisma = new PrismaClient();
+
+// Motion logging setup
+const apiStartTime = new Date().toISOString().replace(/[:.]/g, '-');
+const motionLogPath = path.join(__dirname, '..', 'logs', `motion-${apiStartTime}.log`);
+
+// Ensure logs directory exists
+const logsDir = path.dirname(motionLogPath);
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// Motion logging function
+export function logMotion(message: string) {
+  const timestamp = new Date().toISOString();
+  const logEntry = `${timestamp} ${message}\n`;
+  try {
+    fs.appendFileSync(motionLogPath, logEntry);
+  } catch (error) {
+    console.error('Failed to write to motion log:', error);
+  }
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || config.jwtSecret;
 
@@ -234,7 +255,7 @@ async function cleanExit() {
 
     // Save any pending segments BEFORE stopping FFmpeg and cleaning directories
     if (state?.motionSegments.length > 0) {
-      console.log(`[${streamId}] [cleanExit] Saving`, state.motionSegments.length, 'pending segments');
+      logMotion(`[${streamId}] [cleanExit] Saving ${state.motionSegments.length} pending segments`);
       try {
         await saveMotionSegmentsWithRetry(streamId);
       } catch (error) {
@@ -910,7 +931,7 @@ async function setupStreamMotionMonitoring() {
       startedRecordingAt: 0 // Initialize to 0
     };
 
-    console.log(`[${streamId}] [Motion] Monitoring started at ${new Date().toLocaleString()}`);
+    logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
 
     // --- Motion Detection Watcher ---
     chokidar.watch(dynamicStreams[streamId].config.hlsDir, { ignoreInitial: true }).on('add', segmentPath => {
@@ -930,7 +951,7 @@ async function setupStreamMotionMonitoring() {
         if (motionStatus.motion) {
           // If we're currently saving and detect new motion, cancel the save and continue recording
           if (state.savingInProgress && state.currentSaveProcess) {
-            console.log(`[${streamId}] [Motion] New motion detected while saving, canceling save operation`);
+            logMotion(`[${streamId}] New motion detected while saving, canceling save operation`);
             state.currentSaveProcess.kill('SIGTERM');
             state.savingInProgress = false;
             state.currentSaveProcess = null;
@@ -955,7 +976,7 @@ async function setupStreamMotionMonitoring() {
           if (!state.motionSegments.includes(segmentPath)) state.motionSegments.push(segmentPath);
 
           // Log motion event
-          console.log(`[${streamId}] [Motion] Detected at ${new Date().toLocaleString()} in segment: ${path.basename(segmentPath)}`);
+          logMotion(`[${streamId}] Detected at ${new Date().toLocaleString()} in segment: ${path.basename(segmentPath)}`);
 
           // --- Notify only once per motion event ---
           if (!state.notificationSent) {
@@ -1010,17 +1031,17 @@ async function saveMotionSegmentsWithRetry(streamId: string, retryAttempt: numbe
     await saveMotionSegments(streamId);
     state.saveRetryCount = 0; // Reset retry count on success
   } catch (error) {
-    console.error(`[${streamId}] [Motion] Save attempt ${retryAttempt + 1} failed:`, error);
+    logMotion(`[${streamId}] Motion save attempt ${retryAttempt + 1} failed: ${error}`);
 
     if (retryAttempt < maxRetries) {
       const delay = Math.min(1000 * Math.pow(2, retryAttempt), 5000); // Exponential backoff, max 5 seconds
-      console.log(`[${streamId}] [Motion] Retrying save in ${delay}ms (attempt ${retryAttempt + 2}/${maxRetries + 1})`);
+      logMotion(`[${streamId}] Retrying save in ${delay}ms (attempt ${retryAttempt + 2}/${maxRetries + 1})`);
 
       setTimeout(() => {
         saveMotionSegmentsWithRetry(streamId, retryAttempt + 1);
       }, delay);
     } else {
-      console.error(`[${streamId}] [Motion] Failed to save motion segments after ${maxRetries + 1} attempts, giving up`);
+      logMotion(`[${streamId}] Failed to save motion segments after ${maxRetries + 1} attempts, giving up`);
       // Reset state even on failure
       state.savingInProgress = false;
       state.currentSaveProcess = null;
@@ -1030,7 +1051,7 @@ async function saveMotionSegmentsWithRetry(streamId: string, retryAttempt: numbe
   }
 }
 
-// Modified save function with better cancellation handling
+// Update the saveMotionSegments function in camera.ts
 function saveMotionSegments(streamId: string): Promise<void> {
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
@@ -1046,16 +1067,16 @@ function saveMotionSegments(streamId: string): Promise<void> {
     // Filter out segments that no longer exist
     const existingSegments = uniqueSegments.filter(segmentPath => {
       if (!fs.existsSync(segmentPath)) {
-        console.warn(`[${streamId}] [Motion] Segment no longer exists, skipping: ${path.basename(segmentPath)}`);
+        logMotion(`[${streamId}] Segment no longer exists, skipping: ${path.basename(segmentPath)}`);
         return false;
       }
       return true;
     });
 
     if (existingSegments.length === 0) {
-      console.log(`[${streamId}] [Motion] No existing segments to save, aborting save operation`);
+      logMotion(`[${streamId}] No existing segments to save, aborting save operation`);
       state.savingInProgress = false;
-      state.motionSegments = [];
+      state.motionSegments = []; // Clear segments even if no existing segments
       return resolve();
     }
 
@@ -1064,7 +1085,7 @@ function saveMotionSegments(streamId: string): Promise<void> {
     try {
       // Ensure HLS directory exists before writing concat list
       if (!fs.existsSync(stream.config.hlsDir)) {
-        console.warn(`[${streamId}] [Motion] HLS directory no longer exists, cannot save segments`);
+        logMotion(`[${streamId}] HLS directory no longer exists, cannot save segments`);
         state.savingInProgress = false;
         state.motionSegments = [];
         return resolve();
@@ -1073,6 +1094,7 @@ function saveMotionSegments(streamId: string): Promise<void> {
       fs.writeFileSync(listFile, existingSegments.map(f => `file '${f.replace(/\\/g, '/')}'`).join('\n'));
     } catch (error) {
       state.savingInProgress = false;
+      state.motionSegments = []; // Clear segments on error too
       return reject(new Error(`Failed to write concat list: ${error}`));
     }
 
@@ -1080,12 +1102,12 @@ function saveMotionSegments(streamId: string): Promise<void> {
     const thumbFile = path.join(stream.config.thumbDir, path.basename(outFile).replace(/\.mp4$/, '.jpg'));
     const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outFile}"`;
 
-    console.log(`[${streamId}] [Motion] Starting save of ${existingSegments.length} segments to ${path.basename(outFile)}`);
+    logMotion(`[${streamId}] Starting save of ${existingSegments.length} segments to ${path.basename(outFile)}`);
 
     const ffmpegProcess = exec(ffmpegConcatCmd, (err) => {
       // Check if process was killed (canceled due to new motion)
       if (ffmpegProcess.killed) {
-        console.log(`[${streamId}] [Motion] Save operation was canceled due to new motion detection`);
+        logMotion(`[${streamId}] Save operation was canceled due to new motion detection`);
         state.savingInProgress = false;
         state.currentSaveProcess = null;
         safeUnlink(listFile);
@@ -1094,9 +1116,10 @@ function saveMotionSegments(streamId: string): Promise<void> {
       }
 
       if (err) {
-        console.error(`[${streamId}] [Motion] FFmpeg concat failed:`, err);
+        logMotion(`[${streamId}] FFmpeg concat failed: ${err}`);
         state.savingInProgress = false;
         state.currentSaveProcess = null;
+        state.motionSegments = []; // Clear segments on error
         safeUnlink(listFile);
         return reject(err);
       }
@@ -1112,11 +1135,10 @@ function saveMotionSegments(streamId: string): Promise<void> {
         });
         safeUnlink(listFile);
 
-        // Only clear motionSegments if we successfully completed the save
-        // and we're not currently recording new motion
-        if (!state.motionRecordingActive) {
-          state.motionSegments = [];
-        }
+        // ALWAYS clear motionSegments after successful save, regardless of recording state
+        // This prevents the segments from being saved again on exit
+        logMotion(`[${streamId}] Clearing ${state.motionSegments.length} saved segments from state`);
+        state.motionSegments = [];
 
         state.savingInProgress = false;
         state.currentSaveProcess = null;
@@ -1139,9 +1161,9 @@ function saveMotionSegments(streamId: string): Promise<void> {
             }
           });
 
-          console.log(`[${streamId}] [Motion] Successfully saved ${filename} (${duration}s, ${existingSegments.length} segments)`);
+          logMotion(`[${streamId}] Successfully saved ${filename} (${duration}s, ${existingSegments.length} segments)`);
         } catch (e) {
-          console.error(`[${streamId}] Failed to upsert MotionRecording:`, e);
+          logMotion(`[${streamId}] Failed to upsert MotionRecording: ${e}`);
         }
 
         resolve();
@@ -1157,7 +1179,7 @@ function saveMotionSegments(streamId: string): Promise<void> {
     // Add timeout for the save operation (in case it hangs)
     const saveTimeout = setTimeout(() => {
       if (state.currentSaveProcess && !state.currentSaveProcess.killed) {
-        console.warn(`[${streamId}] [Motion] Save operation timed out, killing process`);
+        logMotion(`[${streamId}] Save operation timed out, killing process`);
         state.currentSaveProcess.kill('SIGTERM');
       }
     }, 60000); // 60 second timeout
@@ -1819,7 +1841,7 @@ app.post('/api/motion-pause/:streamId', jwtAuth, express.json(), async (req, res
   if (state.motionPaused) {
     // Cancel any ongoing save operation
     if (state.savingInProgress && state.currentSaveProcess) {
-      console.log(`[${streamId}] [Motion] Pausing motion - canceling ongoing save operation`);
+      logMotion(`[${streamId}] Pausing motion - canceling ongoing save operation`);
       state.currentSaveProcess.kill('SIGTERM');
       state.savingInProgress = false;
       state.currentSaveProcess = null;
