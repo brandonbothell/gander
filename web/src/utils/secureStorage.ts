@@ -90,37 +90,54 @@ class SecureStorage {
     }
   }
 
-  // Set refresh token
-  static async setRefreshToken(token: string): Promise<void> {
-    if (Capacitor.isNativePlatform()) {
-      // Use Capacitor Preferences for native platforms
-      await Preferences.set({ key: 'refreshToken', value: token });
-    } else {
-      // Use encrypted localStorage for web
-      const encrypted = await this.encrypt(token);
-      localStorage.setItem(this.STORAGE_KEY, encrypted);
-    }
-  }
-
   // Get refresh token
   static async getRefreshToken(): Promise<string | null> {
     if (Capacitor.isNativePlatform()) {
-      // Use Capacitor Preferences for native platforms
-      const result = await Preferences.get({ key: 'refreshToken' });
-      return result.value;
+      try {
+        console.log('Getting refresh token from Capacitor Preferences...');
+        const result = await Preferences.get({ key: 'refreshToken' });
+        console.log('Capacitor Preferences result:', result.value ? 'token found' : 'no token');
+        return result.value;
+      } catch (error) {
+        console.error('Error accessing Capacitor Preferences:', error);
+        return null;
+      }
     } else {
       // Use encrypted localStorage for web
       const encrypted = localStorage.getItem(this.STORAGE_KEY);
-      if (!encrypted) return null;
+      if (!encrypted) {
+        console.log('No encrypted refresh token in localStorage');
+        return null;
+      }
 
       try {
-        return await this.decrypt(encrypted);
+        const decrypted = await this.decrypt(encrypted);
+        console.log('Successfully decrypted refresh token from localStorage');
+        return decrypted;
       } catch (error) {
         console.error('Failed to decrypt refresh token:', error);
         // Remove corrupted token
         localStorage.removeItem(this.STORAGE_KEY);
         return null;
       }
+    }
+  }
+
+  // Set refresh token
+  static async setRefreshToken(token: string): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        console.log('Storing refresh token in Capacitor Preferences...');
+        await Preferences.set({ key: 'refreshToken', value: token });
+        console.log('Successfully stored refresh token in Capacitor Preferences');
+      } catch (error) {
+        console.error('Error storing refresh token in Capacitor Preferences:', error);
+        throw error;
+      }
+    } else {
+      // Use encrypted localStorage for web
+      const encrypted = await this.encrypt(token);
+      localStorage.setItem(this.STORAGE_KEY, encrypted);
     }
   }
 

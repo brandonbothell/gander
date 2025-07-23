@@ -9,6 +9,7 @@ import { useLocalStorageState } from './hooks/useLocalStorageState';
 import SecureStorage from './utils/secureStorage';
 import { getSessionId, SessionMonitor, type Session } from './components/SessionMonitor';
 import { getDeviceFingerprint, type TrustedDevice } from '../../source/types/deviceInfo';
+import { Capacitor } from '@capacitor/core';
 
 export type Recording = { streamId: string, filename: string };
 
@@ -26,69 +27,79 @@ export default function App() {
   // Helper: Try to refresh token
   const tryRefreshToken = async (): Promise<boolean> => {
     try {
+      console.log('Attempting token refresh...');
       const refreshToken = await SecureStorage.getRefreshToken();
+
       if (!refreshToken) {
+        console.log('No refresh token available for refresh attempt');
         setAuthenticated(false);
         return false;
       }
 
-      // Check if another tab is already refreshing
-      const refreshInProgress = localStorage.getItem('tokenRefreshInProgress');
-      if (refreshInProgress) {
-        const startTime = parseInt(refreshInProgress);
-        // If refresh has been in progress for more than 10 seconds, assume it failed
-        if (Date.now() - startTime < 10000) {
-          console.log('Another tab is refreshing, waiting...');
-          // Wait for the other tab to finish
-          return new Promise((resolve) => {
-            let attempts = 0;
-            const maxAttempts = 100; // 10 seconds max wait
+      console.log('Refresh token found, proceeding with refresh request');
 
-            const tokenChannel = new BroadcastChannel('tokenUpdates');
+      // Check if another tab is already refreshing (only on web)
+      if (!Capacitor.isNativePlatform()) {
+        const refreshInProgress = localStorage.getItem('tokenRefreshInProgress');
+        if (refreshInProgress) {
+          const startTime = parseInt(refreshInProgress);
+          // If refresh has been in progress for more than 10 seconds, assume it failed
+          if (Date.now() - startTime < 10000) {
+            console.log('Another tab is refreshing, waiting...');
+            // Wait for the other tab to finish
+            return new Promise((resolve) => {
+              let attempts = 0;
+              const maxAttempts = 100; // 10 seconds max wait
 
-            const handleTokenUpdate = (event: MessageEvent) => {
-              if (event.data.type === 'TOKEN_UPDATED') {
-                console.log('Another tab successfully refreshed token via broadcast');
-                setAuthenticated(true);
-                tokenChannel.close();
-                resolve(true);
-              }
-            };
+              const tokenChannel = new BroadcastChannel('tokenUpdates');
 
-            tokenChannel.addEventListener('message', handleTokenUpdate);
+              const handleTokenUpdate = (event: MessageEvent) => {
+                if (event.data.type === 'TOKEN_UPDATED') {
+                  console.log('Another tab successfully refreshed token via broadcast');
+                  setAuthenticated(true);
+                  tokenChannel.close();
+                  resolve(true);
+                }
+              };
 
-            const checkComplete = () => {
-              attempts++;
-              const stillInProgress = localStorage.getItem('tokenRefreshInProgress');
-              const newToken = localStorage.getItem('jwt');
+              tokenChannel.addEventListener('message', handleTokenUpdate);
 
-              if (!stillInProgress && newToken) {
-                // Another tab successfully refreshed
-                console.log('Another tab successfully refreshed token via localStorage check');
-                setAuthenticated(true);
-                tokenChannel.close();
-                resolve(true);
-              } else if (!stillInProgress || attempts >= maxAttempts) {
-                // Refresh failed in other tab or timeout
-                console.log('Token refresh failed or timed out in other tab');
-                setAuthenticated(false);
-                tokenChannel.close();
-                resolve(false);
-              } else {
-                // Still in progress, check again
-                setTimeout(checkComplete, 100);
-              }
-            };
-            setTimeout(checkComplete, 100);
-          });
+              const checkComplete = () => {
+                attempts++;
+                const stillInProgress = localStorage.getItem('tokenRefreshInProgress');
+                const newToken = localStorage.getItem('jwt');
+
+                if (!stillInProgress && newToken) {
+                  // Another tab successfully refreshed
+                  console.log('Another tab successfully refreshed token via localStorage check');
+                  setAuthenticated(true);
+                  tokenChannel.close();
+                  resolve(true);
+                } else if (!stillInProgress || attempts >= maxAttempts) {
+                  // Refresh failed in other tab or timeout
+                  console.log('Token refresh failed or timed out in other tab');
+                  setAuthenticated(false);
+                  tokenChannel.close();
+                  resolve(false);
+                } else {
+                  // Still in progress, check again
+                  setTimeout(checkComplete, 100);
+                }
+              };
+              setTimeout(checkComplete, 100);
+            });
+          }
         }
       }
 
-      // Mark refresh as in progress
-      console.log('This tab is performing token refresh');
-      localStorage.setItem('tokenRefreshInProgress', Date.now().toString());
+      // Mark refresh as in progress (only on web)
+      if (!Capacitor.isNativePlatform()) {
+        console.log('This tab is performing token refresh');
+        localStorage.setItem('tokenRefreshInProgress', Date.now().toString());
+      }
 
       const deviceInfo = getDeviceFingerprint();
+      console.log('Making refresh token request to server...');
 
       const res = await fetch(`${API_BASE}/api/refresh-token`, {
         method: 'POST',
@@ -99,38 +110,55 @@ export default function App() {
         body: JSON.stringify({ deviceInfo })
       });
 
+      console.log('Refresh token response status:', res.status);
+
       if (res.status === 200) {
         const data = await res.json();
         if (data && data.token && data.refreshToken) {
+          console.log('Token refresh successful, storing new tokens');
+
           await SecureStorage.setRefreshToken(data.refreshToken);
-
-          // Update JWT in localStorage
           localStorage.setItem('jwt', data.token);
-          localStorage.removeItem('tokenRefreshInProgress'); // Clear flag
 
-          // Broadcast to all tabs immediately (listeners should be ready now)
-          const tokenChannel = new BroadcastChannel('tokenUpdates');
-          tokenChannel.postMessage({
-            type: 'TOKEN_UPDATED',
-            token: data.token,
-            timestamp: Date.now()
-          });
-          console.log('Token refresh successful, broadcasted to all tabs');
-          tokenChannel.close();
+          // Clear refresh flag (only on web)
+          if (!Capacitor.isNativePlatform()) {
+            localStorage.removeItem('tokenRefreshInProgress');
+          }
+
+          // Broadcast to all tabs (only on web)
+          if (!Capacitor.isNativePlatform()) {
+            const tokenChannel = new BroadcastChannel('tokenUpdates');
+            tokenChannel.postMessage({
+              type: 'TOKEN_UPDATED',
+              token: data.token,
+              timestamp: Date.now()
+            });
+            console.log('Token refresh successful, broadcasted to all tabs');
+            tokenChannel.close();
+          }
 
           setAuthenticated(true);
           return true;
         }
+      } else {
+        console.log('Token refresh failed with status:', res.status);
+        const errorText = await res.text().catch(() => 'Unable to read error');
+        console.log('Error response:', errorText);
       }
 
-      console.log('Token refresh failed - invalid response');
+      console.log('Token refresh failed - invalid response or server error');
     } catch (error) {
       console.error('Error during token refresh:', error);
     }
 
+    // Cleanup on failure
     await SecureStorage.removeRefreshToken();
     localStorage.removeItem('jwt');
-    localStorage.removeItem('tokenRefreshInProgress'); // Clear flag on failure
+
+    if (!Capacitor.isNativePlatform()) {
+      localStorage.removeItem('tokenRefreshInProgress');
+    }
+
     setAuthenticated(false);
     return false;
   };
@@ -225,14 +253,38 @@ export default function App() {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       const token = localStorage.getItem('jwt');
-      if (token) {
-        console.log('Found existing JWT, assuming authenticated');
-        // If we have a JWT, assume authenticated (it will be validated on first API call)
-        setAuthenticated(true);
+
+      // On native platforms, always check for refresh token even if JWT exists
+      // because JWT might be expired and we need to verify refresh token is available
+      if (Capacitor.isNativePlatform()) {
+        console.log('Native platform detected, checking refresh token availability');
+        const refreshToken = await SecureStorage.getRefreshToken();
+
+        if (refreshToken) {
+          if (token) {
+            console.log('Found both JWT and refresh token, assuming authenticated');
+            setAuthenticated(true);
+          } else {
+            console.log('Found refresh token but no JWT, attempting token refresh');
+            const refreshSuccess = await tryRefreshToken();
+            if (!refreshSuccess) {
+              console.log('Token refresh failed on native platform, logging out');
+              setAuthenticated(false);
+            }
+          }
+        } else {
+          console.log('No refresh token found on native platform, user not authenticated');
+          setAuthenticated(false);
+        }
       } else {
-        console.log('No JWT found, attempting token refresh');
-        // No JWT, try to refresh
-        await tryRefreshToken();
+        // Web platform logic (existing)
+        if (token) {
+          console.log('Found existing JWT, assuming authenticated');
+          setAuthenticated(true);
+        } else {
+          console.log('No JWT found, attempting token refresh');
+          await tryRefreshToken();
+        }
       }
     };
 
