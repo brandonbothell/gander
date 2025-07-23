@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { type StreamMask } from '../../../source/types/shared';
-import { authFetch } from '../main';
 import type { ClientMask } from '../StreamPage';
+import { authFetch } from '../main';
 
 interface MaskEditorOverlayProps {
   pauseMaskPollingUntil: React.RefObject<number>;
@@ -17,10 +17,22 @@ interface MaskEditorOverlayProps {
   setIsDraggingMask?: (dragging: boolean) => void;
 }
 
+interface DragState {
+  maskId: string;
+  mode: 'move' | 'resize';
+  startPointerX: number;
+  startPointerY: number;
+  startMaskX: number;
+  startMaskY: number;
+  startMaskW: number;
+  startMaskH: number;
+  currentPointerX: number;
+  currentPointerY: number;
+}
+
 export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
   pauseMaskPollingUntil,
   masks,
-  setMasks,
   streamWidth,
   streamHeight,
   maskBaseWidth,
@@ -30,189 +42,277 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
   saveMaskPosition,
   setIsDraggingMask,
 }) => {
-  const [dragging, setDragging] = useState<
-    | null
-    | {
-      id: string;
-      mode: 'move' | 'resize';
-      offsetX: number;
-      offsetY: number;
-      origX: number;
-      origY: number;
-      origW?: number;
-      origH?: number;
-    }
-  >(null);
-  const [pendingPos, setPendingPos] = useState<{ [id: string]: { x: number; y: number, w: number, h: number } }>({});
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const [hoveredMaskId, setHoveredMaskId] = useState<string | null>(null);
   const [hoveredResizeId, setHoveredResizeId] = useState<string | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const pendingPosRef = useRef<{ [id: string]: { x: number; y: number, w: number, h: number } }>({});
-  const lastDragOffsetRef = useRef<{ [maskId: string]: { offsetX: number; offsetY: number; mode: 'move' | 'resize' } }>({});
   const [settingsOpenId, setSettingsOpenId] = useState<string | null>(null);
   const [settingsAnchor, setSettingsAnchor] = useState<{ x: number, y: number } | null>(null);
 
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const masksRef = useRef<ClientMask[]>(masks);
+
+  // Keep refs updated
+  useEffect(() => {
+    masksRef.current = masks;
+  }, [masks]);
+
+  useEffect(() => {
+    dragStateRef.current = dragState;
+  }, [dragState]);
+
+  // Scale factors
   const scaleX = streamWidth / maskBaseWidth;
   const scaleY = streamHeight / maskBaseHeight;
 
-  function getRelativeCoords(e: React.MouseEvent | React.TouchEvent) {
-    const rect = overlayRef.current?.getBoundingClientRect();
+  // Parse mask data safely
+  const parseMask = useCallback((maskObj: ClientMask) => {
+    try {
+      return typeof maskObj.mask === 'string' ? JSON.parse(maskObj.mask) : maskObj.mask;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Calculate new position during drag
+  const calculateDragPosition = useCallback((
+    drag: DragState,
+    currentPointerX: number,
+    currentPointerY: number
+  ) => {
+    const deltaX = currentPointerX - drag.startPointerX;
+    const deltaY = currentPointerY - drag.startPointerY;
+
+    if (drag.mode === 'move') {
+      let newX = drag.startMaskX + deltaX;
+      let newY = drag.startMaskY + deltaY;
+
+      // Clamp to bounds
+      newX = Math.max(0, Math.min(maskBaseWidth - drag.startMaskW, newX));
+      newY = Math.max(0, Math.min(maskBaseHeight - drag.startMaskH, newY));
+
+      return {
+        x: Math.round(newX),
+        y: Math.round(newY),
+        w: drag.startMaskW,
+        h: drag.startMaskH
+      };
+    } else if (drag.mode === 'resize') {
+      let newW = drag.startMaskW + deltaX;
+      let newH = drag.startMaskH + deltaY;
+
+      // Enforce minimum size and bounds
+      newW = Math.max(10, Math.min(maskBaseWidth - drag.startMaskX, newW));
+      newH = Math.max(10, Math.min(maskBaseHeight - drag.startMaskY, newH));
+
+      return {
+        x: drag.startMaskX,
+        y: drag.startMaskY,
+        w: Math.round(newW),
+        h: Math.round(newH)
+      };
+    }
+
+    return null;
+  }, [maskBaseWidth, maskBaseHeight]);
+
+  // Get current mask position - accounting for any ongoing drag
+  const getCurrentMaskPosition = useCallback((maskId: string) => {
+    const maskObj = masksRef.current.find(m => m.id === maskId);
+    if (!maskObj) return null;
+
+    const baseMask = parseMask(maskObj);
+    if (!baseMask) return null;
+
+    // If this mask is being dragged, calculate its current position
+    if (dragStateRef.current && dragStateRef.current.maskId === maskId) {
+      const drag = dragStateRef.current;
+      const currentPos = calculateDragPosition(drag, drag.currentPointerX, drag.currentPointerY);
+      if (currentPos) {
+        return currentPos;
+      }
+    }
+
+    return { x: baseMask.x, y: baseMask.y, w: baseMask.w, h: baseMask.h };
+  }, [parseMask, calculateDragPosition]);
+
+  // Get pointer coordinates in mask space
+  const getPointerCoords = useCallback((e: PointerEvent | MouseEvent | TouchEvent) => {
+    if (!overlayRef.current) return null;
+
+    const rect = overlayRef.current.getBoundingClientRect();
     let clientX = 0, clientY = 0;
+
     if ('touches' in e && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else if ('clientX' in e) {
       clientX = e.clientX;
       clientY = e.clientY;
+    } else {
+      return null;
     }
+
     return {
-      x: ((clientX - (rect?.left ?? 0)) / scaleX),
-      y: ((clientY - (rect?.top ?? 0)) / scaleY),
+      x: (clientX - rect.left) / scaleX,
+      y: (clientY - rect.top) / scaleY
     };
-  }
+  }, [scaleX, scaleY]);
 
-  function startDrag(
-    e: React.MouseEvent | React.TouchEvent,
-    maskObj: StreamMask,
-    mask: { x: number; y: number; w: number; h: number },
-    mode: 'move' | 'resize'
-  ) {
+  // Find which mask and interaction type is under the pointer
+  const getMaskUnderPointer = useCallback((pointerX: number, pointerY: number): { maskId: string, mode: 'move' | 'resize' } | null => {
+    // Check masks in reverse order (topmost first)
+    for (let i = masksRef.current.length - 1; i >= 0; i--) {
+      const maskObj = masksRef.current[i];
+      const pos = getCurrentMaskPosition(maskObj.id);
+      if (!pos) continue;
+
+      // Check resize handle area first (bottom-right corner with extended bounds)
+      const handleSize = 41 / Math.min(scaleX, scaleY);
+      const handleOffset = 8 / Math.min(scaleX, scaleY);
+      const handleLeft = pos.x + pos.w - handleSize + handleOffset;
+      const handleRight = pos.x + pos.w + handleOffset;
+      const handleTop = pos.y + pos.h - handleSize + handleOffset;
+      const handleBottom = pos.y + pos.h + handleOffset;
+
+      if (pointerX >= handleLeft && pointerX <= handleRight &&
+        pointerY >= handleTop && pointerY <= handleBottom) {
+        return { maskId: maskObj.id, mode: 'resize' };
+      }
+
+      // Check mask body area
+      if (pointerX >= pos.x && pointerX <= pos.x + pos.w &&
+        pointerY >= pos.y && pointerY <= pos.y + pos.h) {
+        return { maskId: maskObj.id, mode: 'move' };
+      }
+    }
+    return null;
+  }, [getCurrentMaskPosition, scaleX, scaleY]);
+
+  // Start drag operation
+  const handlePointerDown = useCallback((e: React.PointerEvent | React.MouseEvent | React.TouchEvent) => {
+    const nativeEvent = e.nativeEvent;
+    const coords = getPointerCoords(nativeEvent);
+    if (!coords) return;
+
+    const hit = getMaskUnderPointer(coords.x, coords.y);
+    if (!hit) return;
+
+    const pos = getCurrentMaskPosition(hit.maskId);
+    if (!pos) return;
+
+    // Prevent default to avoid text selection, etc.
+    e.preventDefault();
     e.stopPropagation();
+
+    const newDragState: DragState = {
+      maskId: hit.maskId,
+      mode: hit.mode,
+      startPointerX: coords.x,
+      startPointerY: coords.y,
+      startMaskX: pos.x,
+      startMaskY: pos.y,
+      startMaskW: pos.w,
+      startMaskH: pos.h,
+      currentPointerX: coords.x,
+      currentPointerY: coords.y,
+    };
+
+    setDragState(newDragState);
+    setIsDraggingMask?.(true);
+
+    console.log('Starting drag:', newDragState);
+  }, [getPointerCoords, getMaskUnderPointer, getCurrentMaskPosition, setIsDraggingMask]);
+
+  // Handle drag movement
+  const handlePointerMove = useCallback((e: PointerEvent | MouseEvent | TouchEvent) => {
+    const drag = dragStateRef.current;
+    if (!drag) return;
+
+    const coords = getPointerCoords(e);
+    if (!coords) return;
+
+    // Update the drag state with current pointer position
+    const updatedDrag = {
+      ...drag,
+      currentPointerX: coords.x,
+      currentPointerY: coords.y,
+    };
+    setDragState(updatedDrag);
+
+    const newPos = calculateDragPosition(updatedDrag, coords.x, coords.y);
+    if (!newPos) return;
+
+    // Update the mask position optimistically
+    onMaskMove?.(drag.maskId, newPos);
+
     e.preventDefault();
-    const coords = getRelativeCoords(e);
+  }, [getPointerCoords, calculateDragPosition, onMaskMove]);
 
-    let offsetX = coords.x - mask.x;
-    let offsetY = coords.y - mask.y;
-    if (mode === 'resize') {
-      offsetY = coords.y - (mask.y + mask.h);
-    }
-    // Store the offset for this mask
-    lastDragOffsetRef.current[maskObj.id] = { offsetX, offsetY, mode };
+  // End drag operation
+  const handlePointerUp = useCallback((e: PointerEvent | MouseEvent | TouchEvent) => {
+    const drag = dragStateRef.current;
+    if (!drag) return;
 
-    setDragging({
-      id: maskObj.id,
-      mode,
-      offsetX,
-      offsetY,
-      origX: mask.x,
-      origY: mask.y,
-      origW: mask.w,
-      origH: mask.h,
-    });
-    setPendingPosSafe({ [maskObj.id]: { x: mask.x, y: mask.y, w: mask.w, h: mask.h } });
-    if (setIsDraggingMask) setIsDraggingMask(true);
-    window.addEventListener('pointermove', handlePointerMove as any);
-    window.addEventListener('pointerup', handlePointerUp as any);
-  }
-
-  function setPendingPosSafe(newPos: { [id: string]: { x: number; y: number, w: number, h: number } }) {
-    pendingPosRef.current = { ...pendingPosRef.current, ...newPos };
-    setPendingPos(prev => ({ ...prev, ...newPos }));
-  }
-
-  function handlePointerMove(e: MouseEvent | TouchEvent) {
-    if (!dragging) return;
-    e.preventDefault();
-    const maskObj = masks.find(m => m.id === dragging.id);
-    if (!maskObj) return;
-    let mask;
-    try {
-      mask = typeof maskObj.mask === 'string' ? JSON.parse(maskObj.mask) : maskObj.mask;
-    } catch {
-      return;
-    }
-    let clientX = 0, clientY = 0;
-    if ('touches' in e && e.touches.length > 0) {
-      clientX = (e as TouchEvent).touches[0].clientX;
-      clientY = (e as TouchEvent).touches[0].clientY;
-    } else if ('clientX' in e) {
-      clientX = (e as MouseEvent).clientX;
-      clientY = (e as MouseEvent).clientY;
-    }
-    const rect = overlayRef.current?.getBoundingClientRect();
-    const relX = (clientX - (rect?.left ?? 0)) / scaleX;
-    const relY = (clientY - (rect?.top ?? 0)) / scaleY;
-
-    const minWidth = 10, minHeight = 10;
-
-    if (dragging.mode === 'move') {
-      let newX = Math.round(relX - dragging.offsetX);
-      let newY = Math.round(relY - dragging.offsetY);
-
-      // Clamp so mask stays fully inside canvas
-      newX = Math.max(0, Math.min(maskBaseWidth - mask.w, newX));
-      newY = Math.max(0, Math.min(maskBaseHeight - mask.h, newY));
-
-      setPendingPosSafe({ [maskObj.id]: { x: newX, y: newY, w: Math.round(mask.w), h: Math.round(mask.h) } });
-      if (onMaskMove) onMaskMove(maskObj.id, { x: newX, y: newY, w: Math.round(mask.w), h: Math.round(mask.h) });
-    } else if (dragging.mode === 'resize') {
-      // The pointer should control the bottom-left corner
-      // Calculate the new bottom-left position
-      const left = relX - dragging.offsetX;
-      const bottom = relY - dragging.offsetY;
-
-      // New width is from left to original right edge
-      let newW = Math.round(dragging.origX + dragging.origW! - left);
-      // New height is from original top to new bottom
-      let newH = Math.round(bottom - dragging.origY);
-
-      // Clamp width and height
-      newW = Math.max(minWidth, Math.min(newW, dragging.origX + dragging.origW!));
-      newH = Math.max(minHeight, Math.min(newH, maskBaseHeight - dragging.origY));
-
-      // Clamp x so mask stays in bounds
-      let newX = Math.round(dragging.origX + dragging.origW! - newW);
-      if (newX < 0) {
-        newW += newX;
-        newX = 0;
+    const coords = getPointerCoords(e);
+    if (coords) {
+      const finalPos = calculateDragPosition(drag, coords.x, coords.y);
+      if (finalPos && !Object.entries(finalPos).every(
+        ([key, value]) => drag[`startMask${key.charAt(0).toUpperCase() + key.slice(1) as 'X' | 'Y' | 'H' | 'W'}`] === value
+      )) {
+        console.log('Saving final position:', finalPos);
+        saveMaskPosition?.(drag.maskId, finalPos);
       }
-      // Clamp width so right edge stays in bounds
-      if (newX + newW > maskBaseWidth) {
-        newW = maskBaseWidth - newX;
-      }
-
-      setPendingPosSafe({ [maskObj.id]: { x: newX, y: Math.round(mask.y), w: newW, h: newH } });
-      if (onMaskMove) onMaskMove(maskObj.id, { x: newX, y: Math.round(mask.y), w: newW, h: newH });
     }
-  }
 
-  function handlePointerUp(e: PointerEvent) {
-    if (!dragging) return;
+    setDragState(null);
+    setIsDraggingMask?.(false);
+
     e.preventDefault();
-    window.removeEventListener('pointermove', handlePointerMove as any);
-    window.removeEventListener('pointerup', handlePointerUp as any);
+  }, [getPointerCoords, calculateDragPosition, saveMaskPosition, setIsDraggingMask]);
 
-    // Only call saveMaskPosition if position changed
-    const pos =
-      pendingPosRef.current[dragging.id] ??
-      (() => {
-        // fallback: get mask's current position from props
-        const maskObj = masks.find(m => m.id === dragging.id);
-        if (!maskObj) return undefined;
-        try {
-          const mask = typeof maskObj.mask === 'string' ? JSON.parse(maskObj.mask) : maskObj.mask;
-          return { x: mask.x, y: mask.y, w: mask.w, h: mask.h };
-        } catch {
-          return undefined;
-        }
-      })();
+  // Set up global event listeners
+  useEffect(() => {
+    const handleGlobalMove = (e: Event) => {
+      if (dragStateRef.current) {
+        handlePointerMove(e as PointerEvent | MouseEvent | TouchEvent);
+      }
+    };
 
-    if (pos && saveMaskPosition) {
-      saveMaskPosition(dragging.id, pos);
-    }
-    if (setIsDraggingMask) setIsDraggingMask(false);
-    setDragging(null);
-    setPendingPos({});
-  }
+    const handleGlobalUp = (e: Event) => {
+      if (dragStateRef.current) {
+        handlePointerUp(e as PointerEvent | MouseEvent | TouchEvent);
+      }
+    };
+
+    // Add global listeners for move and up events
+    window.addEventListener('pointermove', handleGlobalMove, { passive: false });
+    window.addEventListener('pointerup', handleGlobalUp, { passive: false });
+    window.addEventListener('mousemove', handleGlobalMove, { passive: false });
+    window.addEventListener('mouseup', handleGlobalUp, { passive: false });
+    window.addEventListener('touchmove', handleGlobalMove, { passive: false });
+    window.addEventListener('touchend', handleGlobalUp, { passive: false });
+
+    return () => {
+      window.removeEventListener('pointermove', handleGlobalMove);
+      window.removeEventListener('pointerup', handleGlobalUp);
+      window.removeEventListener('mousemove', handleGlobalMove);
+      window.removeEventListener('mouseup', handleGlobalUp);
+      window.removeEventListener('touchmove', handleGlobalMove);
+      window.removeEventListener('touchend', handleGlobalUp);
+    };
+  }, [handlePointerMove, handlePointerUp]);
 
   // Close settings when clicking outside
   useEffect(() => {
     if (!settingsOpenId) return;
-    function close(_: MouseEvent) {
+
+    const handleClickOutside = () => {
       setSettingsOpenId(null);
-    }
-    window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
+    };
+
+    window.addEventListener('pointerdown', handleClickOutside);
+    return () => window.removeEventListener('pointerdown', handleClickOutside);
   }, [settingsOpenId]);
 
   return (
@@ -228,93 +328,86 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
         zIndex: 10,
         ...style,
       }}
-      onPointerDown={() => {
-        // Only unset dragging if clicking/tapping empty space (not on a mask)
-        if (dragging) {
-          setDragging(null);
-          setPendingPos({});
-          setIsDraggingMask?.(false);
-        }
-      }}
+      onPointerDown={handlePointerDown}
+      onMouseDown={handlePointerDown}
+      onTouchStart={handlePointerDown}
     >
       {masks.map(maskObj => {
-        let mask;
-        try {
-          mask = typeof maskObj.mask === 'string' ? JSON.parse(maskObj.mask) : maskObj.mask;
-        } catch {
-          return null;
-        }
-        const isDragging = dragging && dragging.id === maskObj.id;
+        const currentPos = getCurrentMaskPosition(maskObj.id);
+        if (!currentPos) return null;
+
+        const isDragging = dragState?.maskId === maskObj.id;
         const isPending = !!maskObj.pendingUpdate;
-        const dragPos = isDragging && pendingPos[maskObj.id]
-          ? pendingPos[maskObj.id]
-          : { x: mask.x, y: mask.y, w: mask.w, h: mask.h };
+        const isHovered = hoveredMaskId === maskObj.id;
+
         return (
           <div
             key={maskObj.id}
             style={{
               position: 'absolute',
-              left: dragPos.x * scaleX,
-              top: dragPos.y * scaleY,
-              width: dragPos.w * scaleX,
-              height: dragPos.h * scaleY,
-              pointerEvents: 'none',
-              opacity: isPending ? 0.8 : 1,
-              transition: 'opacity 0.2s',
+              left: currentPos.x * scaleX,
+              top: currentPos.y * scaleY,
+              width: currentPos.w * scaleX,
+              height: currentPos.h * scaleY,
+              pointerEvents: isPending ? 'none' : 'auto',
+              opacity: isPending ? 0.7 : 1,
+              transition: isDragging ? 'none' : 'opacity 0.2s',
             }}
             onPointerEnter={() => setHoveredMaskId(maskObj.id)}
             onPointerLeave={() => setHoveredMaskId(null)}
           >
+            {/* Main mask body */}
             <div
-              draggable={false}
               style={{
                 position: 'absolute',
                 left: 0,
                 top: 0,
                 width: '100%',
                 height: '100%',
-                border: isDragging ? '2px solid #ff9800' : '2px solid #2196f3',
-                background: isDragging ? 'rgba(255,152,0,0.18)' : 'rgba(33,150,243,0.18)',
-                mixBlendMode: 'plus-lighter',
+                border: isDragging
+                  ? '3px solid #ff9800'
+                  : isHovered
+                    ? '3px solid #4caf50'
+                    : '3px solid #2196f3',
+                background: isDragging
+                  ? 'rgba(255,152,0,0.25)'
+                  : isHovered
+                    ? 'rgba(76,175,80,0.25)'
+                    : 'rgba(33,150,243,0.2)',
+                boxShadow: isDragging
+                  ? '0 4px 16px rgba(255,152,0,0.4), inset 0 0 20px rgba(255,152,0,0.1)'
+                  : isHovered
+                    ? '0 3px 14px rgba(76,175,80,0.35), inset 0 0 18px rgba(76,175,80,0.1)'
+                    : '0 2px 12px rgba(33,150,243,0.3), inset 0 0 15px rgba(33,150,243,0.08)',
                 borderRadius: 6,
-                pointerEvents: isPending ? 'none' : 'auto',
                 boxSizing: 'border-box',
-                touchAction: 'none',
-                cursor: isPending ? 'not-allowed' : (isDragging ? 'move' : 'pointer'),
-                transition: isDragging ? 'none' : 'border 0.15s, background 0.15s',
+                cursor: isPending
+                  ? 'not-allowed'
+                  : hoveredMaskId === maskObj.id
+                    ? (hoveredResizeId === maskObj.id ? 'nwse-resize' : 'move')
+                    : 'pointer',
+                transition: isDragging ? 'none' : 'all 0.15s',
                 userSelect: 'none',
-                WebkitUserSelect: 'none',
-                MozUserSelect: 'none',
-                msUserSelect: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                maskImage: 'radial-gradient(circle 16px at 16px 100%, white 16px, black 17px)',
-                WebkitMaskImage: 'radial-gradient(circle 16px at 16px 100%, white 16px, black 17px)',
+                touchAction: 'none',
               }}
-              title={maskObj.type || ''}
-              onPointerDown={isPending ? undefined : e => {
-                e.preventDefault();
-                // Remove focus from any element (including this mask)
-                if (document.activeElement instanceof HTMLElement) {
-                  document.activeElement.blur();
-                }
-                startDrag(e, maskObj, mask, 'move');
-              }}
+              title={maskObj.type || 'Mask'}
             >
               {/* Move mask icon */}
               <span
                 style={{
                   opacity:
                     isDragging
-                      ? dragging?.mode === 'move'
+                      ? dragState.mode === 'move'
                         ? 1
                         : 0
                       : (hoveredMaskId === maskObj.id && hoveredResizeId !== maskObj.id)
                         ? 1
                         : 0,
                   transform:
-                    (hoveredMaskId === maskObj.id && hoveredResizeId !== maskObj.id) || (isDragging && dragging?.mode === 'move')
+                    (hoveredMaskId === maskObj.id && hoveredResizeId !== maskObj.id) || (isDragging && dragState.mode === 'move')
                       ? 'translate(-50%, -50%) scale(1)'
                       : 'translate(-50%, -50%) scale(0.2)',
                   transition:
@@ -329,15 +422,15 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   justifyContent: 'center',
                 }}
               >
-                <svg width={Math.max(32, dragPos.w * scaleX * 0.4)}
-                  height={Math.max(32, dragPos.h * scaleY * 0.4)}
+                <svg width={Math.max(32, currentPos.w * scaleX * 0.4)}
+                  height={Math.max(32, currentPos.h * scaleY * 0.4)}
                   viewBox="0 0 572.156 572.156"
                   fill={isDragging ? '#ff9800' : 'none'}
-                  strokeWidth={isDragging ? 0 : 16}
+                  strokeWidth={isDragging ? 0 : 20}
                   stroke='#2196f3'
                   style={{
-                    opacity: 0.7,
-                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))',
+                    opacity: 0.8,
+                    filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.25))',
                     display: 'block',
                   }} version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
                   xmlSpace="preserve">
@@ -350,14 +443,17 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   </g>
                 </svg>
               </span>
-              {/* Show resize handle always, but only allow resizing on pointer down */}
+
+              {/* Resize handle */}
               <span
+                data-mask-element="true"
+                data-resize-handle="true"
                 style={{
                   position: 'absolute',
-                  left: -8,
+                  right: -8,
                   bottom: -8,
-                  width: 42,
-                  height: 42,
+                  width: 41,
+                  height: 41,
                   zIndex: 2,
                   display: 'flex',
                   alignItems: 'center',
@@ -374,19 +470,11 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                 }}
                 onPointerEnter={isPending ? undefined : () => setHoveredResizeId(maskObj.id)}
                 onPointerLeave={isPending ? undefined : () => setHoveredResizeId(null)}
-                onPointerDown={isPending ? undefined : e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (document.activeElement instanceof HTMLElement) {
-                    document.activeElement.blur();
-                  }
-                  startDrag(e, maskObj, mask, 'resize');
-                }}
               >
                 <svg
-                  width={42}
-                  height={42}
-                  viewBox="0 0 42 42"
+                  width={41}
+                  height={41}
+                  viewBox="0 0 41 41"
                   style={{
                     display: 'block',
                     pointerEvents: 'none',
@@ -399,58 +487,52 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                       mixBlendMode: 'plus-lighter', // Use additive blending to avoid stacking opacity
                     }}
                     cx={isDragging
-                      ? (dragging?.mode === 'resize' ? 20 : 13)
-                      : (hoveredResizeId === maskObj.id ? 20 : 13)}
+                      ? (dragState.mode === 'resize' ? 20.5 : 20.5)
+                      : (hoveredResizeId === maskObj.id ? 20.5 : 20.5)}
                     cy={isDragging
-                      ? (dragging?.mode === 'resize' ? 21 : 30)
-                      : (hoveredResizeId === maskObj.id ? 21 : 30)}
+                      ? (dragState.mode === 'resize' ? 20.5 : 20.5)
+                      : (hoveredResizeId === maskObj.id ? 18.5 : 20.5)}
                     r={isDragging
-                      ? (dragging?.mode === 'resize' ? 14 : 0)
-                      : (hoveredResizeId === maskObj.id ? 12 : 10)}
-                    fill={isDragging ? 'rgba(255,152,0,0.18)' : 'rgba(33,150,243,0.18)'}
-                    stroke={isDragging ? "#ff9800" : "#2196f3"}
-                    strokeWidth="2"
+                      ? (dragState.mode === 'resize' ? 13.5 : 0)
+                      : (hoveredResizeId === maskObj.id ? 11.5 : 9.5)}
+                    fill={isDragging ? 'rgba(255,152,0,0.25)' : 'rgba(100, 243, 33, 0.25)'}
+                    stroke={isDragging ? "#ff9800" : "#4caf50"}
+                    strokeWidth="3"
                   />
                   {/* Arrow triangles */}
                   <g
                     style={{
                       transition: 'transform 0.25s cubic-bezier(.4,2,.6,1)',
                       transform: hoveredResizeId === maskObj.id
-                        ? 'translate(1px, -1px)'
-                        : 'translate(0,0)',
+                        ? 'scale(2.0)'
+                        : 'scale(1.3)',
+                      transformOrigin: '20.5px 20.5px', // Center of circle
                     }}
                   >
-                    {/* Bigger arrow at 45deg (top-right) */}
+                    {/* Arrow pointing to top-left */}
                     <polygon
-                      points="17,6 26,6 26,15"
-                      fill={
+                      points={
                         isDragging
-                          ? (dragging?.mode === 'resize' ? '#ff9800' : 'none')
-                          : (hoveredResizeId === maskObj.id ? '#2196f3' : 'none')
+                          ? `17.5,17.5 17.5,21.5 21.5,17.5`
+                          : hoveredResizeId === maskObj.id
+                            ? `17.5,16.5 17.5,20.5 21.5,16.5`
+                            : `17.5,17.5 17.5,21.5 21.5,17.5`
                       }
-                      transform="rotate(14 -24 8)"
+                      fill={isDragging ? (dragState.mode === 'resize' ? '#ff9800' : dragState.mode === 'move' ? 'none' : '#4caf50') : '#4caf50'}
                       style={{
                         transition: 'fill 0.25s cubic-bezier(.4,2,.6,1)',
                       }}
                     />
-                  </g>
-                  <g
-                    style={{
-                      transition: 'transform 0.25s cubic-bezier(.4,2,.6,1)',
-                      transform: hoveredResizeId === maskObj.id
-                        ? 'translate(-1px, 1px)'
-                        : 'translate(0,0)',
-                    }}
-                  >
-                    {/* Bigger arrow at 225deg (bottom-left) */}
+                    {/* Arrow pointing to bottom-right */}
                     <polygon
-                      points="6,17 6,26 15,26"
-                      fill={
+                      points={
                         isDragging
-                          ? (dragging?.mode === 'resize' ? '#ff9800' : 'none')
-                          : (hoveredResizeId === maskObj.id ? '#2196f3' : 'none')
+                          ? `23.5,23.5 23.5,19.5 19.5,23.5`
+                          : hoveredResizeId === maskObj.id
+                            ? `23.5,22.5 23.5,18.5 19.5,22.5`
+                            : `23.5,23.5 23.5,19.5 19.5,23.5`
                       }
-                      transform="rotate(14 13 54)"
+                      fill={isDragging ? (dragState.mode === 'resize' ? '#ff9800' : dragState.mode === 'move' ? 'none' : '#4caf50') : '#4caf50'}
                       style={{
                         transition: 'fill 0.25s cubic-bezier(.4,2,.6,1)',
                       }}
@@ -458,274 +540,274 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   </g>
                 </svg>
               </span>
-            </div>
-            <button
-              disabled={isPending}
-              onPointerDown={async (e) => {
-                e.stopPropagation();
-                // Find the mask being deleted
-                const deletedMask = maskObj;
 
-                setMasks(prev => {
-                  const newMasks = prev.filter(m => m.id !== maskObj.id);
-                  // Find the mask under the deleted one with the largest overlap area
-                  let maskA = typeof deletedMask.mask === 'string' ? JSON.parse(deletedMask.mask) : deletedMask.mask;
-                  let maxOverlap = 0;
-                  let mostOverlapping: typeof maskObj | undefined;
-                  for (const m of newMasks) {
-                    let maskB = typeof m.mask === 'string' ? JSON.parse(m.mask) : m.mask;
-                    const x_overlap = Math.max(0, Math.min(maskA.x + maskA.w, maskB.x + maskB.w) - Math.max(maskA.x, maskB.x));
-                    const y_overlap = Math.max(0, Math.min(maskA.y + maskA.h, maskB.y + maskB.h) - Math.max(maskA.y, maskB.y));
-                    const overlapArea = x_overlap * y_overlap;
-                    if (overlapArea > maxOverlap) {
-                      maxOverlap = overlapArea;
-                      mostOverlapping = m;
+              <button
+                data-mask-element="true"
+                disabled={isPending}
+                onPointerDown={async (e) => {
+                  e.stopPropagation();
+                  // Find the mask being deleted
+                  const deletedMask = maskObj;
+
+                  masksRef.current = (() => {
+                    const newMasks = masksRef.current.filter(m => m.id !== maskObj.id);
+                    // Find the mask under the deleted one with the largest overlap area
+                    let maskA = typeof deletedMask.mask === 'string' ? JSON.parse(deletedMask.mask) : deletedMask.mask;
+                    let maxOverlap = 0;
+                    let mostOverlapping: typeof maskObj | undefined;
+                    for (const m of newMasks) {
+                      let maskB = typeof m.mask === 'string' ? JSON.parse(m.mask) : m.mask;
+                      const x_overlap = Math.max(0, Math.min(maskA.x + maskA.w, maskB.x + maskB.w) - Math.max(maskA.x, maskB.x));
+                      const y_overlap = Math.max(0, Math.min(maskA.y + maskA.h, maskB.y + maskB.h) - Math.max(maskA.y, maskB.y));
+                      const overlapArea = x_overlap * y_overlap;
+                      if (overlapArea > maxOverlap) {
+                        maxOverlap = overlapArea;
+                        mostOverlapping = m;
+                      }
                     }
-                  }
-                  if (mostOverlapping) {
-                    const mask = typeof mostOverlapping.mask === 'string' ? JSON.parse(mostOverlapping.mask) : mostOverlapping.mask;
-                    // Use the last drag offset from the deleted mask if available
-                    const lastOffset = lastDragOffsetRef.current[deletedMask.id];
-                    setDragging({
-                      id: mostOverlapping.id,
-                      mode: 'move',
-                      offsetX: lastOffset?.offsetX ?? 0,
-                      offsetY: lastOffset?.offsetY ?? 0,
-                      origX: mask.x,
-                      origY: mask.y,
-                      origW: mask.w,
-                      origH: mask.h
-                    });
-                    if (setIsDraggingMask) setIsDraggingMask(true);
-                  }
-                  return newMasks;
-                });
-                // After any mask API update:
-                pauseMaskPollingUntil.current = Date.now() + 1000; // Pause for 1 second
-                await authFetch(`/api/masks/${maskObj.streamId}/${maskObj.id}`, {
-                  method: 'DELETE',
-                  headers: { 'Content-Type': 'application/json' }
-                });
-              }}
-              style={{
-                position: 'absolute',
-                top: -16,
-                right: -16,
-                zIndex: 20,
-                background: '#ff5252',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-                cursor: 'pointer',
-                opacity: (hoveredMaskId === maskObj.id || (isDragging && dragging.id === maskObj.id)) ? 0.96 : 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.2s, opacity 0.35s cubic-bezier(.4,2,.6,1), transform 0.35s cubic-bezier(.4,2,.6,1)',
-                outline: 'none',
-                padding: 0,
-                pointerEvents: isPending
-                  ? 'none'
-                  : (hoveredMaskId === maskObj.id || (isDragging && dragging.id === maskObj.id))
-                    ? 'auto'
-                    : 'none',
-                transform:
-                  (hoveredMaskId === maskObj.id || (isDragging && dragging.id === maskObj.id))
-                    ? 'scale(1)'
-                    : 'scale(0.2)',
-              }}
-              title="Delete mask"
-            >
-              {/* Trash can icon */}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M7 10v7M12 10v7M17 10v7" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-                <rect x="5" y="7" width="14" height="13" rx="2" stroke="#fff" strokeWidth="2" fill="none" />
-                <rect x="9" y="3" width="6" height="3" rx="1.5" fill="#fff" />
-                <rect x="3" y="6" width="18" height="2" rx="1" fill="#fff" />
-              </svg>
-            </button>
-
-            {/* Settings Cog */}
-            <span
-              style={{
-                position: 'absolute',
-                top: -16,
-                left: -16,
-                zIndex: 30,
-                background: 'rgba(30,30,30,0.92)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-                cursor: 'pointer',
-                opacity: (hoveredMaskId === maskObj.id || (isDragging && dragging.id === maskObj.id)) ? 0.96 : 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.2s, opacity 0.35s cubic-bezier(.4,2,.6,1), transform 0.35s cubic-bezier(.4,2,.6,1)',
-                outline: 'none',
-                padding: 0,
-                pointerEvents: isPending
-                  ? 'none'
-                  : (hoveredMaskId === maskObj.id || (isDragging && dragging.id === maskObj.id))
-                    ? 'auto'
-                    : 'none',
-                transform:
-                  (hoveredMaskId === maskObj.id || (isDragging && dragging.id === maskObj.id))
-                    ? 'scale(1)'
-                    : 'scale(0.2)',
-              }}
-              onPointerDown={e => {
-                e.stopPropagation();
-                setSettingsOpenId(maskObj.id);
-                // Position popout near cog
-                const rect = (e.target as HTMLElement).getBoundingClientRect();
-                setSettingsAnchor({ x: rect.left + rect.width / 2, y: rect.bottom });
-              }}
-              title="Mask settings"
-            >
-              {/* Cog SVG */}
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <circle cx="10" cy="10" r="7" stroke="#2196f3" strokeWidth="2" fill="#fff" />
-                <path d="M10 5v2M10 13v2M5 10h2M13 10h2M7.5 7.5l1 1M11.5 11.5l1 1M7.5 12.5l1-1M11.5 8.5l1-1" stroke="#2196f3" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
-            </span>
-
-            {/* Settings Popout */}
-            {settingsOpenId === maskObj.id && settingsAnchor && (
-              <div
-                style={{
-                  position: 'fixed',
-                  left: settingsAnchor.x,
-                  top: settingsAnchor.y + 4,
-                  zIndex: 10000,
-                  background: 'rgba(30,30,30,0.98)',
-                  borderRadius: 12,
-                  boxShadow: '0 4px 24px #1a2980cc',
-                  padding: '16px 20px',
-                  minWidth: 180,
-                  color: '#fff',
-                  fontFamily: 'Roboto, Arial, sans-serif',
-                  fontSize: 15,
-                  userSelect: 'none',
-                  pointerEvents: 'auto',
+                    if (mostOverlapping) {
+                      const mask = typeof mostOverlapping.mask === 'string' ? JSON.parse(mostOverlapping.mask) : mostOverlapping.mask;
+                      setHoveredMaskId(mask.id);
+                    }
+                    return newMasks;
+                  })();
+                  // After any mask API update:
+                  pauseMaskPollingUntil.current = Date.now() + 1000; // Pause for 1 second
+                  await authFetch(`/api/masks/${maskObj.streamId}/${maskObj.id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                  });
                 }}
-                onPointerDown={e => e.stopPropagation()}
-              >
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>Disable on</div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 4 }}>
-                  <input
-                    type="checkbox"
-                    checked={maskObj.type === 'conditional'}
-                    onChange={async (e) => {
-                      const newType = e.target.checked ? 'conditional' : 'fixed';
-                      setMasks(prev =>
-                        prev.map(m =>
-                          m.id === maskObj.id ? { ...m, type: newType } : m
-                        )
-                      );
-                      setSettingsOpenId(null);
-                      // API update using PATCH
-                      await authFetch(`/api/masks/${maskObj.streamId}/${maskObj.id}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ mask: { ...mask, type: newType } }),
-                      });
-                    }}
-                    style={{ accentColor: '#2196f3', width: 18, height: 18 }}
-                  />
-                  Camera motion
-                </label>
-                <button
-                  style={{
-                    marginTop: 10,
-                    background: '#222',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '4px 12px',
-                    cursor: 'pointer',
-                    fontSize: 14,
-                  }}
-                  onClick={() => setSettingsOpenId(null)}
-                >
-                  Close
-                </button>
-              </div>
-            )}
-
-            {/* Pending update spinner/tap to edit text */}
-            {maskObj.pendingUpdate && (
-              <div
                 style={{
                   position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  width: '100%',
-                  height: '100%',
+                  top: -16,
+                  right: -16,
+                  zIndex: 20,
+                  background: '#ff5252',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 32,
+                  height: 32,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                  cursor: 'pointer',
+                  opacity: (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id)) ? 0.96 : 0,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  zIndex: 99,
+                  transition: 'background 0.2s, opacity 0.35s cubic-bezier(.4,2,.6,1), transform 0.35s cubic-bezier(.4,2,.6,1)',
+                  outline: 'none',
+                  padding: 0,
+                  pointerEvents: isPending
+                    ? 'none'
+                    : (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id))
+                      ? 'auto'
+                      : 'none',
+                  transform:
+                    (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id))
+                      ? 'scale(1)'
+                      : 'scale(0.2)',
+                }}
+                title="Delete mask"
+              >
+                {/* Trash can icon */}
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M7 10v7M12 10v7M17 10v7" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+                  <rect x="5" y="7" width="14" height="13" rx="2" stroke="#fff" strokeWidth="2" fill="none" />
+                  <rect x="9" y="3" width="6" height="3" rx="1.5" fill="#fff" />
+                  <rect x="3" y="6" width="18" height="2" rx="1" fill="#fff" />
+                </svg>
+              </button>
+
+              {/* Settings Cog */}
+              <span
+                data-mask-element="true"
+                style={{
+                  position: 'absolute',
+                  top: -16,
+                  left: -16,
+                  zIndex: 30,
+                  background: 'rgba(30,30,30,0.92)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 32,
+                  height: 32,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                  cursor: 'pointer',
+                  opacity: (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id)) ? 0.96 : 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.2s, opacity 0.35s cubic-bezier(.4,2,.6,1), transform 0.35s cubic-bezier(.4,2,.6,1)',
+                  outline: 'none',
+                  padding: 0,
+                  pointerEvents: isPending
+                    ? 'none'
+                    : (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id))
+                      ? 'auto'
+                      : 'none',
+                  transform:
+                    (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id))
+                      ? 'scale(1)'
+                      : 'scale(0.2)',
+                }}
+                onPointerDown={e => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setSettingsOpenId(maskObj.id);
+                  // Position popout near cog
+                  const rect = (e.target as HTMLElement).getBoundingClientRect();
+                  setSettingsAnchor({ x: rect.left + rect.width / 2, y: rect.bottom });
+                }}
+                title="Mask settings"
+              >
+                {/* Cog SVG */}
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="10" r="7" stroke="#2196f3" strokeWidth="2" fill="#fff" />
+                  <path d="M10 5v2M10 13v2M5 10h2M13 10h2M7.5 7.5l1 1M11.5 11.5l1 1M7.5 12.5l1-1M11.5 8.5l1-1" stroke="#2196f3" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </span>
+
+              {/* Settings Popout */}
+              {settingsOpenId === maskObj.id && settingsAnchor && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    left: settingsAnchor.x,
+                    top: settingsAnchor.y + 4,
+                    zIndex: 10000,
+                    background: 'rgba(30,30,30,0.98)',
+                    borderRadius: 12,
+                    boxShadow: '0 4px 24px #1a2980cc',
+                    padding: '16px 20px',
+                    minWidth: 180,
+                    color: '#fff',
+                    fontFamily: 'Roboto, Arial, sans-serif',
+                    fontSize: 15,
+                    userSelect: 'none',
+                    pointerEvents: 'auto',
+                    cursor: 'default',
+                  }}
+                  onPointerDown={e => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Disable on</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 4 }}>
+                    <input
+                      type="checkbox"
+                      checked={maskObj.type === 'conditional'}
+                      disabled={maskObj.pendingUpdate}
+                      onChange={async (e) => {
+                        const newType = e.target.checked ? 'conditional' : 'fixed';
+                        masksRef.current = masksRef.current.map(m => m.id === maskObj.id ? { ...m, type: newType } : m)
+                        maskObj.pendingUpdate = true;
+                        // API update using PATCH
+                        await authFetch(`/api/masks/${maskObj.streamId}/${maskObj.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ mask: { ...parseMask(maskObj), type: newType } }),
+                        });
+                        maskObj.pendingUpdate = false;
+                      }}
+                      style={{ accentColor: '#2196f3', width: 18, height: 18 }}
+                    />
+                    Camera motion
+                  </label>
+                  <button
+                    style={{
+                      marginTop: 10,
+                      background: '#222',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '4px 12px',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setSettingsOpenId(null)
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+
+              {/* Pending update spinner */}
+              {maskObj.pendingUpdate && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 99,
+                    pointerEvents: 'none',
+                    background: 'rgba(255,255,255,0.15)',
+                  }}
+                >
+                  {/* Simple spinner SVG */}
+                  <svg width="32" height="32" viewBox="0 0 50 50">
+                    <circle
+                      cx="25"
+                      cy="25"
+                      r="20"
+                      fill="none"
+                      stroke="#2196f3"
+                      strokeWidth="5"
+                      strokeDasharray="31.4 31.4"
+                      strokeLinecap="round"
+                    >
+                      <animateTransform
+                        attributeName="transform"
+                        type="rotate"
+                        from="0 25 25"
+                        to="360 25 25"
+                        dur="1s"
+                        repeatCount="indefinite"
+                      />
+                    </circle>
+                  </svg>
+                </div>
+              )}
+
+              {/* Mask label */}
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  transform: (
+                    (hoveredMaskId === maskObj.id && hoveredResizeId !== maskObj.id) ||
+                    (isDragging && dragState.mode === 'move')
+                  )
+                    ? 'translate(-50%, -190%)'
+                    : 'translate(-50%, -50%)',
+                  color: '#2196f3',
+                  fontWeight: 800,
+                  fontSize: Math.max(18, currentPos.h * scaleY * 0.14),
+                  textShadow: '0 3px 12px rgba(0,0,0,0.5), 0 1px 4px rgba(33,150,243,0.3)',
                   pointerEvents: 'none',
-                  background: 'rgba(255,255,255,0.15)',
+                  zIndex: 10,
+                  transition:
+                    'transform 0.35s cubic-bezier(.4,2,.6,1), opacity 0.25s cubic-bezier(.4,2,.6,1)',
+                  opacity: isDragging || maskObj.pendingUpdate ? 0 : 1,
+                  userSelect: 'none',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {/* Simple spinner SVG */}
-                <svg width="32" height="32" viewBox="0 0 50 50">
-                  <circle
-                    cx="25"
-                    cy="25"
-                    r="20"
-                    fill="none"
-                    stroke="#2196f3"
-                    strokeWidth="5"
-                    strokeDasharray="31.4 31.4"
-                    strokeLinecap="round"
-                  >
-                    <animateTransform
-                      attributeName="transform"
-                      type="rotate"
-                      from="0 25 25"
-                      to="360 25 25"
-                      dur="1s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                </svg>
-              </div>
-            )}
-            <span
-              style={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                transform: (
-                  (hoveredMaskId === maskObj.id && hoveredResizeId !== maskObj.id) ||
-                  (isDragging && dragging?.mode === 'move')
-                )
-                  ? 'translate(-50%, -190%)'
-                  : 'translate(-50%, -50%)',
-                color: '#2196f3',
-                fontWeight: 700,
-                fontSize: Math.max(16, dragPos.h * scaleY * 0.15),
-                textShadow: '0 2px 8px rgba(0,0,0,0.35)',
-                pointerEvents: 'none',
-                zIndex: 10,
-                transition:
-                  'transform 0.35s cubic-bezier(.4,2,.6,1), opacity 0.25s cubic-bezier(.4,2,.6,1)',
-                opacity: isDragging || maskObj.pendingUpdate ? 0 : 1,
-                userSelect: 'none',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {'ontouchstart' in window ? 'Tap to edit' : 'Click to edit'}
-            </span>
+                Drag to edit
+              </span>
+            </div>
           </div>
         );
       })}

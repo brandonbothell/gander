@@ -1474,8 +1474,8 @@ app.patch('/api/masks/:streamId/:maskId', jwtAuth, express.json(), async (req, r
 app.delete('/api/masks/:streamId/:maskId', jwtAuth, express.json(), async (req, res) => {
   const { streamId, maskId } = req.params;
   await prisma.streamMask.delete({ where: { id_streamId: { streamId, id: maskId } } })
-    .catch(() => res.status(500).json({ success: false, error: 'Failed to delete mask' }))
-    .then(() => res.json({ success: true }));
+    .then(() => res.json({ success: true }))
+    .catch(() => res.status(500).json({ success: false, error: 'Failed to delete mask' }));
 });
 
 // --- Helper to create a signed latest thumbnail URL for a stream ---

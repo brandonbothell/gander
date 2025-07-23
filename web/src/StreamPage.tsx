@@ -2486,10 +2486,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
                   // Default mask size and position (centered, 160x90 on 320x180 stream)
                   const defaultMask = {
-                    x: 120,
-                    y: 45,
-                    w: 80,
-                    h: 45,
+                    x: 60,
+                    y: 35,
+                    w: 40,
+                    h: 20,
                     type: 'fixed'
                   };
                   // After any mask API update:
@@ -2672,6 +2672,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
                     console.warn(`Failed to parse mask for ID ${maskId}`);
                     return;
                   }
+
                   // Always use all four properties from newPos, fallback to mask if missing
                   const x = newPos.x ?? mask.x;
                   const y = newPos.y ?? mask.y;
