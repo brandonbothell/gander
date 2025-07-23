@@ -2276,7 +2276,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             alignItems: 'center',
             width: '100%',
             maxWidth: 900,
-            margin: `${isMobile && !isIOS() ? 75 : 25}px auto auto`
+            margin: `calc(env(safe-area-inset-top, 0px) + 25px) auto auto`
           }}
         >
           <RecordingBar

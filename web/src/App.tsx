@@ -48,12 +48,12 @@ export default function App() {
           const startTime = parseInt(refreshInProgress);
           const timeSinceStart = Date.now() - startTime;
 
-          if (timeSinceStart < 10000) {
+          if (timeSinceStart < 5000) {
             debugLog(`Another tab is refreshing (${timeSinceStart}ms ago), waiting...`);
 
             return new Promise((resolve) => {
               let attempts = 0;
-              const maxAttempts = 100; // 10 seconds max wait
+              const maxAttempts = 50; // 5 seconds max wait
               const tokenChannel = new BroadcastChannel('tokenUpdates');
 
               const handleTokenUpdate = (event: MessageEvent) => {

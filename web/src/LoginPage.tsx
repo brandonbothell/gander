@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { API_BASE } from './main';
 import { getDeviceFingerprint } from '../../source/types/deviceInfo';
+import { Capacitor } from '@capacitor/core';
 
 export default function LoginPage({ onLogin }: { onLogin: (token: string, refreshToken: string) => void }) {
   const [username, setUsername] = useState('');
@@ -24,6 +25,9 @@ export default function LoginPage({ onLogin }: { onLogin: (token: string, refres
 
       const data = await response.json();
       if (data.success) {
+        if (!Capacitor.isNativePlatform()) {
+          localStorage.removeItem('tokenRefreshInProgress');
+        }
         onLogin(data.token, data.refreshToken);
       } else {
         setError(data.message || 'Login failed');
