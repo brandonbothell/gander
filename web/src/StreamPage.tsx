@@ -2717,15 +2717,37 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             opacity: recordingsListOpen ? 1 : 0,
           }}
           onTouchStart={e => {
-            if (selected.length === 0) {
-              e.preventDefault()
-              handleCopyrightTouchStart()
+            const scrollTop = window.scrollY || window.pageYOffset;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+
+            // Calculate how close to bottom (in pixels from bottom)
+            const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+            const bottomThreshold = windowHeight * 0.5; // 50% of viewport height
+
+            if (
+              selected.length === 0 &&
+              distanceFromBottom <= bottomThreshold
+            ) {
+              e.preventDefault();
+              handleCopyrightTouchStart();
             }
           }}
           onTouchMove={e => e.preventDefault()}
           onTouchEnd={() => {
-            if (selected.length === 0) {
-              handleCopyrightTouchEnd()
+            const scrollTop = window.scrollY || window.pageYOffset;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+
+            // Calculate how close to bottom (in pixels from bottom)
+            const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+            const bottomThreshold = windowHeight * 0.5; // 50% of viewport height
+
+            if (
+              selected.length === 0 &&
+              distanceFromBottom <= bottomThreshold
+            ) {
+              handleCopyrightTouchEnd();
             }
           }}
         />
