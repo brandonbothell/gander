@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { type Stream } from 'c:/Users/shado/Documents/Raspberry PI/SecurityCam/source/types/shared';
+import { type Stream } from '../../../source/types/shared';
 
 interface EditNicknameModalProps {
   showModal: boolean;
