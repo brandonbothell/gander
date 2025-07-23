@@ -24,7 +24,8 @@ export const prisma = new PrismaClient();
 
 // Motion logging setup
 const apiStartTime = new Date().toISOString().replace(/[:.]/g, '-');
-const motionLogPath = path.join(__dirname, '..', 'logs', `motion-${apiStartTime}.log`);
+const motionLogPath = path.join(__dirname, '..', 'logs', `motion`);
+const authLogPath = path.join(__dirname, '..', 'logs', `auth`);
 
 // Ensure logs directory exists
 const logsDir = path.dirname(motionLogPath);
@@ -37,9 +38,25 @@ export function logMotion(message: string) {
   const timestamp = new Date().toISOString();
   const logEntry = `${timestamp} ${message}\n`;
   try {
-    fs.appendFileSync(motionLogPath, logEntry);
+    fs.appendFileSync(`${motionLogPath}-latest.log`, logEntry);
   } catch (error) {
     console.error('Failed to write to motion log:', error);
+  }
+}
+
+export function logAuth(message: string, level: 'info' | 'error' | 'warn' = 'info') {
+  const timestamp = new Date().toISOString();
+  const logEntry = `${timestamp} [${level}] ${message}\n`;
+  try {
+    fs.appendFileSync(`${authLogPath}-latest.log`, logEntry);
+  } catch (error) {
+    console.error('Failed to write to auth log:', error);
+  }
+
+  if (level === 'error') {
+    console.error(logEntry);
+  } else if (level === 'warn') {
+    console.warn(logEntry);
   }
 }
 
@@ -241,6 +258,13 @@ app.get('/hls/:streamId/:segment', jwtAuth, (req, res) => {
 // --- Clean Exit Handler ---
 async function cleanExit() {
   console.log('\nExiting... Cleaning up.');
+
+  // Rename log files
+  console.log('Renaming log files...')
+  try {
+    fs.renameSync(`${motionLogPath}-latest.log`, `${motionLogPath}-${apiStartTime}.log`);
+    fs.renameSync(`${authLogPath}-latest.log`, `${authLogPath}-${apiStartTime}.log`);
+  } catch (error) { console.error('Failed to rename log files:', error) }
 
   // First, save any pending motion segments before cleaning up directories
   for (const streamId of Object.keys(dynamicStreams)) {
@@ -473,13 +497,13 @@ app.post('/api/refresh-token', async (req, res) => {
     return;
   }
 
-  console.log(`[Refresh Token] User ${user.username} refreshing token from IP: ${req.ip}`);
+  logAuth(`[Refresh Token] User ${user.username} refreshing token from IP: ${req.ip}`);
 
   let tokens: string[] = [];
   try {
     tokens = JSON.parse(user.refreshTokens || '[]');
   } catch (err) {
-    console.error('Failed to parse refresh tokens for user:', user.username, err);
+    logAuth(`Failed to parse refresh tokens for user: ${user.username}`, 'error');
     res.status(500).json({ error: 'Failed to parse refresh tokens' });
     return;
   }
@@ -488,7 +512,7 @@ app.post('/api/refresh-token', async (req, res) => {
     try {
       const decoded = jwt.verify(refreshToken, JWT_SECRET) as { exp?: number };
       if (!decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) {
-        console.error('Refresh token expired for user:', user.username);
+        logAuth(`Refresh token expired for user: ${user.username}`, 'error');
         res.status(401).json({ error: 'Refresh token expired' });
         return null;
       }
@@ -501,14 +525,14 @@ app.post('/api/refresh-token', async (req, res) => {
       tokens.push(newRefreshToken);
       return newRefreshToken;
     } catch (err) {
-      console.error('Failed to verify refresh token for user:', user.username, err);
+      logAuth(`Failed to verify refresh token for user: ${user.username}`, 'error');
       res.status(401).json({ error: 'Invalid refresh token' });
       return null;
     }
   })();
 
   if (!newRefreshToken) {
-    console.error('Failed to generate new refresh token for user:', user.username);
+    logAuth(`Failed to generate new refresh token for user: ${user.username}`, 'error');
     res.status(401).json({ error: 'Failed to generate new refresh token' });
     return;
   }
@@ -540,7 +564,7 @@ app.post('/api/refresh-token', async (req, res) => {
 
     // Update IP if it changed (network switching)
     if (device.ip !== (req.ip || 'Unknown')) {
-      console.log(`[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${req.ip}`);
+      logAuth(`[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${req.ip}`, 'warn');
       device.ip = req.ip || 'Unknown';
     }
 
@@ -557,6 +581,7 @@ app.post('/api/refresh-token', async (req, res) => {
       channelId: 'security_event_channel'
     }, user.username);
     res.status(403).json({ error: 'Unauthorized activity detected' });
+    logAuth(`[${user.username}] Unauthorized activity detected from IP: ${req.ip}`, 'warn');
     return;
   }
 
@@ -616,12 +641,12 @@ app.post('/api/logout', async (req, res) => {
             }
           });
 
-          console.log(`[Logout] User ${user.username} logged out from IP: ${req.ip}`);
+          logAuth(`[Logout] User ${user.username} logged out from IP: ${req.ip}`);
           res.json({ success: true });
           return
         }
       } catch {
-        console.log(`Failed to parse refreshTokens for user ${user.username}, skipping logout.`);
+        logAuth(`Failed to parse refreshTokens for user ${user.username}, skipping logout.`, 'error');
         res.status(500).json({ error: 'Failed to logout' });
       }
     }
