@@ -161,6 +161,20 @@ export class StreamManager {
 
   // Main HLS stream - balanced for stability and performance
   startFFmpeg() {
+    // CRITICAL: Clean the HLS directory before starting reencoding
+    // This prevents segment number conflicts
+    try {
+      const files = fs.readdirSync(this.config.hlsDir);
+      files.forEach(file => {
+        if (file.endsWith('.ts') || file.endsWith('.m3u8')) {
+          fs.unlinkSync(path.join(this.config.hlsDir, file));
+        }
+      });
+      console.log(`[${this.config.id}] Cleaned HLS directory: ${this.config.hlsDir}`);
+    } catch (error) {
+      console.log(`[${this.config.id}] Could not clean HLS directory: ${error}`);
+    }
+
     const inputIsRtsp = this.config.ffmpegInput.startsWith('rtsp://');
     const inputUrl = inputIsRtsp ? this.getRtspUrlWithAuth() : this.config.ffmpegInput;
 
