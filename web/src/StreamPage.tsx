@@ -152,7 +152,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [showMobileLogout, setShowMobileLogout] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   // --- Debug overlay state ---
-  const [debugLongPressActive, setDebugLongPressActive] = useState(false);
+  const [_, setDebugLongPressActive] = useState(false);
   const debugLongPressTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Handler for copyright long-press (touch devices)
@@ -160,7 +160,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     if (!isTouchInput) return;
     setDebugLongPressActive(true);
     debugLongPressTimeout.current = setTimeout(() => {
-      if (debugLongPressActive) setShowDebug(true);
+      setShowDebug(true);
       setDebugLongPressActive(false);
     }, 800); // 800ms long-press
   }
