@@ -45,25 +45,22 @@ export function setAuthHandlers(logout: () => Promise<void>, tryRefreshToken: ()
 
 // Track ongoing refresh attempts to prevent multiple simultaneous refreshes
 let tokenRefreshPromise: Promise<boolean> | null = null;
+let isRefreshInProgress = false;
 
 export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   const token = getToken();
-
-  // Always get the latest JWT from localStorage (in case another tab updated it)
   const jwt = localStorage.getItem('jwt');
 
-  if (!jwt && globalTryRefreshToken && globalLogout) {
-    // No JWT available, try to refresh
-    const refreshed = await globalTryRefreshToken();
-    if (!refreshed) {
-      await globalLogout();
-      throw new Error('Authentication failed');
-    }
-    // Get the new JWT after refresh
-    const newJwt = localStorage.getItem('jwt');
-    if (!newJwt) {
-      await globalLogout();
-      throw new Error('Authentication failed');
+  if (!jwt && globalTryRefreshToken && globalLogout && !isRefreshInProgress) {
+    isRefreshInProgress = true;
+    try {
+      const refreshed = await globalTryRefreshToken();
+      if (!refreshed) {
+        await globalLogout();
+        throw new Error('Authentication failed');
+      }
+    } finally {
+      isRefreshInProgress = false;
     }
   }
 
