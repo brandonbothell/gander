@@ -35,6 +35,34 @@ const StreamControls: React.FC<StreamControlsProps> = ({
   API_BASE,
   pauseMaskPollingUntil,
 }) => {
+  // Add this state to track if recording bar was ever open
+  const [hasRecordingBarBeenOpen, setHasRecordingBarBeenOpen] = React.useState(false);
+
+  // Listen for recording bar state changes
+  React.useEffect(() => {
+    // Check if RecordingBar is open by looking for it in the DOM
+    const recordingBar = document.querySelector('.recording-bar');
+    if (recordingBar) {
+      setHasRecordingBarBeenOpen(true);
+    }
+  }, []);
+
+  // Calculate dynamic top position
+  const getTopPosition = () => {
+    const recordingBar = document.querySelector('.recording-bar');
+    const isRecordingBarOpen = recordingBar && recordingBar.clientHeight > 0;
+
+    if (isRecordingBarOpen) {
+      return -44; // Normal position when recording bar is open
+    } else if (hasRecordingBarBeenOpen) {
+      return -44; // Maintain consistent position after recording bar has been used
+    } else {
+      return -44; // Default position
+    }
+  };
+
+  const topPosition = getTopPosition();
+
   const handleAddMask = async () => {
     if (!activeStream) return;
 
@@ -78,7 +106,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
         className="reload-btn"
         style={{
           position: 'absolute',
-          top: -44,
+          top: topPosition,
           left: 0,
           zIndex: 2,
           minWidth: 56,
@@ -129,7 +157,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
             className="reload-btn"
             style={{
               position: 'absolute',
-              top: -44,
+              top: topPosition,
               left: 72, // Position it next to the notifications button
               zIndex: 2,
               minWidth: 120,
@@ -169,7 +197,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
             className="reload-btn"
             style={{
               position: 'absolute',
-              top: -44,
+              top: topPosition,
               left: 72,
               zIndex: 2,
               minWidth: 120,
@@ -200,7 +228,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
           className="reload-btn"
           style={{
             position: 'absolute',
-            top: -44,
+            top: topPosition,
             left: isMobile ? 72 : 228, // On mobile, take the Sessions button position
             zIndex: 2,
             minWidth: 100,
@@ -242,7 +270,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
           className="reload-btn"
           style={{
             position: 'absolute',
-            top: -44,
+            top: topPosition,
             right: 140,
             zIndex: 2,
             minWidth: 120,
@@ -278,7 +306,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
         className="reload-btn"
         style={{
           position: 'absolute',
-          top: -44,
+          top: topPosition,
           right: 0,
           zIndex: 2,
           minWidth: 120,

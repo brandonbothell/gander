@@ -2281,6 +2281,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
               API_BASE={API_BASE}
               pauseMaskPollingUntil={pauseMaskPollingUntil}
             />
+
+            {/* Main stream element with loading state and StreamControlBar */}
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <video
                 ref={videoRef}
