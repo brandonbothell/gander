@@ -47,10 +47,13 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
   const [hoveredResizeId, setHoveredResizeId] = useState<string | null>(null);
   const [settingsOpenId, setSettingsOpenId] = useState<string | null>(null);
   const [settingsAnchor, setSettingsAnchor] = useState<{ x: number, y: number } | null>(null);
+  const [touchSelectedMaskId, setTouchSelectedMaskId] = useState<string | null>(null);
 
   const overlayRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const masksRef = useRef<ClientMask[]>(masks);
+  const touchStartTimeRef = useRef<number>(0);
+  const touchStartCoordsRef = useRef<{ x: number; y: number } | null>(null);
 
   // Keep refs updated
   useEffect(() => {
@@ -64,6 +67,17 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
   // Scale factors
   const scaleX = streamWidth / maskBaseWidth;
   const scaleY = streamHeight / maskBaseHeight;
+
+  // Check if device supports touch
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  // Get effective hover state (combines mouse hover and touch selection)
+  const getEffectiveHoverState = useCallback((maskId: string) => {
+    if (isTouchDevice) {
+      return touchSelectedMaskId === maskId;
+    }
+    return hoveredMaskId === maskId;
+  }, [isTouchDevice, touchSelectedMaskId, hoveredMaskId]);
 
   // Parse mask data safely
   const parseMask = useCallback((maskObj: ClientMask) => {
@@ -195,8 +209,22 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
     const coords = getPointerCoords(nativeEvent);
     if (!coords) return;
 
+    // Store touch start info for touch devices
+    if (isTouchDevice) {
+      touchStartTimeRef.current = Date.now();
+      touchStartCoordsRef.current = coords;
+    }
+
     const hit = getMaskUnderPointer(coords.x, coords.y);
-    if (!hit) return;
+    if (!hit) {
+      // Clicked/touched outside any mask
+      if (isTouchDevice && touchSelectedMaskId) {
+        setTouchSelectedMaskId(null);
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return;
+    }
 
     const pos = getCurrentMaskPosition(hit.maskId);
     if (!pos) return;
@@ -222,7 +250,7 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
     setIsDraggingMask?.(true);
 
     console.log('Starting drag:', newDragState);
-  }, [getPointerCoords, getMaskUnderPointer, getCurrentMaskPosition, setIsDraggingMask]);
+  }, [getPointerCoords, getMaskUnderPointer, getCurrentMaskPosition, setIsDraggingMask, isTouchDevice, touchSelectedMaskId]);
 
   // Handle drag movement
   const handlePointerMove = useCallback((e: PointerEvent | MouseEvent | TouchEvent) => {
@@ -256,6 +284,34 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
 
     const coords = getPointerCoords(e);
     if (coords) {
+      // Check if this was a touch tap rather than a drag
+      if (isTouchDevice && touchStartCoordsRef.current) {
+        const timeDiff = Date.now() - touchStartTimeRef.current;
+        const distanceX = Math.abs(coords.x - touchStartCoordsRef.current.x);
+        const distanceY = Math.abs(coords.y - touchStartCoordsRef.current.y);
+        const totalDistance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+        // Consider it a tap if it was quick and didn't move much
+        const isTap = timeDiff < 300 && totalDistance < 10;
+
+        if (isTap) {
+          // Handle touch selection
+          const hit = getMaskUnderPointer(coords.x, coords.y);
+          if (hit) {
+            if (touchSelectedMaskId === hit.maskId) {
+              setTouchSelectedMaskId(null);
+            } else {
+              setTouchSelectedMaskId(hit.maskId);
+            }
+          }
+
+          setDragState(null);
+          setIsDraggingMask?.(false);
+          e.preventDefault();
+          return;
+        }
+      }
+
       const finalPos = calculateDragPosition(drag, coords.x, coords.y);
       if (finalPos && !Object.entries(finalPos).every(
         ([key, value]) => drag[`startMask${key.charAt(0).toUpperCase() + key.slice(1) as 'X' | 'Y' | 'H' | 'W'}`] === value
@@ -269,7 +325,7 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
     setIsDraggingMask?.(false);
 
     e.preventDefault();
-  }, [getPointerCoords, calculateDragPosition, saveMaskPosition, setIsDraggingMask]);
+  }, [getPointerCoords, calculateDragPosition, saveMaskPosition, setIsDraggingMask, isTouchDevice, getMaskUnderPointer, touchSelectedMaskId]);
 
   // Set up global event listeners
   useEffect(() => {
@@ -315,6 +371,13 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
     return () => window.removeEventListener('pointerdown', handleClickOutside);
   }, [settingsOpenId]);
 
+  // Clear touch selection when settings are opened
+  useEffect(() => {
+    if (settingsOpenId && isTouchDevice) {
+      setTouchSelectedMaskId(null);
+    }
+  }, [settingsOpenId, isTouchDevice]);
+
   return (
     <div
       ref={overlayRef}
@@ -338,7 +401,7 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
 
         const isDragging = dragState?.maskId === maskObj.id;
         const isPending = !!maskObj.pendingUpdate;
-        const isHovered = hoveredMaskId === maskObj.id;
+        const isSelected = getEffectiveHoverState(maskObj.id); // For touch devices, this includes touch selection
 
         return (
           <div
@@ -366,24 +429,24 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                 height: '100%',
                 border: isDragging
                   ? '3px solid #ff9800'
-                  : isHovered
+                  : isSelected
                     ? '3px solid #4caf50'
                     : '3px solid #2196f3',
                 background: isDragging
                   ? 'rgba(255,152,0,0.25)'
-                  : isHovered
+                  : isSelected
                     ? 'rgba(76,175,80,0.25)'
                     : 'rgba(33,150,243,0.2)',
                 boxShadow: isDragging
                   ? '0 4px 16px rgba(255,152,0,0.4), inset 0 0 20px rgba(255,152,0,0.1)'
-                  : isHovered
+                  : isSelected
                     ? '0 3px 14px rgba(76,175,80,0.35), inset 0 0 18px rgba(76,175,80,0.1)'
                     : '0 2px 12px rgba(33,150,243,0.3), inset 0 0 15px rgba(33,150,243,0.08)',
                 borderRadius: 6,
                 boxSizing: 'border-box',
                 cursor: isPending
                   ? 'not-allowed'
-                  : hoveredMaskId === maskObj.id
+                  : isSelected
                     ? (hoveredResizeId === maskObj.id ? 'nwse-resize' : 'move')
                     : 'pointer',
                 transition: isDragging ? 'none' : 'all 0.15s',
@@ -403,11 +466,11 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                       ? dragState.mode === 'move'
                         ? 1
                         : 0
-                      : (hoveredMaskId === maskObj.id && hoveredResizeId !== maskObj.id)
+                      : (isSelected && hoveredResizeId !== maskObj.id)
                         ? 1
                         : 0,
                   transform:
-                    (hoveredMaskId === maskObj.id && hoveredResizeId !== maskObj.id) || (isDragging && dragState.mode === 'move')
+                    (isSelected && hoveredResizeId !== maskObj.id) || (isDragging && dragState.mode === 'move')
                       ? 'translate(-50%, -50%) scale(1)'
                       : 'translate(-50%, -50%) scale(0.2)',
                   transition:
@@ -591,7 +654,7 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   height: 32,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
                   cursor: 'pointer',
-                  opacity: (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id)) ? 0.96 : 0,
+                  opacity: (isSelected || (isDragging && dragState.maskId === maskObj.id)) ? 0.96 : 0,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -600,11 +663,11 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   padding: 0,
                   pointerEvents: isPending
                     ? 'none'
-                    : (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id))
+                    : (isSelected || (isDragging && dragState.maskId === maskObj.id))
                       ? 'auto'
                       : 'none',
                   transform:
-                    (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id))
+                    (isSelected || (isDragging && dragState.maskId === maskObj.id))
                       ? 'scale(1)'
                       : 'scale(0.2)',
                 }}
@@ -635,7 +698,7 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   height: 32,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
                   cursor: 'pointer',
-                  opacity: (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id)) ? 0.96 : 0,
+                  opacity: (isSelected || (isDragging && dragState.maskId === maskObj.id)) ? 0.96 : 0,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -644,11 +707,11 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   padding: 0,
                   pointerEvents: isPending
                     ? 'none'
-                    : (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id))
+                    : (isSelected || (isDragging && dragState.maskId === maskObj.id))
                       ? 'auto'
                       : 'none',
                   transform:
-                    (hoveredMaskId === maskObj.id || (isDragging && dragState.maskId === maskObj.id))
+                    (isSelected || (isDragging && dragState.maskId === maskObj.id))
                       ? 'scale(1)'
                       : 'scale(0.2)',
                 }}
@@ -787,7 +850,7 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   left: '50%',
                   top: '50%',
                   transform: (
-                    (hoveredMaskId === maskObj.id && hoveredResizeId !== maskObj.id) ||
+                    (isSelected && hoveredResizeId !== maskObj.id) ||
                     (isDragging && dragState.mode === 'move')
                   )
                     ? 'translate(-50%, -190%)'
