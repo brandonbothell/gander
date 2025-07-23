@@ -693,6 +693,20 @@ label[style*="align-items: center"] {
   }
 }
 
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  .main-video-container {
+    margin-top: calc(env(safe-area-inset-top, 0px) + 40px) !important;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+}
+
+@media screen and (orientation: portrait) {
+  .main-video-container {
+    margin-top: calc(env(safe-area-inset-top, 0px) + 25px);
+  }
+}
+
 /* Only apply absolute positioning when NOT inside the floating menu popout */
 .floating-menu-popout .deselect-btn,
 .floating-menu-popout .batch-delete-btn {

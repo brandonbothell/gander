@@ -2242,16 +2242,14 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       <div style={{ userSelect: 'none' }}>
         {/* Main video and mask editor remain unchanged, but use activeStream */}
         <div
+          className='main-video-container'
           style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             width: '100%',
             maxWidth: 900,
-            margin: '0 auto',
-            paddingTop: 'max(25px, env(safe-area-inset-top, 0px))',
-            paddingLeft: 'env(safe-area-inset-left, 0px)',
-            paddingRight: 'env(safe-area-inset-right, 0px)',
+            margin: `25px auto`
           }}
         >
           <RecordingBar
