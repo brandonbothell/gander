@@ -395,9 +395,7 @@ video:focus, video:hover {
   .recordings-list {
     width: 100vw;
     max-width: 100vw;
-    margin-left: 0;
-    margin-right: 0;
-    margin: 1em 0;
+    margin: 1em 0 !important;
     border-radius: 0;
     padding-left: 0.5em;
     padding-right: 0.5em;

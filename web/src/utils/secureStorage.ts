@@ -1,165 +1,159 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 
-// Simple encryption/decryption using Web Crypto API
-class SecureStorage {
-  private static readonly STORAGE_KEY = 'secureTokens';
-  private static readonly ENCRYPTION_KEY_NAME = 'tokenEncryptionKey';
-  private static encryptionKey: CryptoKey | null = null;
+class SecureStorageService {
+  private isSecureContext(): boolean {
+    return window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+  }
 
-  // Generate or retrieve encryption key
-  private static async getEncryptionKey(): Promise<CryptoKey> {
-    if (this.encryptionKey) {
-      return this.encryptionKey;
+  private async getEncryptionKey(): Promise<CryptoKey | null> {
+    // Only use Web Crypto API in secure contexts
+    if (!this.isSecureContext() || !window.crypto?.subtle) {
+      return null;
     }
 
-    // Try to get existing key from localStorage
-    const storedKey = localStorage.getItem(this.ENCRYPTION_KEY_NAME);
-
-    if (storedKey) {
-      try {
-        const keyData = JSON.parse(storedKey);
-        this.encryptionKey = await window.crypto.subtle.importKey(
+    try {
+      // Try to get existing key from IndexedDB or generate new one
+      const keyData = localStorage.getItem('_encKey');
+      if (keyData) {
+        const rawKey = new Uint8Array(JSON.parse(keyData));
+        return await window.crypto.subtle.importKey(
           'raw',
-          new Uint8Array(keyData),
+          rawKey,
           { name: 'AES-GCM' },
           false,
           ['encrypt', 'decrypt']
         );
-        return this.encryptionKey;
-      } catch (error) {
-        console.warn('Failed to import existing encryption key, generating new one');
       }
-    }
 
-    // Generate new key
-    this.encryptionKey = await window.crypto.subtle.generateKey(
-      { name: 'AES-GCM', length: 256 },
-      true,
-      ['encrypt', 'decrypt']
-    );
-
-    // Export and store the key
-    const exportedKey = await window.crypto.subtle.exportKey('raw', this.encryptionKey);
-    localStorage.setItem(this.ENCRYPTION_KEY_NAME, JSON.stringify(Array.from(new Uint8Array(exportedKey))));
-
-    return this.encryptionKey;
-  }
-
-  // Encrypt data
-  private static async encrypt(data: string): Promise<string> {
-    const key = await this.getEncryptionKey();
-    const encoder = new TextEncoder();
-    const dataBuffer = encoder.encode(data);
-
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    const encrypted = await window.crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      dataBuffer
-    );
-
-    // Combine IV and encrypted data
-    const combined = new Uint8Array(iv.length + encrypted.byteLength);
-    combined.set(iv);
-    combined.set(new Uint8Array(encrypted), iv.length);
-
-    return btoa(String.fromCharCode(...combined));
-  }
-
-  // Decrypt data
-  private static async decrypt(encryptedData: string): Promise<string> {
-    try {
-      const key = await this.getEncryptionKey();
-      const combined = new Uint8Array(atob(encryptedData).split('').map(c => c.charCodeAt(0)));
-
-      const iv = combined.slice(0, 12);
-      const encrypted = combined.slice(12);
-
-      const decrypted = await window.crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv },
-        key,
-        encrypted
+      // Generate new key
+      const key = await window.crypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
       );
 
-      const decoder = new TextDecoder();
-      return decoder.decode(decrypted);
+      // Export and store key
+      const rawKey = await window.crypto.subtle.exportKey('raw', key);
+      localStorage.setItem('_encKey', JSON.stringify(Array.from(new Uint8Array(rawKey))));
+
+      return key;
     } catch (error) {
-      console.error('Failed to decrypt data:', error);
-      throw new Error('Failed to decrypt stored data');
+      console.warn('Failed to get encryption key:', error);
+      return null;
     }
   }
 
-  // Get refresh token
-  static async getRefreshToken(): Promise<string | null> {
-    if (Capacitor.isNativePlatform()) {
+  private async encrypt(text: string): Promise<string> {
+    const key = await this.getEncryptionKey();
+
+    // Fallback to base64 encoding if no encryption available
+    if (!key || !window.crypto?.subtle) {
+      console.warn('Encryption not available, using base64 encoding');
+      return btoa(text);
+    }
+
+    try {
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const encoded = new TextEncoder().encode(text);
+      const encrypted = await window.crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        encoded
+      );
+
+      return JSON.stringify({
+        iv: Array.from(iv),
+        data: Array.from(new Uint8Array(encrypted))
+      });
+    } catch (error) {
+      console.warn('Encryption failed, using base64 fallback:', error);
+      return btoa(text);
+    }
+  }
+
+  private async decrypt(encryptedText: string): Promise<string> {
+    const key = await this.getEncryptionKey();
+
+    // Handle base64 fallback
+    if (!key || !window.crypto?.subtle) {
       try {
-        console.log('Getting refresh token from Capacitor Preferences...');
-        const result = await Preferences.get({ key: 'refreshToken' });
-        console.log('Capacitor Preferences result:', result.value ? 'token found' : 'no token');
-        return result.value;
+        return atob(encryptedText);
       } catch (error) {
-        console.error('Error accessing Capacitor Preferences:', error);
-        return null;
+        console.error('Failed to decode base64:', error);
+        throw new Error('Failed to decrypt token');
       }
+    }
+
+    try {
+      // Try to parse as encrypted JSON first
+      const { iv, data } = JSON.parse(encryptedText);
+      const decrypted = await window.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: new Uint8Array(iv) },
+        key,
+        new Uint8Array(data)
+      );
+
+      return new TextDecoder().decode(decrypted);
+    } catch (error) {
+      // Fallback to base64 decoding for legacy tokens
+      try {
+        return atob(encryptedText);
+      } catch (fallbackError) {
+        console.error('Failed to decrypt token:', error);
+        throw new Error('Failed to decrypt token');
+      }
+    }
+  }
+
+  async setRefreshToken(token: string): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.set({
+        key: 'refreshToken',
+        value: token
+      });
     } else {
-      // Use encrypted localStorage for web
-      const encrypted = localStorage.getItem(this.STORAGE_KEY);
-      if (!encrypted) {
-        console.log('No encrypted refresh token in localStorage');
-        return null;
-      }
+      const encrypted = await this.encrypt(token);
+      localStorage.setItem('_rt', encrypted);
+    }
+  }
+
+  async getRefreshToken(): Promise<string | null> {
+    if (Capacitor.isNativePlatform()) {
+      const result = await Preferences.get({ key: 'refreshToken' });
+      return result.value;
+    } else {
+      const encrypted = localStorage.getItem('_rt');
+      if (!encrypted) return null;
 
       try {
-        const decrypted = await this.decrypt(encrypted);
-        console.log('Successfully decrypted refresh token from localStorage');
-        return decrypted;
+        return await this.decrypt(encrypted);
       } catch (error) {
         console.error('Failed to decrypt refresh token:', error);
-        // Remove corrupted token
-        localStorage.removeItem(this.STORAGE_KEY);
+        // Clear corrupted token
+        localStorage.removeItem('_rt');
         return null;
       }
     }
   }
 
-  // Set refresh token
-  static async setRefreshToken(token: string): Promise<void> {
-    if (Capacitor.isNativePlatform()) {
-      try {
-        console.log('Storing refresh token in Capacitor Preferences...');
-        await Preferences.set({ key: 'refreshToken', value: token });
-        console.log('Successfully stored refresh token in Capacitor Preferences');
-      } catch (error) {
-        console.error('Error storing refresh token in Capacitor Preferences:', error);
-        throw error;
-      }
-    } else {
-      // Use encrypted localStorage for web
-      const encrypted = await this.encrypt(token);
-      localStorage.setItem(this.STORAGE_KEY, encrypted);
-    }
-  }
-
-  // Remove refresh token
-  static async removeRefreshToken(): Promise<void> {
+  async removeRefreshToken(): Promise<void> {
     if (Capacitor.isNativePlatform()) {
       await Preferences.remove({ key: 'refreshToken' });
     } else {
-      localStorage.removeItem(this.STORAGE_KEY);
+      localStorage.removeItem('_rt');
     }
   }
 
-  // Clear all secure storage (useful for logout)
-  static async clearAll(): Promise<void> {
+  async clearAll(): Promise<void> {
     if (Capacitor.isNativePlatform()) {
       await Preferences.clear();
     } else {
-      localStorage.removeItem(this.STORAGE_KEY);
-      localStorage.removeItem(this.ENCRYPTION_KEY_NAME);
-      this.encryptionKey = null;
+      localStorage.removeItem('_rt');
+      localStorage.removeItem('_encKey');
     }
   }
 }
 
+const SecureStorage = new SecureStorageService();
 export default SecureStorage;

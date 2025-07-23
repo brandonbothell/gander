@@ -4,6 +4,7 @@ import { FiChevronLeft, FiChevronRight, FiMapPin, FiClock, FiGlobe } from 'react
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { GOOGLE_MAPS_API_KEY } from '../../config.json';
 import { type TrustedDevice, type DeviceInfo, getDeviceDisplayName } from '../../../source/types/deviceInfo';
+import { fetchWithRetry } from '../main';
 
 export interface Session {
   ip: string;
@@ -1025,7 +1026,7 @@ export const geolocateIP = async (knownSessions?: string[], device?: TrustedDevi
   const ip = device?.ip || null;
   try {
     // console.log(`Geolocating IP ${ip || 'local'}...`);
-    const geoResponse = await fetchWithRetry(`https://ipinfo.io/${ip ? ip + '/' : ''}json`);
+    const geoResponse = await fetchWithRetry(() => fetch(`https://ipinfo.io/${ip ? ip + '/' : ''}json`));
     const geoData = await geoResponse.json();
 
     // console.log(`Geolocation data for ${ip || 'local'}:`, geoData);
@@ -1089,39 +1090,3 @@ export const geolocateIP = async (knownSessions?: string[], device?: TrustedDevi
     };
   }
 }
-
-// Fetch with retry logic for rate limiting
-export const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<Response> => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const response = await fetch(url);
-
-      if (response.status === 429) {
-        console.warn(`Rate limit hit for ${url}, attempt ${i + 1}/${retries}`);
-        if (i === retries - 1) {
-          throw new Error('Rate limit exceeded after multiple attempts');
-        }
-        // Exponential backoff: 1s, 2s, 4s
-        const waitTime = delay * Math.pow(2, i);
-        console.log(`Waiting ${waitTime}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        continue;
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return response;
-    } catch (error) {
-      console.error(`Fetch attempt ${i + 1} failed:`, error);
-      if (i === retries - 1) {
-        throw error;
-      }
-      // Wait before retry even for non-429 errors
-      const waitTime = delay * Math.pow(2, i);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-  }
-  throw new Error('Max retries exceeded');
-};

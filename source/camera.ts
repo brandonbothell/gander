@@ -1434,8 +1434,8 @@ app.post('/api/masks/:streamId', jwtAuth, express.json(), async (req, res) => {
       ...(typeof mask.type !== 'undefined' ? { type: mask.type } : {})
     }
   })
-    .catch(() => res.status(500).json({ success: false, error: 'Failed to save mask' }))
-    .then(newMask => res.json({ success: true, mask: newMask }));
+    .then(newMask => res.json({ success: true, mask: newMask }))
+    .catch(() => res.status(500).json({ success: false, error: 'Failed to save mask' }));
 });
 
 app.patch('/api/masks/:streamId/:maskId', jwtAuth, express.json(), async (req, res) => {
@@ -1681,11 +1681,13 @@ app.get('/api/recordings/:streamId/:filename/nickname', jwtAuth, async (req, res
 app.post('/api/recordings/:streamId/:filename/nickname', jwtAuth, express.json(), async (req, res) => {
   const { streamId, filename } = req.params;
   const { nickname } = req.body;
-  await prisma.motionRecording.update({
-    where: { streamId_filename: { filename, streamId } },
-    data: { nickname }
-  }).catch(() => res.status(500).json({ success: false, error: 'Failed to save nickname' }));
-  res.json({ success: true });
+  await prisma.motionRecording
+    .update({
+      where: { streamId_filename: { filename, streamId } },
+      data: { nickname }
+    })
+    .then(() => res.json({ success: true }))
+    .catch(() => res.status(500).json({ success: false, error: 'Failed to save nickname' }));
 });
 
 app.get('/api/recordings-nicknames/:streamId', jwtAuth, async (req, res) => {

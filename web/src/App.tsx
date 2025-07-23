@@ -508,14 +508,23 @@ export default function App() {
   };
 
   const handleLogin = async (token: string, refreshToken: string) => {
+    // Show user-friendly error message
+    if (!window.isSecureContext && location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      alert('Note: For enhanced security on remote devices, consider using HTTPS. Authentication will work but tokens will use basic encoding.');
+    }
+
     try {
       await SecureStorage.setRefreshToken(refreshToken);
       localStorage.setItem('jwt', token);
       setAuthenticated(true);
     } catch (error) {
       console.error('Error storing tokens:', error);
-      // Fallback to not authenticated if storage fails
-      setAuthenticated(false);
+
+      // Still try to authenticate even if secure storage fails
+      localStorage.setItem('jwt', token);
+      // Store refresh token as base64 fallback
+      localStorage.setItem('_rt', btoa(refreshToken));
+      setAuthenticated(true);
     }
   };
 

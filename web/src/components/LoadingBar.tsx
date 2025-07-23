@@ -1,4 +1,4 @@
-import { useLoading } from '../LoadingContext';
+import { useLoading } from '../LoadingProvider';
 
 export function LoadingBar() {
   const { loading } = useLoading();

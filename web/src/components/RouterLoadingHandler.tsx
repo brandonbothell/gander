@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useLoading } from '../LoadingContext';
+import { useLoading } from '../LoadingProvider';
 
 export function RouterLoadingHandler() {
   const location = useLocation();

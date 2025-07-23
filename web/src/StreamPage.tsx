@@ -4,27 +4,28 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { API_BASE, authFetch } from './main';
 import { setupPushNotifications, subscribeToWebPush } from './pushNotifications';
-import { RecordingThumbItem } from './components/RecordingThumbItem';
-import { ReloadButton } from './components/ReloadButton';
 import { FloatingMenuButton } from './components/FloatingMenuButton';
 import { FloatingMenuPopout } from './components/FloatingMenuPopout';
-import { BatchDeleteButton } from './components/BatchDeleteButton';
-import { DeselectButton } from './components/DeselectButton';
 import { MotionService } from './plugins/motionService';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import Hls from 'hls.js';
-import { useLoading } from './LoadingContext';
+import { useLoading } from './LoadingProvider';
 import { SearchTools } from './components/SearchTools';
 import { MaskEditorOverlay } from './components/MaskEditorOverlay';
 import { type StreamMask, type Stream } from '../../source/types/shared';
-import { FiBell, FiBellOff, FiChevronDown, FiChevronUp, FiLogOut, FiRefreshCw, FiUsers } from 'react-icons/fi';
+import { FiChevronDown } from 'react-icons/fi';
 import { StreamTilesGrid } from './components/StreamTilesGrid';
+import AddStreamModal from './components/AddStreamModal';
+import EditNicknameModal from './components/EditNicknameModal';
 import { RecordingBar } from './components/RecordingBar';
 import { StreamControlBar } from './components/StreamControlBar';
 import type { Recording } from './App';
 import SecureStorage from './utils/secureStorage';
 import { Preferences } from '@capacitor/preferences';
 import { DebugInfo } from './components/DebugInfo';
+import RecordingsListContent from './components/RecordingsListContent';
+import StreamControls from './components/StreamControls';
+import { fetchWithRetry } from './main';
 
 export type ClientMask = StreamMask & { pendingUpdate?: boolean, pendingUpdateSince?: number };
 
@@ -34,7 +35,6 @@ interface StreamPageProps {
   onSessionMonitorClosed?: () => void; // Add this new prop
   logout: () => Promise<void>;
 }
-
 
 /**
  * StreamPage component
@@ -69,17 +69,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [activeStream, setActiveStream] = useState<Stream | null>(null);
 
   const [showAddStreamModal, setShowAddStreamModal] = useState(false);
-  const [newStream, setNewStream] = useState({
-    nickname: '',
-    ffmpegInput: '',
-    rtspUser: '',
-    rtspPass: '',
-  });
-  const [creatingStream, setCreatingStream] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
 
   const [showEditNicknameModal, setShowEditNicknameModal] = useState(false);
-  const [nicknameDraft, setNicknameDraft] = useState('');
   const [editingStream, setEditingStream] = useState<Stream | null>(null);
 
   const params = useParams<{ streamId?: string }>();
@@ -123,7 +114,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [totalRecordings, setTotalRecordings] = useState<{ [streamId: string]: number }>({});
   const [filteredRecordingsPage, setFilteredRecordingsPage] = useState<number>(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
+  const [isMobileWidth, setIsMobileWidth] = useState(window.innerWidth < 600);
   const searchToolsRef = useRef<HTMLDivElement>(null);
   const recordingsListBottomSentinelRef = useRef<HTMLDivElement>(null);
   const [isMobileRefreshing, setIsMobileRefreshing] = useState(false);
@@ -300,7 +291,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
           try {
             const fileDateObj = new Date(formattedFileDate);
-            const fileDateLocal = utcToLocalDateString(fileDateObj);
+            const fileDateLocal = getLocalDateString(fileDateObj);
 
             if (dateRange.from && /^\d{4}-\d{2}-\d{2}$/.test(dateRange.from) && fileDateLocal < dateRange.from) return false;
             if (dateRange.to && /^\d{4}-\d{2}-\d{2}$/.test(dateRange.to) && fileDateLocal > dateRange.to) return false;
@@ -503,7 +494,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
           try {
             const fileDateObj = new Date(formattedFileDate);
-            const fileDateLocal = utcToLocalDateString(fileDateObj);
+            const fileDateLocal = getLocalDateString(fileDateObj);
 
             if (dateRange.from && /^\d{4}-\d{2}-\d{2}$/.test(dateRange.from) && fileDateLocal < dateRange.from) continue;
             if (dateRange.to && /^\d{4}-\d{2}-\d{2}$/.test(dateRange.to) && fileDateLocal > dateRange.to) continue;
@@ -586,12 +577,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     // Fetch signed URL from API
     try {
-      const data = await fetchWithRetry(async () => {
-        const res = await authFetch(url.startsWith('/') ? `${API_BASE}${url}` : url);
-        if (!res.ok) throw new Error('Failed to fetch signed stream URL');
-        return res.json();
-      });
-      url = `${API_BASE}${data.url}`;
+      const response = await fetchWithRetry(() => authFetch(url.startsWith('/') ? `${API_BASE}${url}` : url));
+      url = `${API_BASE}${(await response.json()).url}`;
     } catch {
       console.error('Failed to fetch signed stream URL');
       setActiveStream(streams[0]);
@@ -1206,7 +1193,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   // For scrolling behavior, we need to set the sticky state based on scroll position
   useEffect(() => {
     function updateSticky() {
-      if (keyboardTransitioningRef.current || isMobile) {
+      if (keyboardTransitioningRef.current || isMobileWidth) {
         // console.warn(`Skipping sticky update ${keyboardTransitioningRef.current ? 'due to keyboard transition' : 'on mobile'}`);
         return; // Add isMobile check
       }
@@ -1226,7 +1213,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     // IntersectionObserver for fast transitions
     const sentinel = searchStickySentinelRef.current;
     let observer: IntersectionObserver | null = null;
-    if (sentinel && !isMobile) { // Add !isMobile check
+    if (sentinel && !isMobileWidth) { // Add !isMobile check
       observer = new window.IntersectionObserver(
         updateSticky,
         { threshold: 0 }
@@ -1243,12 +1230,12 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       window.removeEventListener('resize', updateSticky);
       if (observer && sentinel) observer.disconnect();
     };
-  }, [isMobile]); // Add isMobile as dependency
+  }, [isMobileWidth]); // Add isMobile as dependency
 
   // Update the mobile sticky effect:
   useEffect(() => {
     function updateMobileSticky() {
-      if (keyboardTransitioningRef.current || forceSticky || !isMobile) {
+      if (keyboardTransitioningRef.current || forceSticky || !isMobileWidth) {
         // console.warn(`Skipping sticky update ${keyboardTransitioningRef.current ? 'due to keyboard transition' : 'on desktop'}`);
         return; // Add !isMobile check
       }
@@ -1266,7 +1253,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     const sentinel = mobileSearchStickySentinelRef.current;
     let observer: IntersectionObserver | null = null;
-    if (sentinel && isMobile) { // Add isMobile check
+    if (sentinel && isMobileWidth) { // Add isMobile check
       observer = new window.IntersectionObserver(
         updateMobileSticky,
         { threshold: 0 }
@@ -1280,7 +1267,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       if (observer && sentinel) observer.disconnect();
       window.removeEventListener('scroll', updateMobileSticky);
     };
-  }, [isMobile]); // Add isMobile as dependency
+  }, [isMobileWidth]); // Add isMobile as dependency
 
   // Focus recordings list when the bottom sentinel is intersected
   useEffect(() => {
@@ -1724,17 +1711,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
   useEffect(() => {
     function handleResize() {
-      setIsMobile(window.innerWidth < 600);
+      setIsMobileWidth(window.innerWidth < 600);
     }
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  useEffect(() => {
-    function handleResize() {
-      const newIsMobile = window.innerWidth < 600;
-      setIsMobile(newIsMobile);
-    }
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -1746,7 +1724,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     setMobileSearchSticky(false);
     lastStickyRef.current = false;
     lastMobileStickyRef.current = false;
-  }, [isMobile]);
+  }, [isMobileWidth]);
 
   const handleView = (filename: string) => {
     if (!activeStream) return;
@@ -1827,6 +1805,9 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         // Disable notifications (user toggled OFF)
         if (Capacitor.getPlatform() === 'web') {
           // Web platform
+          if (!navigator.serviceWorker) {
+            return console.warn('Service Worker not supported');
+          }
           const reg = await navigator.serviceWorker.ready;
           const sub = await reg.pushManager.getSubscription();
           if (sub) {
@@ -1882,11 +1863,9 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       const now = Math.floor(Date.now() / 1000);
       // Only fetch if missing or expiring soon
       if (!entry || entry.expires < now + 10) {
-        fetchWithRetry(async () => {
-          const res = await authFetch(`${API_BASE}/api/signed-latest-thumb-url/${stream.id}`);
-          if (!res.ok) throw new Error('Failed to fetch signed thumb URL');
-          return res.json();
-        }).then(data => {
+        fetchWithRetry(() => authFetch(`${API_BASE}/api/signed-latest-thumb-url/${stream.id}`)
+        ).then(async response => {
+          const data = await response.json();
           if (data.url) {
             const match = data.url.match(/[?&]expires=(\d+)/);
             const expires = match ? parseInt(match[1], 10) : now + 300;
@@ -2047,7 +2026,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     if (onSessionMonitorClosed) {
       // Listen for when session monitor closes on mobile
       const handleSessionMonitorClose = () => {
-        if (isMobile) {
+        if (isMobileWidth) {
           setShowMobileLogout(true);
           // Hide after 5 seconds
           setTimeout(() => {
@@ -2063,7 +2042,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     return () => {
       delete (window as any).handleSessionMonitorClose;
     };
-  }, [onSessionMonitorClosed, isMobile]);
+  }, [onSessionMonitorClosed, isMobileWidth]);
 
   // Update video size when video element is ready or resized
   useEffect(() => {
@@ -2239,20 +2218,14 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   // --- Nickname editing logic ---
   const handleStartEditNickname = (stream: Stream) => {
     setEditingStream(stream);
-    setNicknameDraft(stream.nickname || '');
     setShowEditNicknameModal(true);
   };
-  const handleCancelEditNickname = () => {
-    setShowEditNicknameModal(false);
-    setNicknameDraft('');
-    setEditingStream(null);
-  };
-  const handleSaveNickname = async (stream: Stream) => {
-    if (nicknameDraft.trim() && nicknameDraft !== stream.nickname) {
+  const handleSaveNickname = async (stream: Stream, newNickname: string) => {
+    if (newNickname.trim() && newNickname !== stream.nickname) {
       await authFetch(`${API_BASE}/api/streams/${stream.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname: nicknameDraft.trim() })
+        body: JSON.stringify({ nickname: newNickname.trim() })
       });
       // Refresh streams
       const res = await authFetch(`${API_BASE}/api/streams`);
@@ -2261,7 +2234,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     }
     setShowEditNicknameModal(false);
     setEditingStream(null);
-    setNicknameDraft('');
   };
 
   return (
@@ -2276,7 +2248,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             alignItems: 'center',
             width: '100%',
             maxWidth: 900,
-            margin: `calc(env(safe-area-inset-top, 0px) + 25px) auto auto`
+            margin: `calc(env(safe-area-inset-top, 0px) + ${isIOS() && !isMobileWidth ? '40px' : '25px'}) auto auto`
           }}
         >
           <RecordingBar
@@ -2292,302 +2264,22 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             setNicknames={setNicknames}
           />
           <div className="stream-video-container" style={{ position: 'relative' }}>
-            <button
-              className="reload-btn"
-              style={{
-                position: 'absolute',
-                top: -44,
-                left: 0,
-                zIndex: 2,
-                minWidth: 56,
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: '1em',
-                marginBottom: 12,
-                padding: '8px 18px 5px 18px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'transparent',
-                color: shouldNotifyOnMotion ? '#fff' : '#ff6b6b', // White when on, red when off
-                border: 'none',
-                boxShadow: shouldNotifyOnMotion
-                  ? 'inset 0 -3px 0 0 #fff'
-                  : 'inset 0 -3px 0 0 #ff6b6b', // White underline when on, red when off
-                transition: 'color 0.2s',
-                opacity: isLoadingMotionNotifications ? 0.6 : 1,
-                cursor: isLoadingMotionNotifications ? 'not-allowed' : 'pointer',
-              }}
-              onMouseEnter={(e) => {
-                if (!isLoadingMotionNotifications) {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                  e.currentTarget.style.color = '#1cf1d1';
-                }
-              }}
-              onMouseLeave={(e) => {
-                const color = shouldNotifyOnMotion ? '#fff' : '#ff6b6b';
-                e.currentTarget.style.boxShadow = `inset 0 -3px 0 0 ${color}`;
-                e.currentTarget.style.color = color;
-              }}
-              aria-label={shouldNotifyOnMotion ? "Disable Motion Notifications" : "Enable Motion Notifications"}
-              onClick={() => setShouldNotifyOnMotion(v => !v)}
-              disabled={isLoadingMotionNotifications}
-            >
-              {shouldNotifyOnMotion ? (
-                <FiBell size={22} color="currentColor" />
-              ) : (
-                <FiBellOff size={22} color="currentColor" />
-              )}
-            </button>
-
-            {/* Add Active Sessions button */}
-            {!showMaskEditor && !isMobile && (
-              <button
-                className="reload-btn"
-                style={{
-                  position: 'absolute',
-                  top: -44,
-                  left: 72, // Position it next to the notifications button
-                  zIndex: 2,
-                  minWidth: 120,
-                  borderRadius: 8,
-                  fontWeight: 600,
-                  fontSize: '1em',
-                  padding: '8px 18px 5px 18px',
-                  background: 'transparent',
-                  color: '#fff',
-                  border: 'none',
-                  boxShadow: 'inset 0 -3px 0 0 #fff',
-                  transition: 'color 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                  e.currentTarget.style.color = '#1cf1d1';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-                  e.currentTarget.style.color = '#fff';
-                }}
-                onClick={() => onShowSessionMonitor?.()}
-              >
-                <FiUsers size={22} color="currentColor" />
-                Sessions
-              </button>
-            )}
-
-            {/* Sessions button for mobile - only show when logout is NOT showing */}
-            {!showMaskEditor && isMobile && !showMobileLogout && (
-              <button
-                className="reload-btn"
-                style={{
-                  position: 'absolute',
-                  top: -44,
-                  left: 72,
-                  zIndex: 2,
-                  minWidth: 120,
-                  borderRadius: 8,
-                  fontWeight: 600,
-                  fontSize: '1em',
-                  padding: '8px 18px 5px 18px',
-                  background: 'transparent',
-                  color: '#fff',
-                  border: 'none',
-                  boxShadow: 'inset 0 -3px 0 0 #fff',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-                onClick={() => onShowSessionMonitor?.()}
-              >
-                <FiUsers size={22} color="currentColor" />
-                Sessions
-              </button>
-            )}
-
-            {/* Update the Logout button - show on desktop always, on mobile only when showMobileLogout is true */}
-            {!showMaskEditor && (!isMobile || showMobileLogout) && (
-              <button
-                className="reload-btn"
-                style={{
-                  position: 'absolute',
-                  top: -44,
-                  left: isMobile ? 72 : 228, // On mobile, take the Sessions button position
-                  zIndex: 2,
-                  minWidth: 100,
-                  borderRadius: 8,
-                  fontWeight: 600,
-                  fontSize: '1em',
-                  padding: '8px 18px 5px 18px',
-                  background: 'transparent',
-                  color: '#ff6b6b', // Red color like disabled notifications
-                  border: 'none',
-                  boxShadow: 'inset 0 -3px 0 0 #ff6b6b', // Red underline
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  // Add fade-in animation for mobile
-                  opacity: isMobile && showMobileLogout ? 1 : (!isMobile ? 1 : 0),
-                  transform: isMobile && showMobileLogout ? 'translateY(0)' : (isMobile ? 'translateY(-10px)' : 'translateY(0)'),
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                  e.currentTarget.style.color = '#1cf1d1';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #ff6b6b';
-                  e.currentTarget.style.color = '#ff6b6b';
-                }}
-                onClick={handleLogout}
-                aria-label="Logout"
-              >
-                <FiLogOut size={22} color="currentColor" />
-                Logout
-              </button>
-            )}
-
-            {/* Mask Editor Controls */}
-            {showMaskEditor && (
-              <button
-                className="reload-btn"
-                style={{
-                  position: 'absolute',
-                  top: -44,
-                  right: 140,
-                  zIndex: 2,
-                  minWidth: 120,
-                  borderRadius: 8,
-                  fontWeight: 600,
-                  fontSize: '1em',
-                  padding: '8px 18px 5px 18px',
-                  background: 'transparent',
-                  color: '#fff',
-                  border: 'none',
-                  boxShadow: 'inset 0 -3px 0 0 #fff',
-                  transition: 'color 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                  e.currentTarget.style.color = '#1cf1d1';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-                  e.currentTarget.style.color = '#fff';
-                }}
-                onClick={async () => {
-                  if (!activeStream) return;
-
-                  // Default mask size and position (centered, 160x90 on 320x180 stream)
-                  const defaultMask = {
-                    x: 60,
-                    y: 35,
-                    w: 40,
-                    h: 20,
-                    type: 'fixed'
-                  };
-                  // After any mask API update:
-                  pauseMaskPollingUntil.current = Date.now() + 1000; // Pause polling for 1 second
-                  authFetch(`${API_BASE}/api/masks/${activeStream.id}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mask: defaultMask }),
-                  }).then(async result => {
-                    if (!result.body) {
-                      console.error('Failed to create new mask');
-                      return;
-                    }
-                    // Parse the response and add the new mask
-                    let data;
-                    try {
-                      data = await result.json();
-                    } catch {
-                      console.error('Failed to parse mask creation response');
-                      return;
-                    }
-                    if (data && data.mask) {
-                      setMasks(prev => [...prev, data.mask]);
-                    }
-                  });
-                }}
-              >
-                + Add Mask
-              </button>
-            )}
-            <button
-              className="reload-btn"
-              style={{
-                position: 'absolute',
-                top: -44,
-                right: 0,
-                zIndex: 2,
-                minWidth: 120,
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: '1em',
-                padding: '8px 18px 5px 18px',
-                background: 'transparent',
-                color: '#fff',
-                border: 'none',
-                boxShadow: 'inset 0 -3px 0 0 #fff',
-                transition: 'color 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                e.currentTarget.style.color = '#1cf1d1';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-                e.currentTarget.style.color = '#fff';
-              }}
-              onClick={() => setShowMaskEditor(showMaskEditor => !showMaskEditor)}
-            >
-              {!showMaskEditor ? 'Edit Masks' : 'Done'}
-              {!showMaskEditor ? (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ marginLeft: 6, display: 'inline-block', verticalAlign: 'middle' }}
-                  aria-hidden="true"
-                  focusable="false"
-                >
-                  <path d="M15.232 5.232l-10 10V17h1.768l10-10-1.768-1.768zM17.414 3.414a2 2 0 0 0-2.828 0l-1.172 1.172 2.828 2.828 1.172-1.172a2 2 0 0 0 0-2.828z" />
-                </svg>
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ marginLeft: 6, display: 'inline-block', verticalAlign: 'middle' }}
-                  aria-hidden="true"
-                  focusable="false"
-                >
-                  <polyline points="5 11 9 15 15 7" />
-                </svg>
-              )}
-            </button>
+            <StreamControls
+              shouldNotifyOnMotion={shouldNotifyOnMotion}
+              isLoadingMotionNotifications={isLoadingMotionNotifications}
+              setShouldNotifyOnMotion={setShouldNotifyOnMotion}
+              showMaskEditor={showMaskEditor}
+              setShowMaskEditor={setShowMaskEditor}
+              onShowSessionMonitor={onShowSessionMonitor}
+              showMobileLogout={showMobileLogout}
+              isMobile={isMobileWidth}
+              handleLogout={handleLogout}
+              activeStream={activeStream}
+              setMasks={setMasks}
+              authFetch={authFetch}
+              API_BASE={API_BASE}
+              pauseMaskPollingUntil={pauseMaskPollingUntil}
+            />
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <video
                 ref={videoRef}
@@ -2806,57 +2498,29 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           activeStreamId={activeStream?.id}
           motionSaving={Object.entries(motionStatus).reduce((prev, e) => ({ ...prev, [e[0]]: e[1].saving }), {})}
         />
-        {/* Desktop: Show heading and search tools */}
+
         {/* Desktop: Show heading and search tools */}
         <div className="desktop-only" style={{ alignItems: 'center', width: '100%' }}>
-          {<h3 style={{ margin: 0, marginRight: 16, color: '#fff', fontFamily: "'Orbitron', 'Roboto', Arial, sans-serif", userSelect: 'none', }}>
+          <h3 style={{ margin: 0, marginRight: 16, color: '#fff', fontFamily: "'Orbitron', 'Roboto', Arial, sans-serif", userSelect: 'none', }}>
             Motion Recordings
-          </h3>}
+          </h3>
           <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
             <div ref={searchStickySentinelRef} style={{ height: 1 }} />
-            <div
-              className={
-                `searchtools-sticky${searchSticky ? ' active' : ''}`
-              }
-              ref={searchStickyRef}
-            >
-              <SearchTools
-                ref={searchToolsRef}
-                autoScrollUntilRef={autoScrollUntilRef}
-                dateRange={dateRange}
-                setDateRange={setDateRange}
-                search={search}
-                setSearch={setSearch}
-                filterOpen={filterOpen}
-                setFilterOpen={setFilterOpen}
-                isNicknamedOnly={isNicknamedOnly}
-                setIsNicknamedOnly={setIsNicknamedOnly}
-                refreshing={isDesktopRefreshing}
-                isSearching={isSearching}
-                openAndScrollToRecordingsList={openAndScrollToRecordingsList}
-                onUserTyping={setUserTyping}
-                onSearchInputActiveChange={setSearchInputActive}
-                onFilterUpdateBlocked={setFilterUpdatesBlocked}
-                onRefresh={async () => {
-                  setIsDesktopRefreshing(true);
-                  const recordingsStream = viewingRecordingsFrom || activeStream;
-                  const start = Date.now();
-                  if (recordingsStream) await pollLatestRecordings(recordingsStream);
-                  else alert('No active stream to refresh recordings for');
-                  const elapsed = Date.now() - start;
-                  setTimeout(() => setIsDesktopRefreshing(false), Math.max(0, 600 - elapsed));
-                }}
-              />
-            </div>
           </div>
         </div>
 
-        {/* Mobile: Only show centered search tools */}
+        {/* Mobile: Sentinel for sticky behavior */}
         <div className="mobile-only">
           <div ref={mobileSearchStickySentinelRef} style={{ height: 1 }} />
+        </div>
+
+        {/* Unified Search Tools with conditional desktop alignment wrapper */}
+        <div style={isMobileWidth ? {} : { display: 'flex', justifyContent: 'flex-end' }}>
           <div
             className={
-              `searchtools-sticky${mobileSearchSticky || forceSticky ? ' active' : ''}${forceSticky ? ' force-sticky' : ''}`
+              isMobileWidth
+                ? `searchtools-sticky${mobileSearchSticky || forceSticky ? ' active' : ''}${forceSticky ? ' force-sticky' : ''}`
+                : `searchtools-sticky${searchSticky ? ' active' : ''}`
             }
             ref={searchStickyRef}
           >
@@ -2871,19 +2535,29 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
               setFilterOpen={setFilterOpen}
               isNicknamedOnly={isNicknamedOnly}
               setIsNicknamedOnly={setIsNicknamedOnly}
+              refreshing={isMobileWidth ? undefined : isDesktopRefreshing}
               isSearching={isSearching}
               openAndScrollToRecordingsList={openAndScrollToRecordingsList}
-              onFocusSearchInput={() => setForceSticky(true)}
-              onBlurSearchInput={() => setForceSticky(false)}
               onUserTyping={setUserTyping}
               onSearchInputActiveChange={setSearchInputActive}
               onFilterUpdateBlocked={setFilterUpdatesBlocked}
+              onFocusSearchInput={isMobileWidth ? () => setForceSticky(true) : undefined}
+              onBlurSearchInput={isMobileWidth ? () => setForceSticky(false) : undefined}
+              onRefresh={isMobileWidth ? undefined : async () => {
+                setIsDesktopRefreshing(true);
+                const recordingsStream = viewingRecordingsFrom || activeStream;
+                const start = Date.now();
+                if (recordingsStream) await pollLatestRecordings(recordingsStream);
+                else alert('No active stream to refresh recordings for');
+                const elapsed = Date.now() - start;
+                setTimeout(() => setIsDesktopRefreshing(false), Math.max(0, 600 - elapsed));
+              }}
             />
           </div>
         </div>
       </div>
       {/* Motion Recordings label for mobile */}
-      {isMobile && (
+      <div className='mobile-only'>
         <div
           className="motion-recordings-mobile-label"
           style={{
@@ -2903,96 +2577,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         >
           Motion Recordings
         </div>
-      )}
+      </div>
 
-      {/* Floating handle: only show if floating, not open */}
-      {(!recordingsListOpen || !recordingsListInView) && (
-        <div
-          className="recordings-list-handle-floating"
-          tabIndex={0}
-          onClick={() => {
-            setRecordingsListOpen(true);
-            setTimeout(() => {
-              const list = recordingsListRef.current;
-              if (list) {
-                const rect = list.getBoundingClientRect();
-                const scrollY = window.scrollY || window.pageYOffset;
-                const targetY = rect.top + scrollY - (window.innerHeight / 2) + (rect.height / 2);
-                window.scrollTo({ top: targetY, behavior: 'smooth' });
-              }
-            }, 400);
-          }}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              setRecordingsListOpen(true);
-              setTimeout(() => {
-                const list = recordingsListRef.current;
-                if (list) {
-                  const rect = list.getBoundingClientRect();
-                  const scrollY = window.scrollY || window.pageYOffset;
-                  const targetY = rect.top + scrollY - (window.innerHeight / 2) + (rect.height / 2);
-                  window.scrollTo({ top: targetY, behavior: 'smooth' });
-                }
-              }, 400);
-            }
-          }}
-          aria-label="Open recordings list"
-          style={{
-            position: 'fixed',
-            right: '-2.5%',
-            bottom: isMobile ? 40 : 10,
-            transform: 'translateX(-50%)',
-            zIndex: 2002,
-            width: 80,
-            height: 80,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            cursor: 'pointer',
-            outline: 'none',
-            borderRadius: 24,
-            pointerEvents: 'auto',
-          }}
-        >
-          <FiChevronDown
-            size={60}
-            color="#1cf1d1"
-            style={{
-              marginBottom: 0,
-              filter: 'drop-shadow(0 2px 8px #1cf1d1cc)',
-              animation: 'bounceDown 5s infinite cubic-bezier(.4,2,.6,1), pulseDropShadow 5s infinite cubic-bezier(.4,2,.6,1)',
-            }}
-          />
-          <div
-            className="recordings-list-handle"
-            style={{
-              width: 56,
-              height: 12,
-              borderRadius: 6,
-              background: 'linear-gradient(90deg, #1cf1d1 60%, #2196f3 100%)',
-              margin: '12px 0 0 0',
-              cursor: 'pointer',
-              transition: 'background 0.2s, box-shadow 0.2s',
-              boxShadow: '0 2px 12px #1cf1d1aa',
-            }}
-          />
-          {/* Add keyframes for pulse and bounce */}
-          <style>
-            {`
-              @keyframes bounceDown {
-              0%, 100% { transform: translateY(0); }
-              50% { transform: translateY(12px); }
-              }
-              @keyframes pulseDropShadow {
-              0% { filter: drop-shadow(0 2px 8px #1cf1d1cc); }
-              50% { filter: drop-shadow(0 8px 32px #1cf1d1ff); }
-              100% { filter: drop-shadow(0 2px 8px #1cf1d1cc); }
-              }
-            `}
-          </style>
-        </div>
-      )}
       {/* Recordings List */}
       <div
         className='recordings-list'
@@ -3069,269 +2655,47 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           pointerEvents: recordingsListOpen ? 'auto' : 'all',
         }}
       >
-        {recordingsListOpen && (<>
-          {/* Animated refresh icon */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: 48,
-              pointerEvents: 'none',
-              zIndex: 2,
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                left: '50%',
-                top: 0,
-                // Animation logic:
-                transform:
-                  refreshIconState === 'spinning'
-                    ? `translateX(-50%) translateY(130px)`
-                    : refreshIconState === 'snap'
-                      ? `translateX(-50%) translateY(130px)`
-                      : refreshIconState === 'hide'
-                        ? `translateX(-50%) translateY(0px)`
-                        : `translateX(-50%) translateY(${pullDistance < pullThreshold ? 0 : Math.min(pullDistance * 0.2, 120)}px)`,
-                opacity:
-                  refreshIconState === 'hide'
-                    ? 0
-                    : pullStartY.current !== null && pullDistance > 0
-                      ? 1
-                      : isMobileRefreshing || refreshIconState === 'spinning'
-                        ? 1
-                        : 0,
-                transition:
-                  refreshIconState === 'snap'
-                    ? 'transform 0.18s cubic-bezier(.4,2,.6,1)'
-                    : refreshIconState === 'hide'
-                      ? 'transform 0.35s cubic-bezier(.4,2,.6,1), opacity 0.35s'
-                      : 'transform 0.1s cubic-bezier(.4,2,.6,1), opacity 0.15s',
-                fontSize: 32 + Math.min(pullDistance, 120) / 6,
-                zIndex: 3,
-              }}
-            >
-              <FiRefreshCw
-                style={{
-                  transition: 'color 0.2s, filter 0.2s, font-size 0.2s',
-                  color: `rgb(28, 241, 209)`,
-                  fontSize: 32 + Math.min(pullDistance, 120) / 6,
-                  animation:
-                    isMobileRefreshing || refreshIconState === 'spinning'
-                      ? 'spin 0.7s linear infinite'
-                      : undefined,
-                }}
-              />
-            </div>
-          </div>
-          {/* {isRefreshing && (
-          <div className="refreshing-indicator">
-            <span className="spinner" />
-            Refreshing...
-          </div>
-        )} */}
-          {/* Recordings List content update - with stable DOM during search */}
-          {filteredRecordings.length === 0 ? (
-            <em
-              style={{
-                display: 'block',
-                paddingTop: isMobile ? 48 : 0,
-                textAlign: 'center',
-                color: '#999',
-                fontSize: '1.1em',
-                padding: '40px 20px',
-              }}
-            >
-              {((search && search.length >= 2) || isNicknamedOnly || dateRange.from || dateRange.to)
-                ? 'No recordings match your search criteria.'
-                : 'No recordings yet.'}
-            </em>
-          ) : (
-            <>
-              {/* Always render the search animation container, but only show it when needed */}
-              <div
-                style={{
-                  display: isSearching || userTyping ? 'flex' : 'none',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '40px 20px',
-                  color: '#1cf1d1',
-                  fontSize: '1.1em',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: 'rgba(20,30,60,0.9)',
-                  zIndex: 10,
-                }}
-              >
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    border: '4px solid rgba(28, 241, 209, 0.3)',
-                    borderTop: '4px solid #1cf1d1',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                    marginBottom: 16,
-                  }}
-                />
-                Searching recordings...
-              </div>
-
-              {/* Always render the recordings grid to maintain DOM stability */}
-              <div
-                className="recordings-grid"
-                key={userTyping ? 'typing-mode' : 'normal-mode'} // Stable key during typing
-                style={{
-                  // Add these styles to minimize layout shifts
-                  minHeight: filteredRecordings.length > 0 ? 'auto' : '200px',
-                  transition: userTyping ? 'none' : 'min-height 0.2s ease-out', // Disable transitions during typing
-                  position: 'relative',
-                  // Slightly dim the grid during search but keep it rendered
-                  opacity: isSearching ? 0.3 : 1,
-                  pointerEvents: isSearching ? 'none' : 'auto',
-                }}
-              >
-                {activeStream && filteredRecordings.map(({ filename }) => {
-                  const checked = selected.includes(filename);
-                  const recordingsStream = viewingRecordingsFrom || activeStream;
-                  return (
-                    <RecordingThumbItem
-                      recordingsListRef={recordingsListRef}
-                      streamId={recordingsStream.id}
-                      key={filename}
-                      filename={filename}
-                      checked={checked}
-                      hovered={hovered === filename}
-                      anySelected={selected.length > 0}
-                      onMouseEnter={() => setHovered(filename)}
-                      onMouseLeave={() => setHovered(null)}
-                      onTouchStart={() => handleTouchStart(filename, checked)}
-                      onTouchEnd={handleTouchEnd}
-                      onTouchCancel={handleTouchEnd}
-                      onClick={() => handleView(filename)}
-                      onCheckboxChange={checked => handleCheckboxChange(filename, checked)}
-                      nickname={nicknames[filename]}
-                      viewed={viewed.find(v => v.filename === filename && v.streamId === recordingsStream.id) !== undefined}
-                    />
-                  );
-                })}
-              </div>
-            </>
-          )}
-          {/* Load more button - only show for final 50 recordings */}
-          {activeStream && (() => {
-            const recordingsStream = viewingRecordingsFrom || activeStream;
-            const totalRemaining = (totalRecordings[recordingsStream.id] || 0) - (cachedRecordings[recordingsStream.id]?.length || 0);
-            const shouldShowButton = totalRemaining > 0 && totalRemaining <= 50;
-
-            return shouldShowButton && (
-              <button
-                style={{
-                  margin: '24px auto 32px',
-                  display: 'block',
-                  padding: '10px 32px',
-                  fontSize: 16,
-                  borderRadius: 8,
-                  background: '#2196f3',
-                  color: '#fff',
-                  border: 'none',
-                  cursor: isLoadingMore ? 'not-allowed' : 'pointer',
-                  fontWeight: 600,
-                  boxShadow: '0 2px 8px #1a298055',
-                  opacity: isLoadingMore ? 0.7 : 1
-                }}
-                disabled={isLoadingMore}
-                onClick={async () => {
-                  setIsLoadingMore(true);
-                  const recordingsStream = viewingRecordingsFrom || activeStream;
-                  if (!recordingsStream) {
-                    alert('No active stream to load more recordings for');
-                    setIsLoadingMore(false);
-                    return;
-                  }
-                  const nextPage = currentPage + 1;
-                  setCurrentPage(nextPage);
-                  setFilteredRecordingsPage(page => page + 1);
-                  await loadPage(recordingsStream, nextPage, true);
-                  setIsLoadingMore(false);
-                }}
-              >
-                {isLoadingMore ? (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="spinner" style={{
-                      width: 18, height: 18, border: '3px solid #fff', borderTop: '3px solid #2196f3',
-                      borderRadius: '50%', animation: 'spin 1s linear infinite', display: 'inline-block'
-                    }} />
-                    Loading...
-                  </span>
-                ) : (
-                  `Load final ${totalRemaining} recordings...`
-                )}
-              </button>
-            );
-          })()}
-
-          {/* Handle */}
-          {recordingsListOpen && (
-            <div
-              className="recordings-list-handle-parent"
-              style={{
-                position: 'sticky',
-                bottom: 0,
-                userSelect: 'none',
-                zIndex: 2,
-                height: 56,
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                marginBottom: 12,
-                cursor: 'pointer',
-                background: 'none',
-                border: '0 2px 8px #1a298044',
-                // --- Add this for the cubic-bezier translate effect ---
-                transform: mobileSearchSticky && isMobile
-                  ? `translateY(${isIOS() ? 0 : window.innerHeight * .02}px)`
-                  : 'translateY(0px)',
-                transition: 'transform 0.5s cubic-bezier(.4,2,.6,1)',
-              }}
-              tabIndex={0}
-              aria-label="Recordings list handle"
-              onClick={() => {
-                setRecordingsListOpen(false);
-                setViewingRecordingsFrom(null);
-                setTransferScrollToPage(false);
-                lastRecordingsListCloseTime.current = Date.now();
-                setTimeout(() => {
-                  videoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 450);
-              }}
-            >
-              <FiChevronUp size={48} color="#1cf1d1" style={{ marginBottom: 0 }} />
-              <div
-                className="recordings-list-handle"
-                style={{
-                  width: 48,
-                  height: 8,
-                  borderRadius: 4,
-                  background: 'rgb(28, 241, 209)',
-                  margin: '8px 0',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s, box-shadow 0.2s',
-                  boxShadow: '0 2px 8px #1a298044',
-                }}
-              />
-            </div>
-          )}
-        </>)}
+        <RecordingsListContent
+          recordingsListOpen={recordingsListOpen}
+          refreshIconState={refreshIconState}
+          pullDistance={pullDistance}
+          pullThreshold={pullThreshold}
+          pullStartY={pullStartY}
+          isMobileRefreshing={isMobileRefreshing}
+          isMobile={isMobileWidth}
+          filteredRecordings={filteredRecordings}
+          search={search}
+          isNicknamedOnly={isNicknamedOnly}
+          dateRange={dateRange}
+          isSearching={isSearching}
+          userTyping={userTyping}
+          activeStream={activeStream}
+          selected={selected}
+          viewingRecordingsFrom={viewingRecordingsFrom}
+          hovered={hovered}
+          setHovered={setHovered}
+          recordingsListRef={recordingsListRef}
+          handleTouchStart={handleTouchStart}
+          handleTouchEnd={handleTouchEnd}
+          handleView={handleView}
+          handleCheckboxChange={handleCheckboxChange}
+          nicknames={nicknames}
+          viewed={viewed}
+          totalRecordings={totalRecordings}
+          cachedRecordings={cachedRecordings}
+          isLoadingMore={isLoadingMore}
+          setIsLoadingMore={setIsLoadingMore}
+          setCurrentPage={setCurrentPage}
+          setFilteredRecordingsPage={setFilteredRecordingsPage}
+          loadPage={loadPage}
+          currentPage={currentPage}
+          mobileSearchSticky={mobileSearchSticky}
+          setRecordingsListOpen={setRecordingsListOpen}
+          setViewingRecordingsFrom={setViewingRecordingsFrom}
+          setTransferScrollToPage={setTransferScrollToPage}
+          lastRecordingsListCloseTime={lastRecordingsListCloseTime}
+          videoRef={videoRef}
+        />
         <div ref={recordingsListBottomSentinelRef} style={{ height: 1 }} />
       </div>
       {/* Overlay to block touch scrolls below the recordings list on touch devices */}
@@ -3341,15 +2705,19 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             position: 'fixed',
             left: 0,
             right: 0,
-            top: `calc(100vh - 40px)`, // Adjust if needed to match the bottom of the recordings list
+            top: `calc(100vh - 200px)`, // Adjust if needed to match the bottom of the recordings list
             bottom: 0,
             zIndex: 2001,
             background: 'transparent',
             touchAction: 'none',
             pointerEvents: 'auto',
           }}
-          onTouchStart={e => e.preventDefault()}
+          onTouchStart={e => {
+            e.preventDefault()
+            handleCopyrightTouchStart()
+          }}
           onTouchMove={e => e.preventDefault()}
+          onTouchEnd={handleCopyrightTouchEnd}
         />
       )}
       <div style={{ height: recordingsListOpen ? 80 : 0 }} />
@@ -3365,8 +2733,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           letterSpacing: 1,
           userSelect: 'none'
         }}
-        onTouchStart={handleCopyrightTouchStart}
-        onTouchEnd={handleCopyrightTouchEnd}
       >
         gander © {new Date().getFullYear()} Brandon Bothell. All rights reserved.
       </div>
@@ -3376,31 +2742,97 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           width: '100%',
         }}
       />
-      {activeStream && selected.length > 0 && (
-        <div className='desktop-action-buttons'>
-          <BatchDeleteButton
-            recordingsListRef={recordingsListRef}
-            streamId={activeStream.id}
-            count={selected.length}
-            selected={selected}
-            recordings={cachedRecordings[activeStream.id] || []}
-            setRecordings={recs => {
-              setCachedRecordings(prev => ({
-                ...prev,
-                [activeStream.id]: recs.sort((a, b) => b.filename.localeCompare(a.filename))
-              }))
-              setTotalRecordings(prev => ({
-                ...prev,
-                [activeStream.id]: Math.max(0, (prev[activeStream.id] || 0) - selected.length)
-              }));
-              handleImmediateDeleteUpdate(selected);
+
+      {/* Floating handle: only show if floating, not open */}
+      {(!recordingsListOpen || !recordingsListInView) && (
+        <div
+          className="recordings-list-handle-floating"
+          tabIndex={0}
+          onClick={() => {
+            setRecordingsListOpen(true);
+            setTimeout(() => {
+              const list = recordingsListRef.current;
+              if (list) {
+                const rect = list.getBoundingClientRect();
+                const scrollY = window.scrollY || window.pageYOffset;
+                const targetY = rect.top + scrollY - (window.innerHeight / 2) + (rect.height / 2);
+                window.scrollTo({ top: targetY, behavior: 'smooth' });
+              }
+            }, 400);
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setRecordingsListOpen(true);
+              setTimeout(() => {
+                const list = recordingsListRef.current;
+                if (list) {
+                  const rect = list.getBoundingClientRect();
+                  const scrollY = window.scrollY || window.pageYOffset;
+                  const targetY = rect.top + scrollY - (window.innerHeight / 2) + (rect.height / 2);
+                  window.scrollTo({ top: targetY, behavior: 'smooth' });
+                }
+              }, 400);
+            }
+          }}
+          aria-label="Open recordings list"
+          style={{
+            position: 'fixed',
+            right: '-2.5%',
+            bottom: isMobileWidth ? 40 : 10,
+            transform: 'translateX(-50%)',
+            zIndex: 2002,
+            width: 80,
+            height: 80,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            cursor: 'pointer',
+            outline: 'none',
+            borderRadius: 24,
+            pointerEvents: 'auto',
+          }}
+        >
+          <FiChevronDown
+            size={60}
+            color="#1cf1d1"
+            style={{
+              marginBottom: 0,
+              filter: 'drop-shadow(0 2px 8px #1cf1d1cc)',
+              animation: 'bounceDown 5s infinite cubic-bezier(.4,2,.6,1), pulseDropShadow 5s infinite cubic-bezier(.4,2,.6,1)',
             }}
-            setSelected={setSelected}
           />
-          <DeselectButton setSelected={setSelected} recordingsListRef={recordingsListRef} />
+          <div
+            className="recordings-list-handle"
+            style={{
+              width: 56,
+              height: 12,
+              borderRadius: 6,
+              background: 'linear-gradient(90deg, #1cf1d1 60%, #2196f3 100%)',
+              margin: '12px 0 0 0',
+              cursor: 'pointer',
+              transition: 'background 0.2s, box-shadow 0.2s',
+              boxShadow: '0 2px 12px #1cf1d1aa',
+            }}
+          />
+          {/* Add keyframes for pulse and bounce */}
+          <style>
+            {`
+              @keyframes bounceDown {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(12px); }
+              }
+              @keyframes pulseDropShadow {
+              0% { filter: drop-shadow(0 2px 8px #1cf1d1cc); }
+              50% { filter: drop-shadow(0 8px 32px #1cf1d1ff); }
+              100% { filter: drop-shadow(0 2px 8px #1cf1d1cc); }
+              }
+            `}
+          </style>
         </div>
       )}
-      {false && <ReloadButton />}
+
+      {/* Floating menu button and popout for batch recording edits */}
       {selected.length > 0 && <FloatingMenuButton open={menuOpen} onClick={() => setMenuOpen(v => !v)} />}
       {activeStream && (<FloatingMenuPopout
         selected={selected}
@@ -3424,281 +2856,28 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         recordingsListRef={recordingsListRef}
         open={menuOpen}
       />)}
-      {showAddStreamModal && (
-        <div
-          style={{
-            position: 'fixed',
-            zIndex: 3000,
-            left: 0,
-            top: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={() => setShowAddStreamModal(false)}
-        >
-          <div
-            style={{
-              background: '#232b4a',
-              borderRadius: 12,
-              padding: 32,
-              minWidth: 320,
-              maxWidth: '90vw',
-              boxShadow: '0 4px 32px #000a',
-              color: '#fff',
-              position: 'relative',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h2 style={{ marginTop: 0 }}>Add New Stream</h2>
-            <form
-              onSubmit={async e => {
-                e.preventDefault();
-                setCreatingStream(true);
-                setCreateError(null);
-                // Basic client validation
-                if (!newStream.nickname.trim() || !newStream.ffmpegInput.trim()) {
-                  setCreateError('Nickname and Stream URL are required.');
-                  setCreatingStream(false);
-                  return;
-                }
-                // Only allow RTSP or video=...:audio=... for ffmpegInput
-                if (
-                  !/^rtsp:\/\//i.test(newStream.ffmpegInput.trim()) &&
-                  !/^video=.+:audio=.+/i.test(newStream.ffmpegInput.trim())
-                ) {
-                  setCreateError('Stream URL must be an RTSP URL or a video=...:audio=... string.');
-                  setCreatingStream(false);
-                  return;
-                }
-                try {
-                  const res = await authFetch(`${API_BASE}/api/streams`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      nickname: newStream.nickname.trim(),
-                      ffmpegInput: newStream.ffmpegInput.trim(),
-                      rtspUser: newStream.rtspUser.trim() || undefined,
-                      rtspPass: newStream.rtspPass.trim() || undefined,
-                    }),
-                  });
-                  if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    setCreateError(data.error || 'Failed to create stream.');
-                    setCreatingStream(false);
-                    return;
-                  }
-                  // Refresh streams
-                  const data = await res.json();
-                  setStreams(streams => streams ? [...streams, data] : [data]);
-                  setShowAddStreamModal(false);
-                  setNewStream({ nickname: '', ffmpegInput: '', rtspUser: '', rtspPass: '' });
-                } catch (err: any) {
-                  setCreateError(err.message || 'Failed to create stream.');
-                }
-                setCreatingStream(false);
-              }}
-            >
-              <div style={{ marginBottom: 16 }}>
-                <label>Nickname</label>
-                <input
-                  type="text"
-                  value={newStream.nickname}
-                  onChange={e => setNewStream(s => ({ ...s, nickname: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: 8,
-                    borderRadius: 4,
-                    border: '1px solid #1976d2',
-                    marginTop: 4,
-                    marginBottom: 8,
-                  }}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <label>Stream URL (RTSP or video=...:audio=...)</label>
-                <input
-                  type="text"
-                  value={newStream.ffmpegInput}
-                  onChange={e => setNewStream(s => ({ ...s, ffmpegInput: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: 8,
-                    borderRadius: 4,
-                    border: '1px solid #1976d2',
-                    marginTop: 4,
-                    marginBottom: 8,
-                  }}
-                  required
-                />
-              </div>
-              {/^rtsp:\/\//i.test(newStream.ffmpegInput.trim()) && (
-                <>
-                  <div style={{ marginBottom: 16 }}>
-                    <label>RTSP Username (optional)</label>
-                    <input
-                      type="text"
-                      value={newStream.rtspUser}
-                      onChange={e => setNewStream(s => ({ ...s, rtspUser: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: 8,
-                        borderRadius: 4,
-                        border: '1px solid #1976d2',
-                        marginTop: 4,
-                        marginBottom: 8,
-                      }}
-                    />
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <label>RTSP Password (optional)</label>
-                    <input
-                      type="password"
-                      value={newStream.rtspPass}
-                      onChange={e => setNewStream(s => ({ ...s, rtspPass: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: 8,
-                        borderRadius: 4,
-                        border: '1px solid #1976d2',
-                        marginTop: 4,
-                        marginBottom: 8,
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-              {createError && (
-                <div style={{ color: '#ff6b6b', marginBottom: 12 }}>{createError}</div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowAddStreamModal(false)}
-                  style={{
-                    background: '#444',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '8px 18px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                  disabled={creatingStream}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    background: '#1cf1d1',
-                    color: '#232b4a',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '8px 18px',
-                    fontWeight: 600,
-                    cursor: creatingStream ? 'not-allowed' : 'pointer',
-                    opacity: creatingStream ? 0.7 : 1,
-                  }}
-                  disabled={creatingStream}
-                >
-                  {creatingStream ? 'Creating...' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {showEditNicknameModal && editingStream && (
-        <div
-          style={{
-            position: 'fixed',
-            zIndex: 3000,
-            left: 0,
-            top: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={handleCancelEditNickname}
-        >
-          <div
-            style={{
-              background: '#232b4a',
-              borderRadius: 12,
-              padding: 32,
-              minWidth: 320,
-              maxWidth: '90vw',
-              boxShadow: '0 4px 32px #000a',
-              color: '#fff',
-              position: 'relative',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h2 style={{ marginTop: 0 }}>Edit Nickname</h2>
-            <form
-              onSubmit={e => {
-                e.preventDefault();
-                handleSaveNickname(editingStream);
-              }}
-            >
-              <input
-                type="text"
-                value={nicknameDraft}
-                onChange={e => setNicknameDraft(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: 8,
-                  borderRadius: 4,
-                  border: '1px solid #1976d2',
-                  marginTop: 4,
-                  marginBottom: 16,
-                }}
-                autoFocus
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowEditNicknameModal(false)}
-                  style={{
-                    background: '#444',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '8px 18px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    background: '#1cf1d1',
-                    color: '#232b4a',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '8px 18px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
+      {/* Modals */}
+      <AddStreamModal
+        showModal={showAddStreamModal}
+        onClose={() => setShowAddStreamModal(false)}
+        onStreamCreated={(newStreamData) => {
+          setStreams(streams => streams ? [...streams, newStreamData as Stream] : [newStreamData as Stream]);
+        }}
+        authFetch={authFetch}
+        API_BASE={API_BASE}
+      />
+      <EditNicknameModal
+        showModal={showEditNicknameModal}
+        stream={editingStream}
+        onClose={() => {
+          setShowEditNicknameModal(false);
+          setEditingStream(null);
+        }}
+        onSave={async (stream, newNickname) => {
+          await handleSaveNickname(stream, newNickname);
+        }}
+      />
     </div>
   );
 }
@@ -3767,31 +2946,7 @@ function seekToLive(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }
 }
 
-async function fetchWithRetry<T>(
-  fetchFn: () => Promise<T>,
-  retries = 2,
-  delayMs = 1200
-): Promise<T> {
-  try {
-    return await fetchFn();
-  } catch (err) {
-    if (retries > 0) {
-      await new Promise(res => setTimeout(res, delayMs));
-      return fetchWithRetry(fetchFn, retries - 1, delayMs);
-    }
-    throw err;
-  }
-}
-
-function utcToLocalDateString(utcDate: Date): string {
-  // Returns YYYY-MM-DD in the user's local time zone
-  const year = utcDate.getFullYear();
-  const month = String(utcDate.getMonth() + 1).padStart(2, '0');
-  const day = String(utcDate.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getLocalDateString(date: Date) {
+function getLocalDateString(date: Date = new Date()) {
   // Returns YYYY-MM-DD in the user's local time
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');

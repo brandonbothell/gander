@@ -5,6 +5,10 @@ import { MotionService } from './plugins/motionService';
 import { API_BASE, authFetch } from './main';
 
 export async function subscribeToWebPush() {
+  if (!navigator.serviceWorker) {
+    return console.warn('Service Worker not supported');
+  }
+
   const keyRes = await authFetch(`${API_BASE}/api/vapid-public-key`);
   const { publicKey } = await keyRes.json();
 

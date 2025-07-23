@@ -67,7 +67,7 @@ export function StreamTilesGrid({
       const streamId = tile.getAttribute('data-stream-id');
       if (streamId) {
         currentPositions.set(streamId, tile.getBoundingClientRect());
-        console.log(`Captured position for ${streamId}:`, tile.getBoundingClientRect());
+        // console.log(`Captured position for ${streamId}:`, tile.getBoundingClientRect());
       } else {
         console.warn('Tile missing data-stream-id attribute:', tile);
       }
@@ -95,7 +95,7 @@ export function StreamTilesGrid({
 
           // Only animate if position actually changed significantly
           if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-            console.log(`Animating ${streamId}: ${deltaX}px, ${deltaY}px`);
+            // console.log(`Animating ${streamId}: ${deltaX}px, ${deltaY}px`);
 
             // Check if Web Animations API is supported
             if (tile.animate) {
@@ -128,7 +128,7 @@ export function StreamTilesGrid({
               }
             } else {
               // Fallback for browsers without Web Animations API
-              console.log('Web Animations API not supported, using CSS fallback');
+              // console.log('Web Animations API not supported, using CSS fallback');
               fallbackCSSAnimation(tile as HTMLElement, deltaX, deltaY);
             }
           }

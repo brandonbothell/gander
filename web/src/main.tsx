@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { Capacitor } from '@capacitor/core';
-import { LoadingProvider } from './LoadingContext';
+import { LoadingProvider } from './LoadingProvider.tsx';
 import { LoadingBar } from './components/LoadingBar';
 // @ts-ignore
 import SecureStorage from './utils/secureStorage';
@@ -150,3 +150,39 @@ export async function requestNotificationPermission() {
     await Notification.requestPermission();
   }
 }
+// Fetch with retry logic for rate limiting
+
+export async function fetchWithRetry<T extends Response>(fetchFn: () => Promise<T>, tries = 3, delay = 1000): Promise<T> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const response = await fetchFn();
+
+      if (response.status === 429) {
+        console.warn(`Rate limit hit, attempt ${i + 1}/${tries}`);
+        if (i === tries - 1) {
+          throw new Error('Rate limit exceeded after multiple attempts');
+        }
+        // Exponential backoff: 1s, 2s, 4s
+        const waitTime = delay * Math.pow(2, i);
+        console.log(`Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return response;
+    } catch (error) {
+      console.error(`Fetch attempt ${i + 1} failed:`, error);
+      if (i === tries - 1) {
+        throw error;
+      }
+      // Wait before retry even for non-429 errors
+      const waitTime = delay * Math.pow(2, i);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+  throw new Error('Max retries exceeded');
+};
