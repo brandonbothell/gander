@@ -2699,7 +2699,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         <div ref={recordingsListBottomSentinelRef} style={{ height: 1 }} />
       </div>
       {/* Overlay to block touch scrolls below the recordings list on touch devices */}
-      {isTouchInput && recordingsListOpen && (
+      {isTouchInput && (
         <div
           style={{
             position: 'fixed',
@@ -2707,17 +2707,28 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             right: 0,
             top: `calc(100vh - 200px)`, // Adjust if needed to match the bottom of the recordings list
             bottom: 0,
-            zIndex: 2001,
+            zIndex: 1000,
             background: 'transparent',
-            touchAction: 'none',
-            pointerEvents: 'auto',
+            touchAction: recordingsListOpen ? 'none' : 'auto',
+            pointerEvents: recordingsListOpen ? 'auto' : 'none',
+            opacity: recordingsListOpen ? 1 : 0,
           }}
           onTouchStart={e => {
-            e.preventDefault()
-            handleCopyrightTouchStart()
+            if (recordingsListOpen && selected.length === 0) {
+              e.preventDefault()
+              handleCopyrightTouchStart()
+            }
           }}
-          onTouchMove={e => e.preventDefault()}
-          onTouchEnd={handleCopyrightTouchEnd}
+          onTouchMove={e => {
+            if (recordingsListOpen) {
+              e.preventDefault()
+            }
+          }}
+          onTouchEnd={() => {
+            if (recordingsListOpen && selected.length === 0) {
+              handleCopyrightTouchEnd()
+            }
+          }}
         />
       )}
       <div style={{ height: recordingsListOpen ? 80 : 0 }} />
