@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FiPlay, FiPause, FiVolume2, FiVolumeX } from 'react-icons/fi';
+import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
 import { type Stream } from '../../../source/types/shared'
 
 interface StreamControlBarProps {
@@ -200,6 +200,17 @@ export function StreamControlBar({
     handleShowControls();
   };
 
+  const handleFullscreen = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.requestFullscreen) {
+      video.requestFullscreen();
+    } else if ((video as any).webkitRequestFullscreen) {
+      (video as any).webkitRequestFullscreen();
+    }
+    handleShowControls();
+  };
+
   if (!activeStream || !videoRect) return null;
 
   return (
@@ -313,6 +324,26 @@ export function StreamControlBar({
             ) : (
               <FiVolume2 size={sizes.iconSize} />
             )}
+          </button>
+          <button
+            onClick={handleFullscreen}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              padding: 8,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            aria-label="Fullscreen"
+          >
+            <FiMaximize size={24} />
           </button>
         </div>
       </div>

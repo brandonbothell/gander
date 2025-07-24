@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE, authFetch } from '../main';
 import { useSignedUrl } from '../hooks/useSignedUrl';
+import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
 
 export type Recording = { streamId: string, filename: string };
 
@@ -34,16 +35,153 @@ export function Recording({
   onClose,
   cachedRecordings,
   onNavigate,
-  setNicknames
-}: RecordingProps) {
+  setNicknames,
+  videoRef: externalVideoRef
+}: RecordingProps & { videoRef?: React.RefObject<HTMLVideoElement | null> }) {
   const [nickname, setNickname] = useState('');
   const [hover, setHover] = useState(false);
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = externalVideoRef || useRef<HTMLVideoElement>(null);
+  // Controls fade-away logic
+  const [isControlBarVisible, setIsControlBarVisible] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [videoHeight, setVideoHeight] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const hideTimeoutRef = useRef<number | null>(null);
+  const isSeekingRef = useRef(isSeeking);
 
   const videoUrl = useSignedUrl(filename, 'video', streamId);
   const thumbUrl = useSignedUrl(filename.replace(/\.mp4$/, '.jpg'), 'thumbnail', streamId);
+
+  useEffect(() => {
+    isSeekingRef.current = isSeeking;
+  }, [isSeeking]);
+
+  const scheduleHide = useCallback(() => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+    }
+    hideTimeoutRef.current = window.setTimeout(() => {
+      if (isSeekingRef.current) {
+        // While seeking, keep controls visible and reschedule
+        scheduleHide();
+      } else {
+        setIsControlBarVisible(false);
+      }
+    }, 3000);
+  }, []);
+  const handleShowControls = () => {
+    setIsControlBarVisible(true);
+    scheduleHide();
+  };
+
+  // Sync video state for controls/seek bar
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const getElementHeight = () => video.getBoundingClientRect().height;
+    const handlePlay = () => {
+      setIsPaused(false);
+      setVideoHeight(getElementHeight());
+    };
+    const handlePause = () => {
+      setIsPaused(true);
+      setVideoHeight(getElementHeight());
+    };
+    const handleVolumeChange = () => {
+      setIsMuted(video.muted);
+      setVideoHeight(getElementHeight());
+    };
+    const update = () => {
+      setCurrentTime(video.currentTime);
+      setDuration(video.duration || 0);
+      setVideoHeight(getElementHeight());
+    };
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('volumechange', handleVolumeChange);
+    video.addEventListener('timeupdate', update);
+    video.addEventListener('durationchange', update);
+    video.addEventListener('loadedmetadata', update);
+    setIsPaused(video.paused);
+    setIsMuted(video.muted);
+    update();
+    return () => {
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('volumechange', handleVolumeChange);
+      video.removeEventListener('timeupdate', update);
+      video.removeEventListener('durationchange', update);
+      video.removeEventListener('loadedmetadata', update);
+    };
+  }, [videoRef, filename]);
+
+  // Control handlers
+  const handlePlayPause = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      video.play().catch(() => { setTimeout(handlePlayPause, 100); });
+    } else {
+      video.pause();
+    }
+    handleShowControls();
+  };
+  const handleMuteToggle = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+    setIsMuted(video.muted);
+    handleShowControls();
+  };
+  const handleFullscreen = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.requestFullscreen) {
+      video.requestFullscreen();
+    } else if ((video as any).webkitRequestFullscreen) {
+      (video as any).webkitRequestFullscreen();
+    }
+    handleShowControls();
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const value = Number(e.target.value);
+    setCurrentTime(value);
+    video.currentTime = value;
+
+    if (!isSeeking) setIsSeeking(true);
+    if (!isPaused) {
+      video.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const handleSeekPointerDown = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setIsSeeking(true);
+    video.pause();
+    setIsPaused(true);
+  };
+
+  const handleSeekPointerUp = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    setIsSeeking(false);
+    video.play();
+    setIsPaused(false);
+    // When seeking ends, immediately reschedule hiding controls
+    scheduleHide();
+  };
 
   useEffect(() => {
     if (!open && videoRef.current) {
@@ -54,7 +192,7 @@ export function Recording({
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
       videoRef.current.src = videoUrl;
       videoRef.current.load();
-      videoRef.current.play().catch(() => { });
+      videoRef.current.play().catch(() => { videoRef.current!.play(); });
     }
 
     return () => {
@@ -100,7 +238,7 @@ export function Recording({
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.load();
-      videoRef.current.play().catch(() => { });
+      videoRef.current.play().catch(() => { videoRef.current!.play(); });
     }
   }, [filename, videoUrl]);
 
@@ -118,31 +256,251 @@ export function Recording({
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      position: 'relative',
     }}>
-      {/* Video */}
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        controls
-        autoPlay
-        playsInline
-        poster={thumbUrl}
+      {/* Video + Seek Bar Container */}
+      <div
         style={{
+          position: 'relative',
           width: '100%',
           maxWidth: 900,
-          background: '#000',
-          borderRadius: 24,
-          marginBottom: 12,
-          marginTop: 0,
-          boxShadow: '0 8px 32px 0 rgba(26,41,128,0.4), 0 1.5px 8px 0 #000',
         }}
-      />
+      >
+        {/* Invisible overlay for controls/seek bar fade logic */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: videoHeight || 0,
+            zIndex: 10,
+            background: 'transparent',
+            cursor: isControlBarVisible ? 'auto' : 'none',
+            borderRadius: '24px',
+            pointerEvents: 'auto', // restore pointer events for overlay
+          }}
+          onMouseEnter={handleShowControls}
+          onMouseMove={handleShowControls}
+          onTouchStart={handleShowControls}
+        />
+        {/* Video */}
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          controls={false}
+          autoPlay
+          playsInline
+          poster={thumbUrl}
+          muted
+          style={{
+            width: '100%',
+            maxWidth: 900,
+            background: '#000',
+            borderRadius: 24,
+            marginBottom: 0,
+            marginTop: 0,
+            boxShadow: '0 8px 32px 0 rgba(26,41,128,0.4), 0 1.5px 8px 0 #000',
+            maxHeight: '60vh',
+            display: 'block',
+          }}
+        />
+        {/* Controls Bar */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 18,
+            left: 18,
+            zIndex: 20,
+            display: 'flex',
+            gap: 12,
+            background: 'rgba(0,0,0,0.6)',
+            borderRadius: 12,
+            padding: '8px 16px',
+            boxShadow: '0 2px 8px #1a2980aa',
+            opacity: isControlBarVisible ? 1 : 0,
+            transition: 'opacity 0.3s',
+            pointerEvents: isControlBarVisible ? 'auto' : 'none',
+          }}
+        >
+          <button
+            onClick={handlePlayPause}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              padding: 8,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            aria-label={isPaused ? 'Play' : 'Pause'}
+          >
+            {isPaused ? <FiPlay size={24} /> : <FiPause size={24} />}
+          </button>
+          <button
+            onClick={handleMuteToggle}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              padding: 8,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? <FiVolumeX size={24} /> : <FiVolume2 size={24} />}
+          </button>
+          <button
+            onClick={handleFullscreen}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              padding: 8,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            aria-label="Fullscreen"
+          >
+            <FiMaximize size={24} />
+          </button>
+        </div>
+        {/* Seek Bar + Timestamp */}
+        <div style={{
+          width: '100%',
+          maxWidth: 900,
+          margin: '0 auto',
+          marginTop: isControlBarVisible ? 12 : 0,
+          marginBottom: isControlBarVisible ? 12 : 0,
+          display: 'flex',
+          alignItems: 'center',
+          background: 'linear-gradient(180deg, transparent 60%, #232b4a 100%)',
+          opacity: isControlBarVisible ? 1 : 0,
+          height: isControlBarVisible ? 44 : 0, // 44px when visible, 0 when hidden
+          padding: isControlBarVisible ? '8px 18px' : '0px 18px',
+          boxSizing: 'border-box',
+          borderRadius: 8,
+          position: 'relative',
+          overflow: 'hidden',
+          transition: 'opacity 0.3s, height 0.5s cubic-bezier(.4,2,.6,1), padding 0.5s cubic-bezier(.4,2,.6,1), margin 0.5s cubic-bezier(.4,2,.6,1)',
+        }}>
+          <span style={{
+            color: '#8ef',
+            fontSize: '0.95em',
+            fontFamily: 'Orbitron, Roboto, Arial, sans-serif',
+            minWidth: 60,
+            textAlign: 'left',
+            marginRight: 12,
+            transition: 'opacity 0.3s',
+            opacity: isControlBarVisible ? 1 : 0,
+          }}>
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
+          {/* Overlay for seek bar input to allow pointer events only on input */}
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 11,
+            }}
+          />
+          <input
+            type="range"
+            min={0}
+            max={duration || 0}
+            step={1}
+            value={currentTime}
+            onChange={handleSeek}
+            onPointerDown={handleSeekPointerDown}
+            onPointerUp={handleSeekPointerUp}
+            style={{
+              width: '100%',
+              accentColor: '#1cf1d1',
+              height: 4,
+              paddingTop: 2,
+              paddingBottom: 2,
+              borderRadius: 2,
+              background: '#232b4a',
+              position: 'relative',
+              zIndex: 12,
+              pointerEvents: 'auto',
+              transition: 'opacity 0.3s',
+              opacity: isControlBarVisible ? 1 : 0,
+            }}
+            aria-label="Seek"
+          />
+          <span style={{
+            marginLeft: 12,
+            color: '#8ef',
+            fontSize: '0.95em',
+            fontFamily: 'Orbitron, Roboto, Arial, sans-serif',
+            minWidth: 60,
+            textAlign: 'right',
+            transition: 'opacity 0.3s',
+            opacity: isControlBarVisible ? 1 : 0,
+          }}>
+            {formatTimestamp(filename)}
+          </span>
+        </div>
+      </div>
+      {/* Close Button - themed like StreamControlBar */}
+      <button
+        aria-label="Close"
+        onClick={onClose}
+        style={{
+          position: 'absolute',
+          top: 18,
+          right: 18,
+          zIndex: 10,
+          background: 'rgba(0,0,0,0.6)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          width: 40,
+          height: 40,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 24,
+          cursor: 'pointer',
+          transition: 'background 0.2s',
+          boxShadow: '0 2px 8px #1a2980aa',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.6)'}
+      >
+        ×
+      </button>
       {/* Nickname section */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 10,
+          marginTop: isControlBarVisible ? 0 : 8,
           marginBottom: 8,
           minHeight: 36,
           justifyContent: 'center',
@@ -360,4 +718,11 @@ export function Recording({
       </div>
     </div>
   );
+}
+
+function formatTime(sec: number) {
+  if (!isFinite(sec)) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
