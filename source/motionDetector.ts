@@ -81,9 +81,39 @@ export function clearMotionHistory(streamId: string) {
   streamMovementHistory[streamId] = [];
 }
 
+// Limit concurrent FFmpeg frame extractions
+const MAX_CONCURRENT_FFMPEG = 3;
+let runningFfmpeg = 0;
+const ffmpegQueue: Array<() => void> = [];
+
+function runFfmpegTask(task: () => Promise<void>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const run = async () => {
+      if (runningFfmpeg >= MAX_CONCURRENT_FFMPEG) {
+        ffmpegQueue.push(run);
+        return;
+      }
+      runningFfmpeg++;
+      try {
+        await task();
+        resolve();
+      } catch (e) {
+        reject(e);
+      } finally {
+        runningFfmpeg--;
+        if (ffmpegQueue.length > 0) {
+          const next = ffmpegQueue.shift();
+          if (next) next();
+        }
+      }
+    };
+    run();
+  });
+}
+
 // Simplified frame extraction for very short segments
 function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return runFfmpegTask(() => new Promise((resolve, reject) => {
     debugLog(`[Motion] Extracting frame from ${segmentPath} to ${outputPath}`);
 
     // For 0.5-second segments, don't seek at all - just grab the first frame
@@ -108,11 +138,10 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
     const timeout = setTimeout(() => {
       ffmpeg.kill('SIGKILL');
       reject(new Error('Frame extraction timeout'));
-    }, 3000); // Shorter timeout
+    }, 10000); // Increased to 10 seconds
 
     ffmpeg.on('close', (code) => {
       clearTimeout(timeout);
-
       // Small delay for file system sync
       setTimeout(() => {
         if (code === 0) {
@@ -138,7 +167,13 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
                 stdio: ['ignore', 'ignore', 'pipe']
               });
 
+              const pngTimeout = setTimeout(() => {
+                pngFfmpeg.kill('SIGKILL');
+                reject(new Error('PNG frame extraction timeout'));
+              }, 10000); // 10 seconds for PNG as well
+
               pngFfmpeg.on('close', (pngCode) => {
+                clearTimeout(pngTimeout);
                 if (pngCode === 0 && fs.existsSync(pngPath) && fs.statSync(pngPath).size > 100) {
                   // Rename PNG to JPG for consistency
                   try {
@@ -153,6 +188,12 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
                   logMotion(`Both JPG and PNG extraction failed`);
                   reject(new Error('Both formats failed'));
                 }
+              });
+
+              pngFfmpeg.on('error', (err) => {
+                clearTimeout(pngTimeout);
+                debugLog(`[Motion] PNG FFmpeg spawn error: ${err}`);
+                reject(err);
               });
             }
           } else {
@@ -181,7 +222,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
       debugLog(`[Motion] FFmpeg spawn error: ${err}`);
       reject(err);
     });
-  });
+  }));
 }
 
 export async function detectMotion(

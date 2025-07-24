@@ -2712,8 +2712,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             bottom: 0,
             zIndex: 1000,
             background: 'transparent',
-            touchAction: recordingsListOpen ? 'none' : 'auto',
-            pointerEvents: recordingsListOpen ? 'auto' : 'none',
             opacity: recordingsListOpen ? 1 : 0,
           }}
           onTouchStart={e => {
@@ -2735,18 +2733,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           }}
           onTouchMove={e => e.preventDefault()}
           onTouchEnd={() => {
-            const scrollTop = window.scrollY || window.pageYOffset;
-            const windowHeight = window.innerHeight;
-            const documentHeight = document.documentElement.scrollHeight;
-
-            // Calculate how close to bottom (in pixels from bottom)
-            const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
-            const bottomThreshold = windowHeight * 0.5; // 50% of viewport height
-
-            if (
-              selected.length === 0 &&
-              distanceFromBottom <= bottomThreshold
-            ) {
+            if (selected.length === 0) {
               handleCopyrightTouchEnd();
             }
           }}

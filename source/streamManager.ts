@@ -276,7 +276,11 @@ export class StreamManager {
         lastSegmentTime = now;
 
         // Log if segments are taking too long (indicates stuttering)
-        if (segmentCount > 1 && timeSinceLastSegment > 3000) {
+        if (segmentCount > 1 && timeSinceLastSegment > 10000) { // 10 seconds
+          logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (restarting FFmpeg)`, 'warn');
+          this.ffmpeg?.kill();
+          setTimeout(() => this.startFFmpeg(), 1000);
+        } else if (segmentCount > 1 && timeSinceLastSegment > 3000) {
           logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`);
         }
       }
@@ -310,14 +314,18 @@ export class StreamManager {
       }
     });
 
+    // Auto-restart FFmpeg on crash/exit
     const handleFfmpegExit = (code: number | null, signal: NodeJS.Signals | null) => {
       console.log(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
-
       // Only try reencoding if stream copy failed and we got no segments
       if (!hasErrored && inputIsRtsp && code !== 0 && signal !== 'SIGTERM' && segmentCount === 0) {
         console.log(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
         hasErrored = true;
         setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+      } else if (code !== 0 && signal !== 'SIGTERM') {
+        // FFmpeg crashed or exited unexpectedly, restart
+        logMotion(`[${this.config.id}] FFmpeg crashed or exited unexpectedly (code ${code}, signal ${signal}), restarting...`);
+        setTimeout(() => this.startFFmpeg(), 1000);
       }
     };
 

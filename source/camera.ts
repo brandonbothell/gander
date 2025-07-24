@@ -34,13 +34,18 @@ if (!fs.existsSync(logsDir)) {
 }
 
 // Motion logging function
-export function logMotion(message: string) {
+export function logMotion(message: string, level: 'info' | 'error' | 'warn' = 'info') {
   const timestamp = new Date().toISOString();
-  const logEntry = `${timestamp} ${message}\n`;
+  const logEntry = `${timestamp} [${level}] ${message}\n`;
   try {
     fs.appendFileSync(`${motionLogPath}-latest.log`, logEntry);
   } catch (error) {
     console.error('Failed to write to motion log:', error);
+  }
+  if (level === 'error') {
+    console.error(logEntry);
+  } else if (level === 'warn') {
+    console.warn(logEntry);
   }
 }
 
