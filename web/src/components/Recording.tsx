@@ -87,6 +87,7 @@ export function Recording({
     const handlePlay = () => {
       setIsPaused(false);
       setVideoHeight(getElementHeight());
+      handleShowControls();
     };
     const handlePause = () => {
       setIsPaused(true);
