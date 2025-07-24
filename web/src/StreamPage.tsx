@@ -1166,7 +1166,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         recordingsListOpen
       ) {
         setRecordingsListOpen(false);
-        setViewingRecordingsFrom(null);
         setTransferScrollToPage(false);
         lastRecordingsListCloseTime.current = Date.now();
         setTimeout(() => {
@@ -2263,6 +2262,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             )}
             setAutoScrollUntilRef={until => { autoScrollUntilRef.current = until; }}
             setNicknames={setNicknames}
+            isMobileWidth
           />
           <div className="stream-video-container" style={{ position: 'relative' }}>
             <StreamControls
@@ -2694,7 +2694,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           currentPage={currentPage}
           mobileSearchSticky={mobileSearchSticky}
           setRecordingsListOpen={setRecordingsListOpen}
-          setViewingRecordingsFrom={setViewingRecordingsFrom}
           setTransferScrollToPage={setTransferScrollToPage}
           lastRecordingsListCloseTime={lastRecordingsListCloseTime}
           videoRef={videoRef}

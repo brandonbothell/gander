@@ -12,6 +12,7 @@ interface RecordingBarProps {
   setNicknames: React.Dispatch<React.SetStateAction<{
     [filename: string]: string;
   }>>;
+  isMobileWidth: boolean;
 }
 
 const ANIMATION_DURATION = 700; // ms, match your CSS

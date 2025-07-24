@@ -15,6 +15,8 @@ interface RecordingProps {
   setNicknames: React.Dispatch<React.SetStateAction<{
     [filename: string]: string;
   }>>;
+  setAutoScrollUntilRef?: (until: number) => void;
+  isMobileWidth: boolean;
 }
 
 function formatTimestamp(filename: string) {
@@ -36,7 +38,9 @@ export function Recording({
   cachedRecordings,
   onNavigate,
   setNicknames,
-  videoRef: externalVideoRef
+  videoRef: externalVideoRef,
+  setAutoScrollUntilRef,
+  isMobileWidth
 }: RecordingProps & { videoRef?: React.RefObject<HTMLVideoElement | null> }) {
   const [nickname, setNickname] = useState('');
   const [hover, setHover] = useState(false);
@@ -190,11 +194,20 @@ export function Recording({
       hideTimeoutRef.current = null;
     }
     if (!open && videoRef.current) {
-      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+      setAutoScrollUntilRef?.(Date.now() + 1000);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       videoRef.current.pause();
       videoRef.current.src = '';
     } else if (open && videoUrl && videoRef.current) {
-      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+      setAutoScrollUntilRef?.(Date.now() + 1000);
+      // On small screens, delay scroll until controls bar animation finishes
+      if (isMobileWidth) {
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 700); // match controls bar animation duration
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       videoRef.current.src = videoUrl;
       videoRef.current.load();
       videoRef.current.play().catch(() => { videoRef.current!.play(); });

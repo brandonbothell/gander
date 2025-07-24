@@ -38,7 +38,6 @@ interface RecordingsListContentProps {
   currentPage: number;
   mobileSearchSticky: boolean;
   setRecordingsListOpen: (open: boolean) => void;
-  setViewingRecordingsFrom: (stream: any) => void;
   setTransferScrollToPage: (value: boolean) => void;
   lastRecordingsListCloseTime: React.RefObject<number>;
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -81,7 +80,6 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
     currentPage,
     mobileSearchSticky,
     setRecordingsListOpen,
-    setViewingRecordingsFrom,
     setTransferScrollToPage,
     lastRecordingsListCloseTime,
     videoRef,
@@ -326,7 +324,6 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
           aria-label="Recordings list handle"
           onClick={() => {
             setRecordingsListOpen(false);
-            setViewingRecordingsFrom(null);
             setTransferScrollToPage(false);
             lastRecordingsListCloseTime.current = Date.now();
             setTimeout(() => {
