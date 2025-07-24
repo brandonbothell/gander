@@ -185,6 +185,10 @@ export function Recording({
   };
 
   useEffect(() => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
     if (!open && videoRef.current) {
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
       videoRef.current.pause();
@@ -197,6 +201,10 @@ export function Recording({
     }
 
     return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = null;
+      }
       if (videoRef.current) {
         videoRef.current.pause();
         videoRef.current.src = '';
