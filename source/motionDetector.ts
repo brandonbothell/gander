@@ -396,7 +396,7 @@ export async function detectMotion(
 export async function safeUnlink(filePath: string) {
   try {
     if (await fs.promises.stat(filePath).then(() => true).catch(() => false)) {
-      await fs.promises.unlink(filePath);
+      await fs.promises.rm(filePath, { force: true, recursive: true });
     }
   } catch (error) {
     // Ignore errors silently for performance

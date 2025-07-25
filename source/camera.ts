@@ -1957,7 +1957,10 @@ app.delete('/api/recordings/:streamId/:filename', jwtAuth, async (req, res) => {
   const filePath = path.join(stream.config.recordDir, filename);
   const thumbPath = path.join(stream.config.thumbDir, filename.replace(/\.mp4$/, '.jpg'));
   try {
-    await Promise.all([fs.promises.unlink(filePath), fs.promises.unlink(thumbPath)]);
+    await Promise.all([
+      fs.promises.rm(filePath, { force: true, recursive: true }),
+      fs.promises.rm(thumbPath, { force: true, recursive: true })
+    ]);
   } catch (e) {
     res.status(500).json({ error: 'Failed to delete file' });
   }
@@ -1990,7 +1993,10 @@ app.post('/api/recordings/:streamId/bulk-delete', jwtAuth, express.json(), async
     const filePath = path.join(stream.config.recordDir, filename);
     const thumbPath = path.join(stream.config.thumbDir, filename.replace(/\.mp4$/, '.jpg'));
     try {
-      await Promise.all([fs.promises.unlink(filePath), fs.promises.unlink(thumbPath)]);
+      await Promise.all([
+        fs.promises.rm(filePath, { force: true, recursive: true }),
+        fs.promises.rm(thumbPath, { force: true, recursive: true })
+      ]);
     } catch (e) {
       results[filename] = false;
     }
@@ -2014,7 +2020,7 @@ app.post('/api/recordings/:streamId/bulk-delete', jwtAuth, express.json(), async
 
 // --- Safe unlink function ---
 async function safeUnlink(filePath: string, retries = 3) {
-  return fs.promises.unlink(filePath).catch((error) => {
+  return fs.promises.rm(filePath, { force: true, recursive: true }).catch((error) => {
     if (error) {
       if (error.code === 'ENOENT' || error.code === 'EPERM') {
         // File was already deleted by another process, which is fine
