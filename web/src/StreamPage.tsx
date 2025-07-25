@@ -146,6 +146,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   // --- Debug overlay state ---
   const [_, setDebugLongPressActive] = useState(false);
   const debugLongPressTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isAtBottomOfPage, setIsAtBottomOfPage] = useState(false);
 
   // Handler for copyright long-press (touch devices)
   function handleCopyrightTouchStart() {
@@ -1106,6 +1107,17 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     let lastScrollY = window.scrollY;
 
     function handleScroll() {
+      const scrollTop = window.scrollY || window.pageYOffset;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+
+      // Calculate how close to bottom (in pixels from bottom)
+      const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+      const bottomThreshold = windowHeight * 0.5; // 50% of viewport height
+
+      setIsAtBottomOfPage(distanceFromBottom <= bottomThreshold);
+
+
       if (keyboardTransitioningRef.current || isKeyboardOpen || forceSticky) return; // Ignore scroll events while keyboard is transitioning
       const currentScrollY = window.scrollY;
       if (
@@ -2238,7 +2250,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
   return (
     <div className="App with-side-padding">
-      {showDebug && <DebugInfo onClose={() => setShowDebug(false)} />}
+      {showDebug && <DebugInfo onClose={() => { setShowDebug(false); recordingsListRef.current?.focus() }} />}
       <div style={{ userSelect: 'none' }}>
         {/* Main video and mask editor remain unchanged, but use activeStream */}
         <div
@@ -2702,8 +2714,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         />
         <div ref={recordingsListBottomSentinelRef} style={{ height: 1 }} />
       </div>
-      {/* Overlay to block touch scrolls below the recordings list on touch devices */}
-      {isTouchInput && recordingsListOpen && (
+      {/* Overlay to block touch scrolls and open debug logs below the recordings list on touch devices */}
+      {isTouchInput && recordingsListOpen && isAtBottomOfPage && (
         <div
           style={{
             position: 'fixed',
@@ -2714,20 +2726,15 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             zIndex: 1000,
             background: 'transparent',
             opacity: recordingsListOpen ? 1 : 0,
+            touchAction: 'none',
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTapHighlightColor: 'transparent',
           }}
           onTouchStart={e => {
-            const scrollTop = window.scrollY || window.pageYOffset;
-            const windowHeight = window.innerHeight;
-            const documentHeight = document.documentElement.scrollHeight;
 
-            // Calculate how close to bottom (in pixels from bottom)
-            const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
-            const bottomThreshold = windowHeight * 0.5; // 50% of viewport height
 
-            if (
-              selected.length === 0 &&
-              distanceFromBottom <= bottomThreshold
-            ) {
+            if (selected.length === 0 && isAtBottomOfPage) {
               e.preventDefault();
               handleCopyrightTouchStart();
             }
