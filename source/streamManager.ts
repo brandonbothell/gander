@@ -18,6 +18,7 @@ export class StreamManager {
   ffmpeg: ReturnType<typeof spawn> | null = null;
   webrtcProcess: ReturnType<typeof spawn> | null = null;
   private webrtcClients = new Set<string>();
+  private ffmpegRestarting = false;
 
   constructor(config: StreamConfig) {
     this.config = config;
@@ -278,8 +279,13 @@ export class StreamManager {
         // Log if segments are taking too long (indicates stuttering)
         if (segmentCount > 1 && timeSinceLastSegment > 10000) { // 10 seconds
           logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (restarting FFmpeg)`, 'warn');
-          this.ffmpeg?.kill();
-          setTimeout(() => this.startFFmpeg(), 1000);
+          if (!this.ffmpegRestarting) {
+            this.ffmpegRestarting = true;
+            this.stopFFmpegAndWait().then(() => {
+              this.ffmpegRestarting = false;
+              setTimeout(() => this.startFFmpeg(), 1000);
+            });
+          }
         } else if (segmentCount > 1 && timeSinceLastSegment > 3000) {
           logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`);
         }
@@ -302,8 +308,13 @@ export class StreamManager {
         if (hasRealError) {
           console.log(`[${this.config.id}] Stream copy failed, switching to reencoding...`);
           hasErrored = true;
-          this.ffmpeg?.kill();
-          setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+          if (!this.ffmpegRestarting) {
+            this.ffmpegRestarting = true;
+            this.stopFFmpegAndWait().then(() => {
+              this.ffmpegRestarting = false;
+              setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+            });
+          }
           return;
         }
       }
@@ -321,16 +332,51 @@ export class StreamManager {
       if (!hasErrored && inputIsRtsp && code !== 0 && signal !== 'SIGTERM' && segmentCount === 0) {
         console.log(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
         hasErrored = true;
-        setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+        if (!this.ffmpegRestarting) {
+          this.ffmpegRestarting = true;
+          this.stopFFmpegAndWait().then(() => {
+            this.ffmpegRestarting = false;
+            setTimeout(() => this.startFFmpegWithReencoding(), 1000);
+          });
+        }
       } else if (code !== 0 && signal !== 'SIGTERM') {
         // FFmpeg crashed or exited unexpectedly, restart
         logMotion(`[${this.config.id}] FFmpeg crashed or exited unexpectedly (code ${code}, signal ${signal}), restarting...`);
-        setTimeout(() => this.startFFmpeg(), 1000);
+        if (!this.ffmpegRestarting) {
+          this.ffmpegRestarting = true;
+          this.stopFFmpegAndWait().then(() => {
+            this.ffmpegRestarting = false;
+            setTimeout(() => this.startFFmpeg(), 1000);
+          });
+        }
       }
     };
 
     this.ffmpeg.addListener('exit', handleFfmpegExit);
     setTimeout(() => { this.ffmpeg?.removeListener('exit', handleFfmpegExit); }, 20000);
+  }
+
+  // Helper to stop FFmpeg and wait for exit before restarting
+  private async stopFFmpegAndWait(): Promise<void> {
+    return new Promise((resolve) => {
+      if (!this.ffmpeg) return;
+      const proc = this.ffmpeg;
+      let resolved = false;
+      proc.once('exit', () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      });
+      proc.kill('SIGTERM');
+      // Fallback: resolve after 2 seconds if exit event not received
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      }, 2000);
+    });
   }
 
   // Fallback reencoding with balanced settings
