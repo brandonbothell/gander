@@ -116,117 +116,128 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
   return runFfmpegTask(() => new Promise((resolve, reject) => {
     debugLog(`[Motion] Extracting frame from ${segmentPath} to ${outputPath}`);
 
-    // For 0.5-second segments, don't seek at all - just grab the first frame
-    const ffmpeg = spawn('ffmpeg', [
-      '-y',
-      '-i', segmentPath,
-      '-vf', `scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}`,
-      '-vframes', '1',
-      '-update', '1',
-      '-q:v', '5',  // Better quality
-      '-f', 'image2',
-      outputPath
-    ], {
-      stdio: ['ignore', 'ignore', 'pipe']
-    });
+    // Check if segmentPath exists before spawning ffmpeg
+    fs.promises.stat(segmentPath).then(stats => {
+      if (stats.size < 1000) {
+        debugLog(`[Motion] Segment file too small: ${segmentPath}`);
+        reject(new Error('Segment file too small'));
+        return;
+      }
 
-    let errorOutput = '';
-    ffmpeg.stderr?.on('data', (data) => {
-      errorOutput += data.toString();
-    });
+      // For 0.5-second segments, don't seek at all - just grab the first frame
+      const ffmpeg = spawn('ffmpeg', [
+        '-y',
+        '-i', segmentPath,
+        '-vf', `scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}`,
+        '-vframes', '1',
+        '-update', '1',
+        '-q:v', '5',  // Better quality
+        '-f', 'image2',
+        outputPath
+      ], {
+        stdio: ['ignore', 'ignore', 'pipe']
+      });
 
-    const timeout = setTimeout(() => {
-      ffmpeg.kill('SIGKILL');
-      reject(new Error('Frame extraction timeout'));
-    }, 10000); // Increased to 10 seconds
+      let errorOutput = '';
+      ffmpeg.stderr?.on('data', (data) => {
+        errorOutput += data.toString();
+      });
 
-    ffmpeg.on('close', (code) => {
-      clearTimeout(timeout);
-      // Small delay for file system sync
-      setTimeout(async () => {
-        if (code === 0) {
-          // Check if file exists and has content
-          try {
-            const stats = await fs.promises.stat(outputPath);
-            if (stats.size > 100) { // At least 100 bytes
-              debugLog(`[Motion] Successfully extracted frame (${stats.size} bytes)`);
-              resolve();
-            } else {
-              debugLog(`[Motion] Frame file too small (${stats.size} bytes), retrying with PNG`);
-              // Try PNG format instead
-              const pngPath = outputPath.replace('.jpg', '.png');
-              const pngFfmpeg = spawn('ffmpeg', [
-                '-y',
-                '-i', segmentPath,
-                '-vf', `scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}`,
-                '-vframes', '1',
-                '-update', '1',
-                '-f', 'image2',
-                pngPath
-              ], {
-                stdio: ['ignore', 'ignore', 'pipe']
-              });
+      const timeout = setTimeout(() => {
+        ffmpeg.kill('SIGKILL');
+        reject(new Error('Frame extraction timeout'));
+      }, 10000); // Increased to 10 seconds
 
-              const pngTimeout = setTimeout(() => {
-                pngFfmpeg.kill('SIGKILL');
-                reject(new Error('PNG frame extraction timeout'));
-              }, 10000); // 10 seconds for PNG as well
+      ffmpeg.on('close', (code) => {
+        clearTimeout(timeout);
+        // Small delay for file system sync
+        setTimeout(async () => {
+          if (code === 0) {
+            // Check if file exists and has content
+            try {
+              const stats = await fs.promises.stat(outputPath);
+              if (stats.size > 100) {
+                debugLog(`[Motion] Successfully extracted frame (${stats.size} bytes)`);
+                resolve();
+              } else {
+                debugLog(`[Motion] Frame file too small (${stats.size} bytes), retrying with PNG`);
+                // Try PNG format instead
+                const pngPath = outputPath.replace('.jpg', '.png');
+                const pngFfmpeg = spawn('ffmpeg', [
+                  '-y',
+                  '-i', segmentPath,
+                  '-vf', `scale=${STANDARD_WIDTH}:${STANDARD_HEIGHT}`,
+                  '-vframes', '1',
+                  '-update', '1',
+                  '-f', 'image2',
+                  pngPath
+                ], {
+                  stdio: ['ignore', 'ignore', 'pipe']
+                });
 
-              pngFfmpeg.on('close', async (pngCode) => {
-                clearTimeout(pngTimeout);
-                try {
-                  if (pngCode === 0 && (await fs.promises.stat(pngPath)).size > 100) {
-                    // Rename PNG to JPG for consistency
-                    try {
-                      await fs.promises.rename(pngPath, outputPath);
-                      debugLog(`[Motion] PNG extraction successful, renamed to JPG`);
-                      resolve();
-                    } catch (e) {
-                      debugLog(`[Motion] PNG extraction successful but rename failed`);
-                      reject(new Error('Rename failed'));
+                const pngTimeout = setTimeout(() => {
+                  pngFfmpeg.kill('SIGKILL');
+                  reject(new Error('PNG frame extraction timeout'));
+                }, 10000);
+
+                pngFfmpeg.on('close', async (pngCode) => {
+                  clearTimeout(pngTimeout);
+                  try {
+                    if (pngCode === 0 && (await fs.promises.stat(pngPath)).size > 100) {
+                      try {
+                        await fs.promises.rename(pngPath, outputPath);
+                        debugLog(`[Motion] PNG extraction successful, renamed to JPG`);
+                        resolve();
+                      } catch (e) {
+                        debugLog(`[Motion] PNG extraction successful but rename failed`);
+                        reject(new Error('Rename failed'));
+                      }
+                    } else {
+                      logMotion(`Both JPG and PNG extraction failed`);
+                      reject(new Error('Both formats failed'));
                     }
-                  } else {
+                  }
+                  catch {
                     logMotion(`Both JPG and PNG extraction failed`);
                     reject(new Error('Both formats failed'));
                   }
-                }
-                catch {
-                  logMotion(`Both JPG and PNG extraction failed`);
-                  reject(new Error('Both formats failed'));
-                }
-              });
+                });
 
-              pngFfmpeg.on('error', (err) => {
-                clearTimeout(pngTimeout);
-                debugLog(`[Motion] PNG FFmpeg spawn error: ${err}`);
-                reject(err);
-              });
-            }
-          } catch {
-            debugLog(`[Motion] No output file found at ${outputPath} after FFmpeg success`);
-            // List directory to debug
-            if (DEBUG_MOTION) {
-              try {
-                const dir = path.dirname(outputPath);
-                const files = await fs.promises.readdir(dir);
-                debugLog(`[Motion] Directory contents: ${files.slice(0, 10).join(', ')}${files.length > 10 ? '...' : ''}`);
-              } catch (e) {
-                debugLog(`[Motion] Could not list directory: ${e}`);
+                pngFfmpeg.on('error', (err) => {
+                  clearTimeout(pngTimeout);
+                  debugLog(`[Motion] PNG FFmpeg spawn error: ${err}`);
+                  reject(err);
+                });
               }
+            } catch {
+              debugLog(`[Motion] No output file found at ${outputPath} after FFmpeg success`);
+              // List directory to debug
+              if (DEBUG_MOTION) {
+                try {
+                  const dir = path.dirname(outputPath);
+                  const files = await fs.promises.readdir(dir);
+                  debugLog(`[Motion] Directory contents: ${files.slice(0, 10).join(', ')}${files.length > 10 ? '...' : ''}`);
+                } catch (e) {
+                  debugLog(`[Motion] Could not list directory: ${e}`);
+                }
+              }
+              reject(new Error('No output file'));
             }
-            reject(new Error('No output file'));
+          } else {
+            debugLog(`[Motion] FFmpeg failed with code ${code}: ${errorOutput}`);
+            reject(new Error(`FFmpeg failed with code ${code}`));
           }
-        } else {
-          debugLog(`[Motion] FFmpeg failed with code ${code}: ${errorOutput}`);
-          reject(new Error(`FFmpeg failed with code ${code}`));
-        }
-      }, 50); // 50ms delay
-    });
+        }, 50); // 50ms delay
+      });
 
-    ffmpeg.on('error', (err) => {
-      clearTimeout(timeout);
-      debugLog(`[Motion] FFmpeg spawn error: ${err}`);
-      reject(err);
+      ffmpeg.on('error', (err) => {
+        clearTimeout(timeout);
+        debugLog(`[Motion] FFmpeg spawn error: ${err}`);
+        reject(err);
+      });
+    }).catch(err => {
+      debugLog(`[Motion] Segment file missing: ${segmentPath}`);
+      reject(new Error(`Segment file missing: ${segmentPath}`));
     });
   }));
 }
@@ -242,11 +253,12 @@ export async function detectMotion(
   try {
     // Quick file existence check
     try {
-      if ((await fs.promises.stat(segmentPath)).size < 1000) {
+      const stat = await fs.promises.stat(segmentPath);
+      if (stat.size < 1000) {
         debugLog(`[${streamId}] [Motion] Segment file too small: ${segmentPath}`);
         return { motion: false, aboveCameraMovementThreshold: false };
       }
-    } catch {
+    } catch (err) {
       debugLog(`[${streamId}] [Motion] Segment file missing: ${segmentPath}`);
       return { motion: false, aboveCameraMovementThreshold: false };
     }
@@ -261,11 +273,18 @@ export async function detectMotion(
     try {
       await extractFrame(segmentPath, framePath);
     } catch (error) {
-      console.error(`[${streamId}] Failed to extract frame from ${segmentPath}:`, error);
+      debugLog(`[${streamId}] Failed to extract frame from ${segmentPath}: ${error}`);
       return { motion: false, aboveCameraMovementThreshold: false };
     }
 
-    if (!await fs.promises.stat(framePath).then(() => true).catch(() => false)) {
+    // Check if framePath exists
+    let frameExists = false;
+    try {
+      frameExists = await fs.promises.stat(framePath).then(() => true).catch(() => false);
+    } catch {
+      frameExists = false;
+    }
+    if (!frameExists) {
       debugLog(`[${streamId}] [Motion] Frame extraction failed - no output file at ${framePath}`);
       return { motion: false, aboveCameraMovementThreshold: false };
     }
@@ -353,7 +372,7 @@ export async function detectMotion(
 
       lastFrame[streamId] = currentFrame;
     } catch (error) {
-      console.error(`[${streamId}] Error processing frame:`, error);
+      debugLog(`[${streamId}] Error processing frame: ${error}`);
     }
 
     // Clean up frame file
@@ -365,7 +384,7 @@ export async function detectMotion(
     };
 
   } catch (error) {
-    console.error(`[${streamId}] Motion detection failed:`, error);
+    debugLog(`[${streamId}] Motion detection failed: ${error}`);
     return {
       motion: false,
       aboveCameraMovementThreshold: false
