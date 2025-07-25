@@ -2249,8 +2249,12 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   };
 
   const handleExitFullscreen = () => {
-    if (screen.orientation && (screen.orientation as any).lock) {
-      (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch(() => { })).catch(() => { });
+    try {
+      if (screen.orientation && (screen.orientation as any).lock) {
+        (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch(() => { })).catch(() => { });
+      }
+    } catch (err) {
+      console.error('Failed to exit fullscreen orientation lock:', err);
     }
   }
 

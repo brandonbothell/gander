@@ -84,7 +84,11 @@ export function Recording({
   };
   const handleExitFullscreen = () => {
     if (screen.orientation && (screen.orientation as any).lock) {
-      (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch(() => { })).catch(() => { });
+      try {
+        (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch(() => { })).catch(() => { });
+      } catch (error) {
+        console.error('Failed to exit fullscreen orientation lock:', error);
+      }
     }
   }
 
@@ -187,7 +191,11 @@ export function Recording({
       (video as any).webkitRequestFullscreen();
     }
     if (screen.orientation && (screen.orientation as any).lock) {
-      (screen.orientation as any).lock('landscape').catch(() => { });
+      try {
+        (screen.orientation as any).lock('landscape').catch(() => { });
+      } catch (error) {
+        console.error('Failed to lock screen orientation:', error);
+      }
     }
     handleShowControls();
   };

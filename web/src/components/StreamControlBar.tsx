@@ -209,7 +209,11 @@ export function StreamControlBar({
       (video as any).webkitRequestFullscreen();
     }
     if (screen.orientation && (screen.orientation as any).lock) {
-      (screen.orientation as any).lock('landscape').catch(() => { });
+      try {
+        (screen.orientation as any).lock('landscape').catch(() => { });
+      } catch (error) {
+        console.error('Failed to lock screen orientation:', error);
+      }
     }
     handleShowControls();
   };
