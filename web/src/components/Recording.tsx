@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE, authFetch } from '../main';
 import { useSignedUrl } from '../hooks/useSignedUrl';
 import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
+import { isIOS } from '../StreamPage';
 
 export type Recording = { streamId: string, filename: string };
 
@@ -191,19 +192,20 @@ export function Recording({
   const handleFullscreen = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.requestFullscreen) {
+    if (isIOS() && typeof (video as any).webkitEnterFullscreen === 'function') {
+      // iOS Safari/PWA: use webkitEnterFullscreen
+      (video as any).webkitEnterFullscreen();
+    } else if (video.requestFullscreen) {
       video.requestFullscreen();
     } else if ((video as any).webkitRequestFullscreen) {
       (video as any).webkitRequestFullscreen();
     }
     if (
       'orientation' in screen &&
-      typeof (screen.orientation as any).lock === 'function' &&
-      !(/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document))
+      typeof (screen.orientation as any).lock === 'function'
     ) {
       try {
-        (screen.orientation as any).lock('landscape').then(() => (screen.orientation as any).unlock().catch().catch());
+        (screen.orientation as any).lock('landscape').catch();
       } catch (error) {
         // Ignore errors
       }

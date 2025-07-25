@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
 import { type Stream } from '../../../source/types/shared'
+import { isIOS } from '../StreamPage';
 
 interface StreamControlBarProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -203,17 +204,18 @@ export function StreamControlBar({
   const handleFullscreen = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.requestFullscreen) {
+    if (isIOS() && typeof (video as any).webkitEnterFullscreen === 'function') {
+      // iOS Safari/PWA: use webkitEnterFullscreen
+      (video as any).webkitEnterFullscreen();
+    } else if (video.requestFullscreen) {
       video.requestFullscreen();
     } else if ((video as any).webkitRequestFullscreen) {
       (video as any).webkitRequestFullscreen();
     }
-    // Only lock orientation if supported and not iOS PWA
+    // Only lock orientation if supported
     if (
       'orientation' in screen &&
-      typeof (screen.orientation as any).lock === 'function' &&
-      !(/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document))
+      typeof (screen.orientation as any).lock === 'function'
     ) {
       try {
         (screen.orientation as any).lock('landscape').catch(() => { });
@@ -223,6 +225,52 @@ export function StreamControlBar({
     }
     handleShowControls();
   };
+
+  const handleExitFullscreen = () => {
+    if (
+      screen.orientation &&
+      typeof (screen.orientation as any).unlock === 'function'
+    ) {
+      try {
+        const result = (screen.orientation as any).unlock();
+        if (result && typeof result.catch === 'function') {
+          result.catch(() => { });
+        }
+      } catch (error) {
+        console.error('Failed to exit fullscreen orientation lock:', error);
+      }
+    }
+  }
+
+  // Add fullscreenchange event listener to video
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    function onFullscreenChange() {
+      // Check if fullscreen is exited
+      if (
+        !document.fullscreenElement &&
+        !((document as any).webkitFullscreenElement) &&
+        !((document as any).mozFullScreenElement) &&
+        !((document as any).msFullscreenElement)
+      ) {
+        handleExitFullscreen();
+      }
+    }
+
+    video.addEventListener('fullscreenchange', onFullscreenChange);
+    video.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    video.addEventListener('mozfullscreenchange', onFullscreenChange);
+    video.addEventListener('MSFullscreenChange', onFullscreenChange);
+
+    return () => {
+      video.removeEventListener('fullscreenchange', onFullscreenChange);
+      video.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+      video.removeEventListener('mozfullscreenchange', onFullscreenChange);
+      video.removeEventListener('MSFullscreenChange', onFullscreenChange);
+    };
+  }, [videoRef]);
 
   if (!activeStream || !videoRect) return null;
 
