@@ -1404,11 +1404,11 @@ app.get('/recordings/:streamId/file/:filename', jwtAuth, (req, res) => {
   const stream = dynamicStreams[streamId];
   if (!stream) { res.status(404).json({ error: 'Stream not found' }); return; }
   const filePath = path.join(stream.config.recordDir, filename);
-  res.sendFile(filePath, err => {
+  res.sendFile(filePath, (err: any) => {
     if (res.headersSent) return;
-    if (err) {
+    if (err && err.code !== 'ECONNABORTED') {
       res.status(404).json({ error: 'File not found' });
-      console.error(`[${streamId}] Failed to serve recording file ${filename}:`, err);
+      console.error(`[${streamId}] Failed to serve recording file ${filename}:`, JSON.stringify(err, null, 2));
     }
   });
 });
@@ -1596,11 +1596,11 @@ app.get('/signed/recordings/:streamId/thumbnails/latest.jpg', async (req, res) =
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.sendFile(thumbPath, err => {
+    res.sendFile(thumbPath, (err: any) => {
       if (res.headersSent) return;
-      if (err) {
+      if (err && err.code !== 'ECONNABORTED') {
         res.status(404).json({ error: 'File not found' });
-        console.error(`[${streamId}] Failed to serve thumbnail file ${thumbName}:`, err);
+        console.error(`[${streamId}] Failed to serve thumbnail file ${thumbName}:`, JSON.stringify(err, null, 2));
       }
     });
     // --- Lock logic end ---
@@ -1673,11 +1673,11 @@ app.get('/recordings/:streamId/thumbnails/latest.jpg', jwtAuth, async (req, res)
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.sendFile(thumbPath, err => {
+    res.sendFile(thumbPath, (err: any) => {
       if (res.headersSent) return;
-      if (err) {
+      if (err && err.code !== 'ECONNABORTED') {
         res.status(404).json({ error: 'File not found' });
-        console.error(`[${streamId}] Failed to serve thumbnail file ${thumbName}:`, err);
+        console.error(`[${streamId}] Failed to serve thumbnail file ${thumbName}:`, JSON.stringify(err, null, 2));
       }
     });
     // --- Lock logic end ---
@@ -1757,11 +1757,11 @@ app.get('/signed/video/:streamId/:filename', (req, res) => {
     return
   }
   const filePath = path.join(dynamicStreams[streamId].config.recordDir, filename);
-  res.sendFile(filePath, err => {
+  res.sendFile(filePath, (err: any) => {
     if (res.headersSent) return;
-    if (err) {
+    if (err && err.code !== 'ECONNABORTED') {
       res.status(404).json({ error: 'File not found' });
-      console.error(`[${streamId}] Failed to serve recording file ${filename}:`, err);
+      console.error(`[${streamId}] Failed to serve recording file ${filename}:`, JSON.stringify(err, null, 2));
     }
   });
 });
@@ -1783,11 +1783,11 @@ app.get('/signed/thumbnail/:streamId/:filename', (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   }
 
-  res.sendFile(thumbPath, err => {
+  res.sendFile(thumbPath, (err: any) => {
     if (res.headersSent) return;
-    if (err) {
+    if (err && err.code !== 'ECONNABORTED') {
       res.status(404).json({ error: 'File not found' });
-      console.error(`[${streamId}] Failed to serve thumbnail file ${filename}:`, err);
+      console.error(`[${streamId}] Failed to serve thumbnail file ${filename}:`, JSON.stringify(err, null, 2));
     }
   });
 });
@@ -1858,7 +1858,7 @@ app.get('/signed/stream/:streamId/:segment', (req, res) => {
   } catch (err) {
     if (res.headersSent) return;
     res.type('application/json').status(404).json({ error: 'File not found' });
-    console.error(`[${streamId}] Failed to serve segment file ${segment}:`, err);
+    console.error(`[${streamId}] Failed to serve segment file ${segment}:`, JSON.stringify(err, null, 2));
   }
 });
 
