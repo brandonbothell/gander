@@ -181,12 +181,13 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
               color: '#1cf1d1',
               fontSize: '1.1em',
               position: 'absolute',
-              top: 0,
+              top: recordingsListRef.current?.scrollTop || 0,
               left: 0,
               right: 0,
+              height: '60vh',
               bottom: 0,
               background: 'rgba(20,30,60,0.9)',
-              zIndex: 10,
+              zIndex: 100,
             }}
           >
             <div
