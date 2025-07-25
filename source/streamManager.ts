@@ -366,16 +366,15 @@ export class StreamManager {
       proc.once('exit', () => {
         if (!resolved) {
           resolved = true;
-          this.ffmpeg = null; // Ensure reference is cleared
+          this.ffmpeg = null;
           resolve();
         }
       });
-      proc.kill('SIGTERM');
-      // Fallback: resolve after 2 seconds if exit event not received
+      proc.kill('SIGKILL'); // Use SIGKILL for stubborn processes
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          this.ffmpeg = null; // Ensure reference is cleared
+          this.ffmpeg = null;
           resolve();
         }
       }, 2000);

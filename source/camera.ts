@@ -34,11 +34,11 @@ if (!fs.existsSync(logsDir)) {
 }
 
 // Motion logging function
-export function logMotion(message: string, level: 'info' | 'error' | 'warn' = 'info') {
+export async function logMotion(message: string, level: 'info' | 'error' | 'warn' = 'info') {
   const timestamp = new Date().toISOString();
   const logEntry = `${timestamp} [${level}] ${message}\n`;
   try {
-    fs.appendFileSync(`${motionLogPath}-latest.log`, logEntry);
+    await fs.promises.appendFile(`${motionLogPath}-latest.log`, logEntry);
   } catch (error) {
     console.error('Failed to write to motion log:', error);
   }
@@ -49,11 +49,11 @@ export function logMotion(message: string, level: 'info' | 'error' | 'warn' = 'i
   }
 }
 
-export function logAuth(message: string, level: 'info' | 'error' | 'warn' = 'info') {
+export async function logAuth(message: string, level: 'info' | 'error' | 'warn' = 'info') {
   const timestamp = new Date().toISOString();
   const logEntry = `${timestamp} [${level}] ${message}\n`;
   try {
-    fs.appendFileSync(`${authLogPath}-latest.log`, logEntry);
+    await fs.promises.appendFile(`${authLogPath}-latest.log`, logEntry);
   } catch (error) {
     console.error('Failed to write to auth log:', error);
   }
@@ -244,20 +244,21 @@ app.get('/hls/:streamId/stream.m3u8', jwtAuth, (req, res) => {
   });
 });
 
-app.get('/hls/:streamId/:segment', jwtAuth, (req, res) => {
+app.get('/hls/:streamId/:segment', jwtAuth, async (req, res) => {
   const { streamId, segment } = req.params;
   const stream = dynamicStreams[streamId];
   if (!stream || !/^segment_\d+\.ts$/.test(segment)) {
     res.status(404).send('Not found');
     return
   }
-  const segmentPath = stream.getSegmentPath(segment);
-  if (!fs.existsSync(segmentPath)) {
-    res.status(404).send('Segment not found');
+
+  try {
+    const segmentPath = stream.getSegmentPath(segment);
+    fs.createReadStream(segmentPath).pipe(res.type('video/MP2T'));
+  } catch {
+    res.type('text/html').status(404).send('Segment not found');
     return
   }
-  res.type('video/MP2T');
-  fs.createReadStream(segmentPath).pipe(res);
 });
 
 // --- Clean Exit Handler ---
@@ -970,7 +971,7 @@ async function setupStreamMotionMonitoring() {
       state.recentSegments.push(segmentPath);
       if (state.recentSegments.length > RECENT_SEGMENT_BUFFER) {
         const expiredSegment = state.recentSegments.shift();
-        if (!state.motionRecordingActive && !state.savingInProgress && expiredSegment && fs.existsSync(expiredSegment)) {
+        if (!state.motionRecordingActive && !state.savingInProgress && expiredSegment) {
           safeUnlink(expiredSegment);
         }
       }
@@ -1041,15 +1042,17 @@ async function setupStreamMotionMonitoring() {
 }
 
 // --- Save motion segments per stream ---
-function getVideoDuration(filePath: string): number {
-  try {
-    const cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
-    const output = execSync(cmd).toString().trim();
-    return Math.round(Number(output));
-  } catch (e) {
-    console.error(`Failed to get duration for ${filePath}:`, e);
-    return 0;
-  }
+async function getVideoDuration(filePath: string): Promise<number> {
+  const cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
+  return new Promise((resolve) => {
+    exec(cmd, (err, output) => {
+      if (err) {
+        console.error(`Failed to get duration for ${filePath}:`, err);
+        return resolve(0);
+      }
+      resolve(Math.round(Number(output)));
+    });
+  });
 }
 
 // Enhanced save function with retry logic
@@ -1082,142 +1085,142 @@ async function saveMotionSegmentsWithRetry(streamId: string, retryAttempt: numbe
 }
 
 // Update the saveMotionSegments function in camera.ts
-function saveMotionSegments(streamId: string): Promise<void> {
+async function saveMotionSegments(streamId: string): Promise<void> {
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
 
-  return new Promise((resolve, reject) => {
-    if (state.motionSegments.length === 0) return resolve();
+  if (state.motionSegments.length === 0) return;
 
-    // Mark as saving in progress
-    state.savingInProgress = true;
+  // Mark as saving in progress
+  state.savingInProgress = true;
 
-    const uniqueSegments = [...new Set(state.motionSegments)];
+  const uniqueSegments = [...new Set(state.motionSegments)];
 
-    // Filter out segments that no longer exist
-    const existingSegments = uniqueSegments.filter(segmentPath => {
-      if (!fs.existsSync(segmentPath)) {
-        logMotion(`[${streamId}] Segment no longer exists, skipping: ${path.basename(segmentPath)}`);
-        return false;
-      }
-      return true;
-    });
+  // Filter out segments that no longer exist
+  const existingSegmentsPromises = uniqueSegments.map(async segmentPath => {
+    // logMotion(`[${streamId}] Segment no longer exists, skipping: ${path.basename(segmentPath)}`);
+    return { segmentPath, exists: await fs.promises.access(segmentPath).then(() => true).catch(() => false) };
+  });
 
-    if (existingSegments.length === 0) {
-      logMotion(`[${streamId}] No existing segments to save, aborting save operation`);
+  const existingSegments = (await Promise.all(existingSegmentsPromises)).filter(seg => seg.exists);
+
+  if (existingSegments.length === 0) {
+    logMotion(`[${streamId}] No existing segments to save, aborting save operation`);
+    state.savingInProgress = false;
+    state.motionSegments = []; // Clear segments even if no existing segments
+    return;
+  }
+
+  const listFile = path.join(stream.config.hlsDir, 'concat_list.txt');
+
+  try {
+    // Ensure HLS directory exists before writing concat list
+    await fs.promises.access(stream.config.hlsDir);
+  } catch {
+    logMotion(`[${streamId}] HLS directory no longer exists, cannot save segments`);
+    state.savingInProgress = false;
+    state.motionSegments = [];
+    return;
+  }
+
+  try {
+    await fs.promises.writeFile(listFile, existingSegments.map(seg => `file '${seg.segmentPath.replace(/\\/g, '/')}'`).join('\n'));
+  } catch (error) {
+    state.savingInProgress = false;
+    state.motionSegments = []; // Clear segments on error too
+    throw new Error(`Failed to write concat list: ${error}`);
+  }
+
+  const outFile = path.join(stream.config.recordDir, `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`);
+  const thumbFile = path.join(stream.config.thumbDir, path.basename(outFile).replace(/\.mp4$/, '.jpg'));
+  const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outFile}"`;
+
+  logMotion(`[${streamId}] Starting save of ${existingSegments.length} segments to ${path.basename(outFile)}`);
+
+  const ffmpegProcess = exec(ffmpegConcatCmd, async (err) => {
+    // Check if process was killed (canceled due to new motion)
+    if (ffmpegProcess.killed) {
+      logMotion(`[${streamId}] Save operation was canceled due to new motion detection`);
       state.savingInProgress = false;
-      state.motionSegments = []; // Clear segments even if no existing segments
-      return resolve();
+      state.currentSaveProcess = null;
+      await safeUnlink(listFile);
+      // Don't clear motionSegments since we want to keep them for continued recording
+      return; // Don't reject since cancellation is expected behavior
     }
 
-    const listFile = path.join(stream.config.hlsDir, 'concat_list.txt');
-
-    try {
-      // Ensure HLS directory exists before writing concat list
-      if (!fs.existsSync(stream.config.hlsDir)) {
-        logMotion(`[${streamId}] HLS directory no longer exists, cannot save segments`);
-        state.savingInProgress = false;
-        state.motionSegments = [];
-        return resolve();
-      }
-
-      fs.writeFileSync(listFile, existingSegments.map(f => `file '${f.replace(/\\/g, '/')}'`).join('\n'));
-    } catch (error) {
+    if (err) {
+      logMotion(`[${streamId}] FFmpeg concat failed: ${err}`);
       state.savingInProgress = false;
-      state.motionSegments = []; // Clear segments on error too
-      return reject(new Error(`Failed to write concat list: ${error}`));
+      state.currentSaveProcess = null;
+      state.motionSegments = []; // Clear segments on error
+      await safeUnlink(listFile);
+      throw err;
     }
 
-    const outFile = path.join(stream.config.recordDir, `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`);
-    const thumbFile = path.join(stream.config.thumbDir, path.basename(outFile).replace(/\.mp4$/, '.jpg'));
-    const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outFile}"`;
+    // Generate thumbnail
+    let seek = 7; // Default seek time for thumbnail
+    const thumbProcess = exec(`ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 -update 1 "${thumbFile}"`, async (thumbErr) => {
+      // Clean up segments that are no longer needed
+      const promises = existingSegments.map(seg => {
+        if (!state.recentSegments.includes(seg.segmentPath)) {
+          return safeUnlink(seg.segmentPath);
+        }
+      });
+      promises.push(safeUnlink(listFile))
+      await Promise.all(promises);
 
-    logMotion(`[${streamId}] Starting save of ${existingSegments.length} segments to ${path.basename(outFile)}`);
+      // ALWAYS clear motionSegments after successful save, regardless of recording state
+      // This prevents the segments from being saved again on exit
+      logMotion(`[${streamId}] Clearing ${state.motionSegments.length} saved segments from state`);
+      state.motionSegments = [];
 
-    const ffmpegProcess = exec(ffmpegConcatCmd, (err) => {
-      // Check if process was killed (canceled due to new motion)
-      if (ffmpegProcess.killed) {
-        logMotion(`[${streamId}] Save operation was canceled due to new motion detection`);
-        state.savingInProgress = false;
-        state.currentSaveProcess = null;
-        safeUnlink(listFile);
-        // Don't clear motionSegments since we want to keep them for continued recording
-        return resolve(); // Don't reject since cancellation is expected behavior
-      }
+      state.savingInProgress = false;
+      state.currentSaveProcess = null;
 
-      if (err) {
-        logMotion(`[${streamId}] FFmpeg concat failed: ${err}`);
-        state.savingInProgress = false;
-        state.currentSaveProcess = null;
-        state.motionSegments = []; // Clear segments on error
-        safeUnlink(listFile);
-        return reject(err);
-      }
+      // --- Save to MotionRecording table ---
+      try {
+        const duration = await getVideoDuration(outFile);
+        const filename = path.basename(outFile);
+        const recordedAt = filename.match(/(\d{4}-\d{2}-\d{2})T/)?.[1] || new Date().toISOString().slice(0, 10);
 
-      // Generate thumbnail
-      let seek = 7; // Default seek time for thumbnail
-      const thumbProcess = exec(`ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 -update 1 "${thumbFile}"`, async (thumbErr) => {
-        // Clean up segments that are no longer needed
-        existingSegments.forEach(f => {
-          if (!state.recentSegments.includes(f) && fs.existsSync(f)) {
-            safeUnlink(f);
+        await prisma.motionRecording.upsert({
+          where: { streamId_filename: { streamId, filename } },
+          update: { duration, updatedAt: new Date() },
+          create: {
+            streamId,
+            filename,
+            duration,
+            recordedAt,
+            updatedAt: new Date(),
           }
         });
-        safeUnlink(listFile);
 
-        // ALWAYS clear motionSegments after successful save, regardless of recording state
-        // This prevents the segments from being saved again on exit
-        logMotion(`[${streamId}] Clearing ${state.motionSegments.length} saved segments from state`);
-        state.motionSegments = [];
-
-        state.savingInProgress = false;
-        state.currentSaveProcess = null;
-
-        // --- Save to MotionRecording table ---
-        try {
-          const duration = getVideoDuration(outFile);
-          const filename = path.basename(outFile);
-          const recordedAt = filename.match(/(\d{4}-\d{2}-\d{2})T/)?.[1] || new Date().toISOString().slice(0, 10);
-
-          await prisma.motionRecording.upsert({
-            where: { streamId_filename: { streamId, filename } },
-            update: { duration, updatedAt: new Date() },
-            create: {
-              streamId,
-              filename,
-              duration,
-              recordedAt,
-              updatedAt: new Date(),
-            }
-          });
-
-          logMotion(`[${streamId}] Successfully saved ${filename} (${duration}s, ${existingSegments.length} segments)`);
-        } catch (e) {
-          logMotion(`[${streamId}] Failed to upsert MotionRecording: ${e}`);
-        }
-
-        resolve();
-      });
-
-      // Store thumbnail process as well for potential cancellation
-      state.currentSaveProcess = thumbProcess;
-    });
-
-    // Store the process for potential cancellation
-    state.currentSaveProcess = ffmpegProcess;
-
-    // Add timeout for the save operation (in case it hangs)
-    const saveTimeout = setTimeout(() => {
-      if (state.currentSaveProcess && !state.currentSaveProcess.killed) {
-        logMotion(`[${streamId}] Save operation timed out, killing process`);
-        state.currentSaveProcess.kill('SIGTERM');
+        logMotion(`[${streamId}] Successfully saved ${filename} (${duration}s, ${existingSegments.length} segments)`);
+      } catch (e) {
+        logMotion(`[${streamId}] Failed to upsert MotionRecording: ${e}`);
       }
-    }, 60000); // 60 second timeout
 
-    // Clear timeout when process completes
-    ffmpegProcess.on('exit', () => {
-      clearTimeout(saveTimeout);
+      return;
     });
+
+    // Store thumbnail process as well for potential cancellation
+    state.currentSaveProcess = thumbProcess;
+  });
+
+  // Store the process for potential cancellation
+  state.currentSaveProcess = ffmpegProcess;
+
+  // Add timeout for the save operation (in case it hangs)
+  const saveTimeout = setTimeout(() => {
+    if (state.currentSaveProcess && !state.currentSaveProcess.killed) {
+      logMotion(`[${streamId}] Save operation timed out, killing process`);
+      state.currentSaveProcess.kill('SIGTERM');
+    }
+  }, 60000); // 60 second timeout
+
+  // Clear timeout when process completes
+  ffmpegProcess.on('exit', () => {
+    clearTimeout(saveTimeout);
   });
 }
 
@@ -1401,8 +1404,13 @@ app.get('/recordings/:streamId/file/:filename', jwtAuth, (req, res) => {
   const stream = dynamicStreams[streamId];
   if (!stream) { res.status(404).json({ error: 'Stream not found' }); return; }
   const filePath = path.join(stream.config.recordDir, filename);
-  if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'File not found' }); return; }
-  res.sendFile(filePath);
+  res.sendFile(filePath, err => {
+    if (res.headersSent) return;
+    if (err) {
+      res.status(404).json({ error: 'File not found' });
+      console.error(`[${streamId}] Failed to serve recording file ${filename}:`, err);
+    }
+  });
 });
 
 
@@ -1566,7 +1574,7 @@ app.get('/signed/recordings/:streamId/thumbnails/latest.jpg', async (req, res) =
         const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 -update 1 "${thumbPath}"`;
         streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>((resolve) => {
           require('child_process').exec(ffmpegCmd, (err: any) => {
-            if (err || !fs.existsSync(thumbPath)) {
+            if (err) {
               console.error(`[${streamId}] Failed to generate thumbnail from ${latestTs}:`, err);
               resolve({ success: false });
             }
@@ -1588,7 +1596,13 @@ app.get('/signed/recordings/:streamId/thumbnails/latest.jpg', async (req, res) =
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.sendFile(thumbPath);
+    res.sendFile(thumbPath, err => {
+      if (res.headersSent) return;
+      if (err) {
+        res.status(404).json({ error: 'File not found' });
+        console.error(`[${streamId}] Failed to serve thumbnail file ${thumbName}:`, err);
+      }
+    });
     // --- Lock logic end ---
   });
 });
@@ -1637,7 +1651,7 @@ app.get('/recordings/:streamId/thumbnails/latest.jpg', jwtAuth, async (req, res)
         const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 "${thumbPath}"`;
         streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>((resolve) => {
           require('child_process').exec(ffmpegCmd, { windowsHide: true }, (err: any) => {
-            if (err || !fs.existsSync(thumbPath)) {
+            if (err) {
               console.error(`[${streamId}] Failed to generate thumbnail from ${latestTs}:`, err);
               resolve({ success: false });
             }
@@ -1659,7 +1673,13 @@ app.get('/recordings/:streamId/thumbnails/latest.jpg', jwtAuth, async (req, res)
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.sendFile(thumbPath);
+    res.sendFile(thumbPath, err => {
+      if (res.headersSent) return;
+      if (err) {
+        res.status(404).json({ error: 'File not found' });
+        console.error(`[${streamId}] Failed to serve thumbnail file ${thumbName}:`, err);
+      }
+    });
     // --- Lock logic end ---
   });
 });
@@ -1737,8 +1757,13 @@ app.get('/signed/video/:streamId/:filename', (req, res) => {
     return
   }
   const filePath = path.join(dynamicStreams[streamId].config.recordDir, filename);
-  if (!fs.existsSync(filePath)) { res.status(404).send('Not found'); return; }
-  res.sendFile(filePath);
+  res.sendFile(filePath, err => {
+    if (res.headersSent) return;
+    if (err) {
+      res.status(404).json({ error: 'File not found' });
+      console.error(`[${streamId}] Failed to serve recording file ${filename}:`, err);
+    }
+  });
 });
 
 app.get('/signed/thumbnail/:streamId/:filename', (req, res) => {
@@ -1753,13 +1778,18 @@ app.get('/signed/thumbnail/:streamId/:filename', (req, res) => {
     return
   }
   const thumbPath = path.join(dynamicStreams[streamId].config.thumbDir, filename);
-  if (!fs.existsSync(thumbPath)) { res.status(404).send('Not found'); return; }
 
   if (!req.url.endsWith('latest.jpg')) {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   }
 
-  res.sendFile(thumbPath);
+  res.sendFile(thumbPath, err => {
+    if (res.headersSent) return;
+    if (err) {
+      res.status(404).json({ error: 'File not found' });
+      console.error(`[${streamId}] Failed to serve thumbnail file ${filename}:`, err);
+    }
+  });
 });
 
 // Serve signed stream playlist for a specific stream
@@ -1818,14 +1848,18 @@ app.get('/signed/stream/:streamId/:segment', (req, res) => {
     return;
   }
   const segmentPath = dynamicStreams[streamId].getSegmentPath(segment);
-  if (!fs.existsSync(segmentPath)) { res.status(404).send('Segment not found'); return; }
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
-  res.type('video/MP2T');
-  fs.createReadStream(segmentPath).pipe(res);
+  try {
+    fs.createReadStream(segmentPath).pipe(res.type('video/MP2T'));
+  } catch (err) {
+    if (res.headersSent) return;
+    res.type('application/json').status(404).json({ error: 'File not found' });
+    console.error(`[${streamId}] Failed to serve segment file ${segment}:`, err);
+  }
 });
 
 // --- Motion status ---
@@ -1923,18 +1957,25 @@ app.delete('/api/recordings/:streamId/:filename', jwtAuth, async (req, res) => {
   const filePath = path.join(stream.config.recordDir, filename);
   const thumbPath = path.join(stream.config.thumbDir, filename.replace(/\.mp4$/, '.jpg'));
   try {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
-    await prisma.motionRecording.delete({
-      where: { streamId_filename: { streamId, filename } }
-    });
-    await prisma.deletedRecording.create({
-      data: { streamId, filename }
-    });
-    res.json({ success: true });
+    await Promise.all([fs.promises.unlink(filePath), fs.promises.unlink(thumbPath)]);
   } catch (e) {
     res.status(500).json({ error: 'Failed to delete file' });
   }
+
+  try {
+    await Promise.all([
+      prisma.motionRecording.delete({
+        where: { streamId_filename: { streamId, filename } }
+      }),
+      prisma.deletedRecording.create({
+        data: { streamId, filename }
+      })]);
+  } catch {
+    res.status(500).json({ error: 'Deleted file, but failed to delete recording from database' });
+    return;
+  }
+
+  res.json({ success: true });
 });
 
 // --- Bulk delete for a stream ---
@@ -1949,30 +1990,31 @@ app.post('/api/recordings/:streamId/bulk-delete', jwtAuth, express.json(), async
     const filePath = path.join(stream.config.recordDir, filename);
     const thumbPath = path.join(stream.config.thumbDir, filename.replace(/\.mp4$/, '.jpg'));
     try {
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
-      await prisma.motionRecording.delete({
-        where: { streamId_filename: { streamId, filename } }
-      });
-      await prisma.deletedRecording.create({
-        data: { streamId, filename }
-      });
-      results[filename] = true;
+      await Promise.all([fs.promises.unlink(filePath), fs.promises.unlink(thumbPath)]);
     } catch (e) {
       results[filename] = false;
     }
+
+    try {
+      await Promise.all([
+        prisma.motionRecording.delete({
+          where: { streamId_filename: { streamId, filename } }
+        }),
+        prisma.deletedRecording.create({
+          data: { streamId, filename }
+        })]);
+      results[filename] = true;
+    } catch {
+      results[filename] = false;
+    }
   }
+
   res.json({ success: true, results });
 });
 
 // --- Safe unlink function ---
-function safeUnlink(filePath: string, retries = 3) {
-  // Check if file exists first
-  if (!fs.existsSync(filePath)) {
-    return; // File doesn't exist, nothing to do
-  }
-
-  fs.unlink(filePath, (error) => {
+async function safeUnlink(filePath: string, retries = 3) {
+  return fs.promises.unlink(filePath).catch((error) => {
     if (error) {
       if (error.code === 'ENOENT' || error.code === 'EPERM') {
         // File was already deleted by another process, which is fine
@@ -2162,7 +2204,9 @@ async function syncDeletedRecordings() {
         for (const recording of allDbRecordings) {
           if (!deletedSet.has(recording.filename)) {
             const filePath = path.join(stream.config.recordDir, recording.filename);
-            if (!fs.existsSync(filePath)) {
+            try {
+              await fs.promises.access(filePath);
+            } catch {
               missingRecordings.push(recording.filename);
             }
           }
