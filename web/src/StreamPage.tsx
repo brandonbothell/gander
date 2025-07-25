@@ -2249,14 +2249,19 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   };
 
   const handleExitFullscreen = () => {
-    try {
-      if (screen.orientation && (screen.orientation as any).lock) {
-        (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch(() => { })).catch(() => { });
+    // Only try to unlock orientation if supported and not iOS PWA
+    if (
+      'orientation' in screen &&
+      typeof (screen.orientation as any).unlock === 'function' &&
+      !isIOS()
+    ) {
+      try {
+        (screen.orientation as any).unlock();
+      } catch (err) {
+        // Ignore errors
       }
-    } catch (err) {
-      console.error('Failed to exit fullscreen orientation lock:', err);
     }
-  }
+  };
 
   // Add fullscreenchange event listener to video
   useEffect(() => {
@@ -2264,13 +2269,14 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     if (!video) return;
 
     function onFullscreenChange() {
-      // Check if fullscreen is exited
-      if (
-        document.fullscreenElement &&
-        !((document as any).webkitFullscreenElement) &&
-        !((document as any).mozFullScreenElement) &&
-        !((document as any).msFullscreenElement)
-      ) {
+      // Only run on exit fullscreen
+      const isFullscreen =
+        document.fullscreenElement === video ||
+        (document as any).webkitFullscreenElement === video ||
+        (document as any).mozFullScreenElement === video ||
+        (document as any).msFullscreenElement === video;
+
+      if (!isFullscreen) {
         handleExitFullscreen();
       }
     }
@@ -2958,7 +2964,7 @@ function seekToLiveEdgeGentle(videoRef: React.RefObject<HTMLVideoElement | null>
     const targetTime = hls.liveSyncPosition - 3; // 3 seconds behind live edge
     console.log(`Initial gentle seek to HLS live edge: ${targetTime.toFixed(2)}s`);
     video.currentTime = Math.max(0, targetTime);
-  } else if (video.duration && Number.isFinite(video.duration) && video.duration > 0) {
+  } else if (video.duration && Number.isFinite(video.duration)) {
     // More conservative for initial load
     const targetTime = video.duration - 2;
     console.log(`Initial gentle seek to duration-based live edge: ${targetTime.toFixed(2)}s`);

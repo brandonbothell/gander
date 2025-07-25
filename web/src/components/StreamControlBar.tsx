@@ -208,11 +208,17 @@ export function StreamControlBar({
     } else if ((video as any).webkitRequestFullscreen) {
       (video as any).webkitRequestFullscreen();
     }
-    if (screen.orientation && (screen.orientation as any).lock) {
+    // Only lock orientation if supported and not iOS PWA
+    if (
+      'orientation' in screen &&
+      typeof (screen.orientation as any).lock === 'function' &&
+      !(/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document))
+    ) {
       try {
         (screen.orientation as any).lock('landscape').catch(() => { });
       } catch (error) {
-        console.error('Failed to lock screen orientation:', error);
+        // Ignore errors
       }
     }
     handleShowControls();
