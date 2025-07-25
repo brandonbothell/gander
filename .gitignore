@@ -48,6 +48,7 @@ android-signing-key.jks
 *.keystore
 *.apk
 *.aab
+*.dm
 
 # iOS builds
 *.ipa
