@@ -84,7 +84,7 @@ export function Recording({
   };
   const handleExitFullscreen = () => {
     if (screen.orientation && (screen.orientation as any).lock) {
-      (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch()).catch();
+      (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch(() => { })).catch(() => { });
     }
   }
 

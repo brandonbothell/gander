@@ -2250,7 +2250,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
   const handleExitFullscreen = () => {
     if (screen.orientation && (screen.orientation as any).lock) {
-      (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch()).catch();
+      (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch(() => { })).catch(() => { });
     }
   }
 
@@ -2262,7 +2262,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     function onFullscreenChange() {
       // Check if fullscreen is exited
       if (
-        !document.fullscreenElement &&
+        document.fullscreenElement &&
         !((document as any).webkitFullscreenElement) &&
         !((document as any).mozFullScreenElement) &&
         !((document as any).msFullscreenElement)
