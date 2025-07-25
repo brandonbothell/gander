@@ -3,7 +3,7 @@
   "author": "Brandon Bothell",
   "version": "0.0.1",
   "main": "./compiled/camera.js",
-  "packageManager": "yarn@4.6.0",
+  "packageManager": "yarn@4.9.2",
   "workspaces": [
     ".",
     "web"
