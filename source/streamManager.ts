@@ -327,6 +327,7 @@ export class StreamManager {
 
     // Auto-restart FFmpeg on crash/exit
     const handleFfmpegExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      this.ffmpeg = null; // Always clear reference on exit
       console.log(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
       // Only try reencoding if stream copy failed and we got no segments
       if (!hasErrored && inputIsRtsp && code !== 0 && signal !== 'SIGTERM' && segmentCount === 0) {
@@ -359,12 +360,13 @@ export class StreamManager {
   // Helper to stop FFmpeg and wait for exit before restarting
   private async stopFFmpegAndWait(): Promise<void> {
     return new Promise((resolve) => {
-      if (!this.ffmpeg) return;
+      if (!this.ffmpeg) return resolve();
       const proc = this.ffmpeg;
       let resolved = false;
       proc.once('exit', () => {
         if (!resolved) {
           resolved = true;
+          this.ffmpeg = null; // Ensure reference is cleared
           resolve();
         }
       });
@@ -373,6 +375,7 @@ export class StreamManager {
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
+          this.ffmpeg = null; // Ensure reference is cleared
           resolve();
         }
       }, 2000);
@@ -445,6 +448,7 @@ export class StreamManager {
     });
 
     this.ffmpeg.on('exit', (code, signal) => {
+      this.ffmpeg = null; // Always clear reference on exit
       console.log(`[${this.config.id}] FFmpeg (reencoded) exited with code ${code} and signal ${signal}`);
     });
   }
