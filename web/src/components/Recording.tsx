@@ -16,7 +16,7 @@ interface RecordingProps {
     [filename: string]: string;
   }>>;
   setAutoScrollUntilRef?: (until: number) => void;
-  isMobileWidth: boolean;
+  setOpeningRecording: (opening: boolean) => void;
 }
 
 function formatTimestamp(filename: string) {
@@ -40,7 +40,7 @@ export function Recording({
   setNicknames,
   videoRef: externalVideoRef,
   setAutoScrollUntilRef,
-  isMobileWidth
+  setOpeningRecording
 }: RecordingProps & { videoRef?: React.RefObject<HTMLVideoElement | null> }) {
   const [nickname, setNickname] = useState('');
   const [hover, setHover] = useState(false);
@@ -200,14 +200,11 @@ export function Recording({
       videoRef.current.src = '';
     } else if (open && videoUrl && videoRef.current) {
       setAutoScrollUntilRef?.(Date.now() + 1000);
-      // On small screens, delay scroll until controls bar animation finishes
-      if (isMobileWidth) {
-        setTimeout(() => {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }, 700); // match controls bar animation duration
-      } else {
+      setOpeningRecording(true);
+      setTimeout(() => {
+        setOpeningRecording(false);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      }, 700); // match controls bar animation duration
       videoRef.current.src = videoUrl;
       videoRef.current.load();
       videoRef.current.play().catch(() => { videoRef.current!.play(); });

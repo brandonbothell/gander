@@ -41,6 +41,7 @@ interface RecordingsListContentProps {
   setTransferScrollToPage: (value: boolean) => void;
   lastRecordingsListCloseTime: React.RefObject<number>;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  openingRecording: boolean;
 }
 
 export default function RecordingsListContent(props: RecordingsListContentProps) {
@@ -83,6 +84,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
     setTransferScrollToPage,
     lastRecordingsListCloseTime,
     videoRef,
+    openingRecording
   } = props;
   // Component logic goes here
   return <>
@@ -171,7 +173,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
           {/* Always render the search animation container, but only show it when needed */}
           <div
             style={{
-              display: isSearching || userTyping ? 'flex' : 'none',
+              display: isSearching || userTyping || openingRecording ? 'flex' : 'none',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
@@ -198,7 +200,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
                 marginBottom: 16,
               }}
             />
-            Searching recordings...
+            {openingRecording ? 'Opening recording...' : 'Searching recordings...'}
           </div>
 
           {/* Always render the recordings grid to maintain DOM stability */}
@@ -307,14 +309,13 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
             height: 56,
             width: '100%',
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
             justifyContent: 'flex-end',
             marginBottom: 12,
             cursor: 'pointer',
             background: 'none',
             border: '0 2px 8px #1a298044',
-            // --- Add this for the cubic-bezier translate effect ---
             transform: mobileSearchSticky && isMobile
               ? `translateY(${isIOS() ? 0 : window.innerHeight * .02}px)`
               : 'translateY(0px)',
@@ -331,20 +332,22 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
             }, 450);
           }}
         >
-          <FiChevronUp size={48} color="#1cf1d1" style={{ marginBottom: 0 }} />
-          <div
-            className="recordings-list-handle"
-            style={{
-              width: 48,
-              height: 8,
-              borderRadius: 4,
-              background: 'rgb(28, 241, 209)',
-              margin: '8px 0',
-              cursor: 'pointer',
-              transition: 'background 0.2s, box-shadow 0.2s',
-              boxShadow: '0 2px 8px #1a298044',
-            }}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: 16 }}>
+            <FiChevronUp size={48} color="#1cf1d1" style={{ marginBottom: 0 }} />
+            <div
+              className="recordings-list-handle"
+              style={{
+                width: 48,
+                height: 8,
+                borderRadius: 4,
+                background: 'rgb(28, 241, 209)',
+                margin: '8px 0',
+                cursor: 'pointer',
+                transition: 'background 0.2s, box-shadow 0.2s',
+                boxShadow: '0 2px 8px #1a298044',
+              }}
+            />
+          </div>
         </div>
       )}
     </>)}

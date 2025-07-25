@@ -142,6 +142,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [showMobileLogout, setShowMobileLogout] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [openingRecording, setOpeningRecording] = useState(false);
   // --- Debug overlay state ---
   const [_, setDebugLongPressActive] = useState(false);
   const debugLongPressTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2262,7 +2263,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             )}
             setAutoScrollUntilRef={until => { autoScrollUntilRef.current = until; }}
             setNicknames={setNicknames}
-            isMobileWidth
+            setOpeningRecording={setOpeningRecording}
           />
           <div className="stream-video-container" style={{ position: 'relative' }}>
             <StreamControls
@@ -2696,6 +2697,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           setRecordingsListOpen={setRecordingsListOpen}
           setTransferScrollToPage={setTransferScrollToPage}
           lastRecordingsListCloseTime={lastRecordingsListCloseTime}
+          openingRecording={openingRecording}
           videoRef={videoRef}
         />
         <div ref={recordingsListBottomSentinelRef} style={{ height: 1 }} />
@@ -2707,7 +2709,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             position: 'fixed',
             left: 0,
             right: 0,
-            top: `calc(100vh - 200px)`, // Adjust if needed to match the bottom of the recordings list
+            top: `80vh`, // Adjust if needed to match the bottom of the recordings list
             bottom: 0,
             zIndex: 1000,
             background: 'transparent',
