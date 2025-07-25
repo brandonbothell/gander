@@ -2249,19 +2249,20 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   };
 
   const handleExitFullscreen = () => {
-    // Only try to unlock orientation if supported and not iOS PWA
     if (
-      'orientation' in screen &&
-      typeof (screen.orientation as any).unlock === 'function' &&
-      !isIOS()
+      screen.orientation &&
+      typeof (screen.orientation as any).unlock === 'function'
     ) {
       try {
-        (screen.orientation as any).unlock();
-      } catch (err) {
-        // Ignore errors
+        const result = (screen.orientation as any).unlock();
+        if (result && typeof result.catch === 'function') {
+          result.catch(() => { });
+        }
+      } catch (error) {
+        console.error('Failed to exit fullscreen orientation lock:', error);
       }
     }
-  };
+  }
 
   // Add fullscreenchange event listener to video
   useEffect(() => {
@@ -2269,14 +2270,13 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     if (!video) return;
 
     function onFullscreenChange() {
-      // Only run on exit fullscreen
-      const isFullscreen =
-        document.fullscreenElement === video ||
-        (document as any).webkitFullscreenElement === video ||
-        (document as any).mozFullScreenElement === video ||
-        (document as any).msFullscreenElement === video;
-
-      if (!isFullscreen) {
+      // Check if fullscreen is exited
+      if (
+        !document.fullscreenElement &&
+        !((document as any).webkitFullscreenElement) &&
+        !((document as any).mozFullScreenElement) &&
+        !((document as any).msFullscreenElement)
+      ) {
         handleExitFullscreen();
       }
     }

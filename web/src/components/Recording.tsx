@@ -83,9 +83,15 @@ export function Recording({
     scheduleHide();
   };
   const handleExitFullscreen = () => {
-    if (screen.orientation && (screen.orientation as any).lock) {
+    if (
+      screen.orientation &&
+      typeof (screen.orientation as any).unlock === 'function'
+    ) {
       try {
-        (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch(() => { })).catch(() => { });
+        const result = (screen.orientation as any).unlock();
+        if (result && typeof result.catch === 'function') {
+          result.catch(() => { });
+        }
       } catch (error) {
         console.error('Failed to exit fullscreen orientation lock:', error);
       }
@@ -190,11 +196,16 @@ export function Recording({
     } else if ((video as any).webkitRequestFullscreen) {
       (video as any).webkitRequestFullscreen();
     }
-    if (screen.orientation && (screen.orientation as any).lock) {
+    if (
+      'orientation' in screen &&
+      typeof (screen.orientation as any).lock === 'function' &&
+      !(/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document))
+    ) {
       try {
-        (screen.orientation as any).lock('landscape').catch(() => { });
+        (screen.orientation as any).lock('landscape').then(() => (screen.orientation as any).unlock().catch().catch());
       } catch (error) {
-        console.error('Failed to lock screen orientation:', error);
+        // Ignore errors
       }
     }
     handleShowControls();
