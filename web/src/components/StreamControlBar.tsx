@@ -208,6 +208,9 @@ export function StreamControlBar({
     } else if ((video as any).webkitRequestFullscreen) {
       (video as any).webkitRequestFullscreen();
     }
+    if (screen.orientation && (screen.orientation as any).lock) {
+      (screen.orientation as any).lock('landscape').catch(() => { });
+    }
     handleShowControls();
   };
 

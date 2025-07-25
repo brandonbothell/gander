@@ -82,6 +82,41 @@ export function Recording({
     setIsControlBarVisible(true);
     scheduleHide();
   };
+  const handleExitFullscreen = () => {
+    if (screen.orientation && (screen.orientation as any).lock) {
+      (screen.orientation as any).lock('portrait').then(() => (screen.orientation as any).unlock().catch()).catch();
+    }
+  }
+
+  // Add fullscreenchange event listener to video
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    function onFullscreenChange() {
+      // Check if fullscreen is exited
+      if (
+        !document.fullscreenElement &&
+        !((document as any).webkitFullscreenElement) &&
+        !((document as any).mozFullScreenElement) &&
+        !((document as any).msFullscreenElement)
+      ) {
+        handleExitFullscreen();
+      }
+    }
+
+    video.addEventListener('fullscreenchange', onFullscreenChange);
+    video.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    video.addEventListener('mozfullscreenchange', onFullscreenChange);
+    video.addEventListener('MSFullscreenChange', onFullscreenChange);
+
+    return () => {
+      video.removeEventListener('fullscreenchange', onFullscreenChange);
+      video.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+      video.removeEventListener('mozfullscreenchange', onFullscreenChange);
+      video.removeEventListener('MSFullscreenChange', onFullscreenChange);
+    };
+  }, [videoRef]);
 
   // Sync video state for controls/seek bar
   useEffect(() => {
@@ -150,6 +185,9 @@ export function Recording({
       video.requestFullscreen();
     } else if ((video as any).webkitRequestFullscreen) {
       (video as any).webkitRequestFullscreen();
+    }
+    if (screen.orientation && (screen.orientation as any).lock) {
+      (screen.orientation as any).lock('landscape').catch(() => { });
     }
     handleShowControls();
   };
