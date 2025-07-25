@@ -50,6 +50,7 @@
     "@capacitor/local-notifications": "^7.0.1",
     "@capacitor/preferences": "^7.0.1",
     "@capacitor/push-notifications": "^7.0.1",
+    "@capacitor/screen-orientation": "^7.0.1",
     "@prisma/client": "^6.9.0",
     "@root/encoding": "^1.0.1",
     "@root/keypairs": "^0.10.3",

@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   webDir: './web/dist',
   server: {
     url: localConfig.baseUrl,
-    cleartext: false
+    cleartext: false // Disallow cleartext for production
   }
 };
 

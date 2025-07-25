@@ -15,6 +15,7 @@
     "@capacitor/local-notifications": "^7.0.1",
     "@capacitor/preferences": "^7.0.1",
     "@capacitor/push-notifications": "^7.0.1",
+    "@capacitor/screen-orientation": "^7.0.1",
     "hls.js": "^1.6.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

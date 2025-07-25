@@ -2248,52 +2248,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     setEditingStream(null);
   };
 
-  const handleExitFullscreen = () => {
-    if (
-      screen.orientation &&
-      typeof (screen.orientation as any).unlock === 'function'
-    ) {
-      try {
-        const result = (screen.orientation as any).unlock();
-        if (result && typeof result.catch === 'function') {
-          result.catch(() => { });
-        }
-      } catch (error) {
-        console.error('Failed to exit fullscreen orientation lock:', error);
-      }
-    }
-  }
-
-  // Add fullscreenchange event listener to video
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    function onFullscreenChange() {
-      // Check if fullscreen is exited
-      if (
-        !document.fullscreenElement &&
-        !((document as any).webkitFullscreenElement) &&
-        !((document as any).mozFullScreenElement) &&
-        !((document as any).msFullscreenElement)
-      ) {
-        handleExitFullscreen();
-      }
-    }
-
-    video.addEventListener('fullscreenchange', onFullscreenChange);
-    video.addEventListener('webkitfullscreenchange', onFullscreenChange);
-    video.addEventListener('mozfullscreenchange', onFullscreenChange);
-    video.addEventListener('MSFullscreenChange', onFullscreenChange);
-
-    return () => {
-      video.removeEventListener('fullscreenchange', onFullscreenChange);
-      video.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-      video.removeEventListener('mozfullscreenchange', onFullscreenChange);
-      video.removeEventListener('MSFullscreenChange', onFullscreenChange);
-    };
-  }, [videoRef]);
-
   return (
     <div className="App with-side-padding">
       {showDebug && <DebugInfo onClose={() => { setShowDebug(false); recordingsListRef.current?.focus() }} />}

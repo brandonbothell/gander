@@ -3,6 +3,8 @@ import { API_BASE, authFetch } from '../main';
 import { useSignedUrl } from '../hooks/useSignedUrl';
 import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
 import { isIOS } from '../StreamPage';
+import { Capacitor } from '@capacitor/core';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 export type Recording = { streamId: string, filename: string };
 
@@ -83,8 +85,36 @@ export function Recording({
     setIsControlBarVisible(true);
     scheduleHide();
   };
+
+  const handleFullscreen = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isIOS() && typeof (video as any).webkitEnterFullscreen === 'function') {
+      // iOS Safari/PWA: use webkitEnterFullscreen
+      (video as any).webkitEnterFullscreen();
+    } else if (video.requestFullscreen) {
+      video.requestFullscreen();
+    } else if ((video as any).webkitRequestFullscreen) {
+      (video as any).webkitRequestFullscreen();
+    }
+    if (Capacitor.isNativePlatform()) {
+      ScreenOrientation.lock({ orientation: 'landscape' })
+    } else if (
+      'orientation' in screen &&
+      typeof (screen.orientation as any).lock === 'function'
+    ) {
+      try {
+        (screen.orientation as any).lock('landscape').catch();
+      } catch (error) {
+        // Ignore errors
+      }
+    }
+    handleShowControls();
+  };
   const handleExitFullscreen = () => {
-    if (
+    if (Capacitor.isNativePlatform()) {
+      ScreenOrientation.unlock()
+    } else if (
       screen.orientation &&
       typeof (screen.orientation as any).unlock === 'function'
     ) {
@@ -105,6 +135,7 @@ export function Recording({
     if (!video) return;
 
     function onFullscreenChange() {
+      console.warn('Fullscreen change detected:')
       // Check if fullscreen is exited
       if (
         !document.fullscreenElement &&
@@ -187,29 +218,6 @@ export function Recording({
     if (!video) return;
     video.muted = !video.muted;
     setIsMuted(video.muted);
-    handleShowControls();
-  };
-  const handleFullscreen = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (isIOS() && typeof (video as any).webkitEnterFullscreen === 'function') {
-      // iOS Safari/PWA: use webkitEnterFullscreen
-      (video as any).webkitEnterFullscreen();
-    } else if (video.requestFullscreen) {
-      video.requestFullscreen();
-    } else if ((video as any).webkitRequestFullscreen) {
-      (video as any).webkitRequestFullscreen();
-    }
-    if (
-      'orientation' in screen &&
-      typeof (screen.orientation as any).lock === 'function'
-    ) {
-      try {
-        (screen.orientation as any).lock('landscape').catch();
-      } catch (error) {
-        // Ignore errors
-      }
-    }
     handleShowControls();
   };
 

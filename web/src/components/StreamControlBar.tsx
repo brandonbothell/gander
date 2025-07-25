@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
 import { type Stream } from '../../../source/types/shared'
 import { isIOS } from '../StreamPage';
+import { Capacitor } from '@capacitor/core';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 interface StreamControlBarProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -212,8 +214,11 @@ export function StreamControlBar({
     } else if ((video as any).webkitRequestFullscreen) {
       (video as any).webkitRequestFullscreen();
     }
+
     // Only lock orientation if supported
-    if (
+    if (Capacitor.isNativePlatform()) {
+      ScreenOrientation.lock({ orientation: 'landscape' })
+    } else if (
       'orientation' in screen &&
       typeof (screen.orientation as any).lock === 'function'
     ) {
@@ -227,7 +232,9 @@ export function StreamControlBar({
   };
 
   const handleExitFullscreen = () => {
-    if (
+    if (Capacitor.isNativePlatform()) {
+      ScreenOrientation.unlock()
+    } else if (
       screen.orientation &&
       typeof (screen.orientation as any).unlock === 'function'
     ) {
@@ -248,6 +255,7 @@ export function StreamControlBar({
     if (!video) return;
 
     function onFullscreenChange() {
+      console.warn('Fullscreen change detected:')
       // Check if fullscreen is exited
       if (
         !document.fullscreenElement &&

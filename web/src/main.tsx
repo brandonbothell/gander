@@ -10,7 +10,7 @@ import SecureStorage from './utils/secureStorage';
 
 export const API_BASE =
   Capacitor.isNativePlatform()
-    ? 'https://gander.onl'
+    ? 'https://gander.onl' // Use production URL for native apps
     : '';
 
 createRoot(document.getElementById('root')!).render(
