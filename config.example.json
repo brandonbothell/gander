@@ -1,23 +1,23 @@
 {
-  "appId": "com.example.securitycam",
-  "appName": "SecurityCam",
-  "recordingsDirectory": "D:/Recordings/ExampleDirectory",
-  "maintainerEmail": "example@email.com",
+  "appId":                "com.example.securitycam",
+  "appName":              "SecurityCam",
+  "recordingsDirectory":  "D:/Recordings/ExampleDirectory",
+  "maintainerEmail":      "example@email.com",
   "vapid": {
-    "email": "mailto:example@email.com",
-    "publicKey": "BEXAMPLEPUBLICKEY1234567890",
-    "privateKey": "EXAMPLEPRIVATEKEY0987654321"
+    "email":              "mailto:example@email.com",
+    "publicKey":          "BEXAMPLEPUBLICKEY1234567890",
+    "privateKey":         "EXAMPLEPRIVATEKEY0987654321"
   },
   "users": [
     {
-      "username": "User1",
-      "password": "ExamplePassword1"
+      "username":         "User1",
+      "password":         "ExamplePassword1"
     },
     {
-      "username": "User2",
-      "password": "ExamplePassword2"
+      "username":         "User2",
+      "password":         "ExamplePassword2"
     }
   ],
-  "greenlockConfigDir": "C:\\Example\\Path\\greenlock.d",
-  "jwtSecret": "EXAMPLE_SECRET_KEY_1234567890"
+  "greenlockConfigDir":   "C:\\Example\\Path\\greenlock.d",
+  "jwtSecret":            "EXAMPLE_SECRET_KEY_1234567890"
 }
