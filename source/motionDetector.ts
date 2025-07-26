@@ -7,7 +7,8 @@ import { Jimp, diff as getDiff } from 'jimp';
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
-import { prisma, logMotion } from './camera';
+import { prisma } from './camera';
+import { logMotion } from './logMotion';
 
 const STANDARD_WIDTH = 160;   // Much smaller for performance
 const STANDARD_HEIGHT = 90;

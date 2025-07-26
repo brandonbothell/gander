@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
-import { logMotion } from './camera';
+import { logMotion } from './logMotion';
 
 export interface StreamConfig {
   id: string;
