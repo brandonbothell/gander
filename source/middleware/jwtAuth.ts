@@ -1,12 +1,9 @@
-import { RequestWithUser } from "../camera";
+import { JWT_SECRET, RequestWithUser } from "../camera";
 import express from "express";
-import config from '../../config.json'
 import jwt from 'jsonwebtoken';
 
 // --- JWT Middleware ---
 export async function jwtAuth(req: RequestWithUser, res: express.Response, next: express.NextFunction) {
-  const JWT_SECRET = process.env.JWT_SECRET ?? config.jwtSecret;
-
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Authentication required.' });

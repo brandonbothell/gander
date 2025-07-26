@@ -39,7 +39,12 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const JWT_SECRET = process.env.JWT_SECRET ?? config.jwtSecret;
+export const JWT_SECRET = process.env.JWT_SECRET as string;
+
+if (!JWT_SECRET) {
+  console.error('JWT_SECRET environment variable is not set!');
+  process.exit(1);
+}
 
 if (!admin.apps.length) {
   admin.initializeApp({

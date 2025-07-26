@@ -1,4 +1,4 @@
-import { StreamMotionState, prisma, RequestWithUser } from "../camera";
+import { prisma, RequestWithUser, JWT_SECRET } from "../camera";
 import { logAuth } from '../logMotion';
 import { jwtAuth } from "../middleware/jwtAuth";
 import { StreamManager } from "../streamManager";
@@ -9,8 +9,6 @@ import jwt from 'jsonwebtoken';
 import { notify } from "./notifications";
 
 export default function initializeAuthRoutes(app: express.Express, dynamicStreams: Record<string, StreamManager>) {
-  const JWT_SECRET = process.env.JWT_SECRET ?? config.jwtSecret;
-
   app.post('/api/login', express.json(), async (req, res) => {
     const { username, password, deviceInfo }: { username: string, password: string, deviceInfo: DeviceInfo } = req.body;
 
