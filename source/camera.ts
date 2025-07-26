@@ -11,7 +11,7 @@ import webpush from 'web-push';
 import * as chokidar from 'chokidar';
 import { PrismaClient } from './generated/prisma';
 import { StreamManager } from './streamManager';
-import { detectMotion } from './motionDetector';
+import { detectMotion, cleanFrameCache } from './motionDetector';
 import { TrustedDevice } from './types/deviceInfo';
 import Greenlock from 'greenlock-express';
 import config from '../config.json'
@@ -193,6 +193,8 @@ async function setupStreamMotionMonitoring() {
       }, 300);
     });
   }
+
+  setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000);
 }
 
 // Load streams from DB on startup
@@ -497,16 +499,46 @@ app.get('/signed/recordings/:streamId/thumbnails/latest.jpg', async (req, res) =
       return;
     }
 
-    const latestTs = tsFiles[0];
-    const thumbName = 'latest.jpg';
-    const thumbPath = path.join(stream.config.thumbDir, thumbName);
-    const tsPath = path.join(stream.config.hlsDir, latestTs);
+    const state = streamStates[streamId]
+
+    // --- If motion detection is active, serve the latest segment_*_motion.jpg if it exists ---
+    if (!state?.motionPaused) {
+      // Find the latest segment_*_motion.jpg file
+      const motionJpgs = files
+        .filter(f => /^segment_(\d+)_motion\.jpg$/.test(f))
+        .sort((a, b) => {
+          const aNum = parseInt(a.match(/^segment_(\d+)_motion\.jpg$/)![1], 10);
+          const bNum = parseInt(b.match(/^segment_(\d+)_motion\.jpg$/)![1], 10);
+          return bNum - aNum;
+        });
+      if (motionJpgs.length > 0) {
+        const latestMotionJpg = motionJpgs[0];
+        const latestMotionJpgPath = path.join(stream.config.hlsDir, latestMotionJpg);
+        // Serve the motion jpg directly
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.sendFile(latestMotionJpgPath, (err: any) => {
+          if (res.headersSent) return;
+          if (err && err.code !== 'ECONNABORTED') {
+            res.status(404).json({ error: 'File not found' });
+            console.error(`[${streamId}] Failed to serve motion thumbnail file ${latestMotionJpg}:`, JSON.stringify(err, null, 2));
+          }
+        });
+        return;
+      }
+      // If no motion jpg exists, fall through to original logic
+    }
 
     // --- Lock logic start ---
     // Only regenerate if thumbnail doesn't exist or is older than the segment
     let regenerate = !streamThumbnailPromises[streamId];
+    const thumbName = 'latest.jpg';
+    const thumbPath = path.join(stream.config.thumbDir, thumbName);
 
     if (regenerate) {
+      const latestTs = tsFiles[0];
+      const tsPath = path.join(stream.config.hlsDir, latestTs);
       try {
         const [thumbStat, tsStat] = await Promise.all([
           fs.promises.stat(thumbPath).catch(() => null),
@@ -518,7 +550,7 @@ app.get('/signed/recordings/:streamId/thumbnails/latest.jpg', async (req, res) =
       } catch { /* ignore */ }
 
       if (regenerate) {
-        const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 -update 1 "${thumbPath}"`;
+        const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=160:90" -vframes 1 -update 1 "${thumbPath}"`;
         streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>((resolve) => {
           require('child_process').exec(ffmpegCmd, (err: any) => {
             if (err) {
@@ -574,16 +606,46 @@ app.get('/recordings/:streamId/thumbnails/latest.jpg', jwtAuth, async (req, res)
       return;
     }
 
-    const latestTs = tsFiles[0];
-    const thumbName = 'latest.jpg';
-    const thumbPath = path.join(stream.config.thumbDir, thumbName);
-    const tsPath = path.join(stream.config.hlsDir, latestTs);
+    const state = streamStates[streamId];
+
+    // --- If motion detection is active, serve the latest segment_*_motion.jpg if it exists ---
+    if (!state?.motionPaused) {
+      // Find the latest segment_*_motion.jpg file
+      const motionJpgs = files
+        .filter(f => /^segment_(\d+)_motion\.jpg$/.test(f))
+        .sort((a, b) => {
+          const aNum = parseInt(a.match(/^segment_(\d+)_motion\.jpg$/)![1], 10);
+          const bNum = parseInt(b.match(/^segment_(\d+)_motion\.jpg$/)![1], 10);
+          return bNum - aNum;
+        });
+      if (motionJpgs.length > 0) {
+        const latestMotionJpg = motionJpgs[0];
+        const latestMotionJpgPath = path.join(stream.config.hlsDir, latestMotionJpg);
+        // Serve the motion jpg directly
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.sendFile(latestMotionJpgPath, (err: any) => {
+          if (res.headersSent) return;
+          if (err && err.code !== 'ECONNABORTED') {
+            res.status(404).json({ error: 'File not found' });
+            console.error(`[${streamId}] Failed to serve motion thumbnail file ${latestMotionJpg}:`, JSON.stringify(err, null, 2));
+          }
+        });
+        return;
+      }
+      // If no motion jpg exists, fall through to original logic
+    }
 
     // --- Lock logic start ---
     // Only regenerate if thumbnail doesn't exist or is older than the segment
     let regenerate = !streamThumbnailPromises[streamId];
+    const thumbName = 'latest.jpg';
+    const thumbPath = path.join(stream.config.thumbDir, thumbName);
 
     if (regenerate) {
+      const latestTs = tsFiles[0];
+      const tsPath = path.join(stream.config.hlsDir, latestTs);
       try {
         const [thumbStat, tsStat] = await Promise.all([
           fs.promises.stat(thumbPath).catch(() => null),

@@ -7,8 +7,9 @@ import { Jimp, diff as getDiff } from 'jimp';
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
-import { prisma } from './camera';
+import { prisma, StreamMotionState } from './camera';
 import { logMotion } from './logMotion';
+import { StreamManager } from './streamManager';
 
 const STANDARD_WIDTH = 160;   // Much smaller for performance
 const STANDARD_HEIGHT = 90;
@@ -376,9 +377,6 @@ export async function detectMotion(
       debugLog(`[${streamId}] Error processing frame: ${error}`);
     }
 
-    // Clean up frame file
-    await safeUnlink(framePath);
-
     return {
       motion: motionDetected,
       aboveCameraMovementThreshold
@@ -393,11 +391,39 @@ export async function detectMotion(
   }
 }
 
+export function cleanFrameCache(dynamicStreams: Record<string, StreamManager>, streamStates: Record<string, StreamMotionState>) {
+  for (const streamId in dynamicStreams) {
+    const stream = dynamicStreams[streamId];
+    if (streamStates[streamId]?.motionPaused) continue;
+
+    fs.readdir(stream.config.hlsDir, async (err, files) => {
+      if (err) { console.error(`[${streamId}] Error reading HLS directory: ${err}`); return; }
+      // Clean up frame file
+      const motionJpgs = files
+        .filter(f => /^segment_(\d+)_motion\.jpg$/.test(f))
+        .sort((a, b) => {
+          const aNum = parseInt(a.match(/^segment_(\d+)_motion\.jpg$/)![1], 10);
+          const bNum = parseInt(b.match(/^segment_(\d+)_motion\.jpg$/)![1], 10);
+          return bNum - aNum;
+        });
+      motionJpgs.shift(); // Keep the latest one
+
+      if (motionJpgs?.length > 0) {
+        logMotion(`[${streamId}] Deleting old motion frames: ${motionJpgs.join(', ')}`);
+        const toDelete = motionJpgs.map(f => path.join(stream.config.hlsDir, f));
+        safeUnlink(...toDelete);
+      }
+    });
+  }
+}
+
 // --- Async safeUnlink ---
-export async function safeUnlink(filePath: string) {
+export async function safeUnlink(...filePaths: string[]) {
   try {
-    if (await fs.promises.stat(filePath).then(() => true).catch(() => false)) {
-      await fs.promises.rm(filePath, { force: true, recursive: true });
+    for (const filePath of filePaths) {
+      if (await fs.promises.stat(filePath).then(() => true).catch(() => false)) {
+        await fs.promises.rm(filePath, { force: true, recursive: true });
+      }
     }
   } catch (error) {
     // Ignore errors silently for performance
