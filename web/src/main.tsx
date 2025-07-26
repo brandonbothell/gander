@@ -10,7 +10,7 @@ import SecureStorage from './utils/secureStorage';
 
 export const API_BASE =
   Capacitor.isNativePlatform()
-    ? 'https://gander.onl' // Use production URL for native apps
+    ? import.meta.env.VITE_BASE_URL // Use production URL for native apps
     : '';
 
 createRoot(document.getElementById('root')!).render(
@@ -31,7 +31,7 @@ if ('serviceWorker' in navigator) {
 
 function getToken() {
   const jwt = localStorage.getItem('jwt');
-  return jwt || undefined
+  return jwt ?? undefined;
 }
 
 // Global logout function - will be set by App component
@@ -65,13 +65,13 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   }
 
   // Use the latest JWT
-  const finalJwt = localStorage.getItem('jwt') || undefined;
+  const finalJwt = localStorage.getItem('jwt') ?? undefined;
 
   const makeRequest = (authToken?: string) => {
     return fetch(input, {
       ...init,
       headers: {
-        ...(init.headers || {}),
+        ...(init.headers ?? {}),
         Authorization: authToken ? `Bearer ${authToken}` : (token ? `Bearer ${finalJwt}` : ''),
       },
     });

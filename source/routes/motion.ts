@@ -30,7 +30,7 @@ export default function initializeMotionRoutes(
       states[streamId] = {
         recording: state.motionRecordingActive,
         secondsLeft,
-        saving: state.savingInProgress || false,
+        saving: state.savingInProgress ?? false,
         startedRecordingAt: state.startedRecordingAt
       };
     }

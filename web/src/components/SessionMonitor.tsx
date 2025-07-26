@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { FiChevronLeft, FiChevronRight, FiMapPin, FiClock, FiGlobe } from 'react-icons/fi';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
-import { GOOGLE_MAPS_API_KEY } from '../../config.json';
 import { type TrustedDevice, type DeviceInfo, getDeviceDisplayName } from '../../../source/types/deviceInfo';
 import { fetchWithRetry } from '../main';
 
@@ -56,10 +55,10 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
   const [localSessions, setLocalSessions] = useState<(Session & TrustedDevice)[]>([]);
   const [localKnownSessions, setLocalKnownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
 
-  const sessions = propSessions || localSessions;
-  const knownSessions = propKnownSessions || localKnownSessions;
-  const setSessions = propSetSessions || setLocalSessions;
-  const setKnownSessions = propSetKnownSessions || setLocalKnownSessions;
+  const sessions = propSessions ?? localSessions;
+  const knownSessions = propKnownSessions ?? localKnownSessions;
+  const setSessions = propSetSessions ?? setLocalSessions;
+  const setKnownSessions = propSetKnownSessions ?? setLocalKnownSessions;
   const [currentSessionIndex, setCurrentSessionIndex] = useState(0);
   const [loading, setLoading] = useState(!propSessions); // Don't show loading if sessions provided
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +94,8 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&loading=async&libraries=geometry,marker&callback=initGoogleMaps`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+      }&loading=async&libraries=geometry,marker&callback=initGoogleMaps`;
     script.async = true;
     script.defer = true;
 
@@ -1042,16 +1042,16 @@ export const geolocateIP = async (knownSessions?: string[], device?: TrustedDevi
       const session: Session = {
         ip: geoIp,
         location: {
-          country: geoData.country || 'Unknown',
-          region: geoData.region || 'Unknown',
-          city: geoData.city || 'Unknown',
+          country: geoData.country ?? 'Unknown',
+          region: geoData.region ?? 'Unknown',
+          city: geoData.city ?? 'Unknown',
           lat,
           lon,
-          isp: geoData.org || undefined,
-          timezone: geoData.timezone || undefined,
-          postal: geoData.postal || undefined,
-          country_code: geoData.country || undefined,
-          asn: geoData.org ? geoData.org.split(' ')[0] : undefined,
+          isp: geoData.org ?? undefined,
+          timezone: geoData.timezone ?? undefined,
+          postal: geoData.postal ?? undefined,
+          country_code: geoData.country ?? undefined,
+          asn: geoData.org?.split(' ')[0] ?? undefined,
         },
         firstSeen: new Date().toISOString(),
         lastSeen: new Date().toISOString(),

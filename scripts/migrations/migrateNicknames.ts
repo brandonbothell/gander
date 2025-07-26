@@ -1,5 +1,5 @@
 // scripts/migrateNicknames.ts
-import { PrismaClient } from '../source/generated/prisma';
+import { PrismaClient } from '../../source/generated/prisma';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';

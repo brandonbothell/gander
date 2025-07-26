@@ -102,13 +102,13 @@ export async function notify(
   if (!custom?.body) ({ nickname } = await prisma.stream.findUnique({
     where: { id: streamId },
     select: { nickname: true }
-  }) || { nickname: dynamicStreams[streamId]?.config.ffmpegInput });
-  const title = custom?.title || 'Motion Detected!';
-  const body = custom?.body || `Motion was detected by ${nickname}.`;
-  const icon = custom?.icon || 'push_icon';
-  const sound = custom?.sound || 'motion_alert';
-  const channelId = custom?.channelId || 'motion_event_channel';
-  const tag = custom?.tag || 'motion_event';
+  }) ?? { nickname: dynamicStreams[streamId]?.config.ffmpegInput });
+  const title = custom?.title ?? 'Motion Detected!';
+  const body = custom?.body ?? `Motion was detected by ${nickname}.`;
+  const icon = custom?.icon ?? 'push_icon';
+  const sound = custom?.sound ?? 'motion_alert';
+  const channelId = custom?.channelId ?? 'motion_event_channel';
+  const tag = custom?.tag ?? 'motion_event';
 
   const subs = await prisma.pushSubscription.findMany(username ? { where: { sid: username } } : undefined);
   for (const sub of subs) {
@@ -128,7 +128,7 @@ export async function notify(
             title,
             body,
             data: {
-              streamUrl: `${config.baseUrl}/stream/${streamId}`,
+              streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
               cameraId: streamId,
               // ...other custom data
             }
@@ -178,7 +178,7 @@ export async function notify(
             body
           },
           data: {
-            streamUrl: `${config.baseUrl}/stream/${streamId}`,
+            streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
             cameraId: streamId,
             // ...other custom data
           }

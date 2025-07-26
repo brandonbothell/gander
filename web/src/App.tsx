@@ -416,7 +416,7 @@ export default function App() {
     try {
       const LAST_UPDATE_KEY = 'lastUpdateTimestamp';
       const lastUpdate = localStorage.getItem(LAST_UPDATE_KEY);
-      const currentVersion = import.meta.env.VITE_REACT_APP_VERSION || '1.0.0';
+      const currentVersion = import.meta.env.VITE_REACT_APP_VERSION ?? '1.0.0';
 
       // Use a versioned timestamp to detect updates
       const versionedUpdateKey = `${LAST_UPDATE_KEY}_${currentVersion}`;
@@ -430,7 +430,7 @@ export default function App() {
         setCachedRecordingRanges({});
         setCachedPages({});
         setTotalRecordings({});
-        localStorage.setItem(versionedUpdateKey, lastUpdate || now);
+        localStorage.setItem(versionedUpdateKey, lastUpdate ?? now);
         if (!lastUpdate) localStorage.setItem(LAST_UPDATE_KEY, now);
         alert('Cache reset due to website update or new deployment.');
       }

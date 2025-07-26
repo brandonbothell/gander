@@ -235,10 +235,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
   // Update the filteredRecordings useMemo in StreamPage.tsx:
   const filteredRecordings = useMemo(() => {
-    const recordingsStream = viewingRecordingsFrom || activeStream;
+    const recordingsStream = viewingRecordingsFrom ?? activeStream;
     if (!recordingsStream) return [];
 
-    const allCached = cachedRecordings[recordingsStream.id] || [];
+    const allCached = cachedRecordings[recordingsStream.id] ?? [];
     const notDeleted = deletedRecordings[recordingsStream.id] ?
       allCached.filter(rec => !deletedRecordings[recordingsStream.id].includes(rec.filename)) :
       allCached;
@@ -327,7 +327,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
       // Update frozen results for non-search case
       if (!userTyping) {
-        const recordingsStream = viewingRecordingsFrom || activeStream;
+        const recordingsStream = viewingRecordingsFrom ?? activeStream;
         if (!recordingsStream) {
           setFrozenFilteredRecordings([]);
           return;
@@ -344,7 +344,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       }
     }
   }, [
-    search, isNicknamedOnly, dateRange,
+    search, isNicknamedOnly, dateRange.from, dateRange.to,
     cachedRecordings, deletedRecordings,
     filteredRecordingsPage, activeStream,
     viewingRecordingsFrom, userTyping, isSearching
@@ -362,7 +362,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   useEffect(() => {
     if (filterUpdatesBlocked) return;
 
-    const recordingsStream = viewingRecordingsFrom || activeStream;
+    const recordingsStream = viewingRecordingsFrom ?? activeStream;
     if (!recordingsStream) {
       setFilteredRecordingsCache([]);
       setIsSearching(false);
@@ -386,7 +386,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       searchTimeoutRef.current = window.setTimeout(() => {
         if (currentRequestId !== lastSearchRequestId.current) return;
 
-        const currentRecordingsStream = viewingRecordingsFrom || activeStream;
+        const currentRecordingsStream = viewingRecordingsFrom ?? activeStream;
         if (!currentRecordingsStream || currentRecordingsStream.id !== recordingsStream.id) return;
 
         // Use sync search on iOS, worker on other platforms
@@ -977,7 +977,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     function onScroll() {
       if (!activeStream) return;
-      const recordingsStream = viewingRecordingsFrom || activeStream;
+      const recordingsStream = viewingRecordingsFrom ?? activeStream;
 
       const totalRemaining = (totalRecordings[recordingsStream.id] || 0) - (cachedRecordings[recordingsStream.id]?.length || 0);
       const isNearBottom = list!.scrollTop + list!.clientHeight >= list!.scrollHeight - 300;
@@ -1354,7 +1354,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   // Reset recordings and pagination state when stream changes
   useEffect(() => {
     // Calculate how many pages are already cached for this stream
-    const recordingsStream = viewingRecordingsFrom || activeStream;
+    const recordingsStream = viewingRecordingsFrom ?? activeStream;
     const cachedLen = recordingsStream ? cachedRecordings[recordingsStream.id]?.length || 0 : 0;
     const initialPage = Math.max(1, Math.ceil(cachedLen / PAGE_SIZE));
     setCurrentPage(initialPage);
@@ -1395,7 +1395,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           (!dateRange.from && dateRange.to && today <= dateRange.to) ||
           (dateRange.from && dateRange.to && dateRange.from <= today && today <= dateRange.to);
 
-        const recordingsStream = viewingRecordingsFrom || activeStream;
+        const recordingsStream = viewingRecordingsFrom ?? activeStream;
 
         if (shouldPoll) await pollLatestRecordings(recordingsStream, cancelled);
         else console.log('Skipping latest recordings poll due to date range');
@@ -1406,7 +1406,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           if (cancelled || !activeStream) return;
 
           // Only pre-cache if we have more to fetch
-          const recordingsStream = viewingRecordingsFrom || activeStream;
+          const recordingsStream = viewingRecordingsFrom ?? activeStream;
           const cachedLen = cachedRecordings[recordingsStream.id]?.length || 0;
           const total = totalRecordings[recordingsStream.id] || 0;
 
@@ -1496,7 +1496,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       return { ...prev, [stream.id]: deduped.sort((a, b) => b.filename.localeCompare(a.filename)) };
     });
 
-    if (recsToAdd.length < PAGE_SIZE || foundLastSeen) {
+    if ((recsToAdd.length < PAGE_SIZE) || foundLastSeen) {
       setReachedLastSeen(true);
     }
   }
@@ -1740,7 +1740,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
   const handleView = (filename: string) => {
     if (!activeStream) return;
-    const recordingsStream = viewingRecordingsFrom || activeStream;
+    const recordingsStream = viewingRecordingsFrom ?? activeStream;
     setRecordingOverlay({ streamId: recordingsStream.id, filename });
     if (!viewed.find(viewed => viewed.filename === filename && viewed.streamId === recordingsStream.id)) {
       const updated = [...viewed, { filename, streamId: recordingsStream.id }];
@@ -1911,7 +1911,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
   useEffect(() => {
     if (!activeStream) return;
-    const recordingsStream = viewingRecordingsFrom || activeStream;
+    const recordingsStream = viewingRecordingsFrom ?? activeStream;
     authFetch(`${API_BASE}/api/recordings-nicknames/${recordingsStream.id}`)
       .then(res => res.json())
       .then((nicknamedRecordings: Array<{ filename: string; nickname: string }>) =>
@@ -1928,7 +1928,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     let cancelled = false;
     async function fetchDeleted() {
       if (!activeStream) return;
-      const recordingsStream = viewingRecordingsFrom || activeStream;
+      const recordingsStream = viewingRecordingsFrom ?? activeStream;
       try {
         const res = await authFetch(`${API_BASE}/api/deleted-recordings/${recordingsStream.id}`);
         if (!res.ok) return;
@@ -2410,7 +2410,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
                   setMasks(prevMasks =>
                     prevMasks.map(maskObj => {
                       if (maskObj.id !== maskId) return maskObj;
-                      const since = maskObj.pendingUpdateSince || Date.now();
+                      const since = maskObj.pendingUpdateSince ?? Date.now();
                       const elapsed = Date.now() - since;
                       if (elapsed < 600) {
                         setTimeout(() => {
@@ -2561,7 +2561,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
               onBlurSearchInput={isMobileWidth ? () => setForceSticky(false) : undefined}
               onRefresh={isMobileWidth ? undefined : async () => {
                 setIsDesktopRefreshing(true);
-                const recordingsStream = viewingRecordingsFrom || activeStream;
+                const recordingsStream = viewingRecordingsFrom ?? activeStream;
                 const start = Date.now();
                 if (recordingsStream) await pollLatestRecordings(recordingsStream);
                 else alert('No active stream to refresh recordings for');
@@ -2628,7 +2628,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             setRefreshIconState('snap');
             setIsMobileRefreshing(true);
             setTimeout(() => setRefreshIconState('spinning'), 180);
-            const recordingsStream = viewingRecordingsFrom || activeStream;
+            const recordingsStream = viewingRecordingsFrom ?? activeStream;
             const start = Date.now();
 
             if (recordingsStream) await pollLatestRecordings(recordingsStream);
@@ -3008,8 +3008,7 @@ function playNotificationTone() {
   // Fallback: Create a brief notification tone using Web Audio API
   // This is less likely to interrupt other audio
   try {
-    // @ts-ignore
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const AudioContext = window.AudioContext ?? (window as any).webkitAudioContext;
     const audioContext = new AudioContext();
 
     // Create a brief, subtle notification tone

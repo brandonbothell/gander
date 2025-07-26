@@ -1,10 +1,12 @@
+const BASE_URL = '__BASE_URL__';
+
 self.addEventListener('push', function (event) {
   const data = event.data ? event.data.json() : {};
   event.waitUntil(
     self.registration.showNotification(
-      data.title || 'Motion Detected!',
+      data.title ?? 'Motion Detected!',
       {
-        body: data.body || 'Motion was detected by your camera.',
+        body: data.body ?? 'Motion was detected by your camera.',
         icon: '/icon.png',
         data: data.data // <-- Pass the custom data object here!
       }
@@ -21,11 +23,11 @@ self.addEventListener('notificationclick', function (event) {
   if (!url && event.notification.data && event.notification.data.click_action) {
     url = event.notification.data.click_action;
   }
-  url = url || 'https://gander.onl/';
+  url = url ?? BASE_URL ?? 'http://localhost:3000';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
       for (let client of windowClients) {
-        if (client.url.startsWith('https://gander.onl')) {
+        if (client.url.startsWith(url)) {
           client.focus();
           // Always navigate to the correct stream URL
           client.navigate(url);

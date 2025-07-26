@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 
 // --- JWT Middleware ---
 export async function jwtAuth(req: RequestWithUser, res: express.Response, next: express.NextFunction) {
-  const JWT_SECRET = process.env.JWT_SECRET || config.jwtSecret;
+  const JWT_SECRET = process.env.JWT_SECRET ?? config.jwtSecret;
 
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {

@@ -50,7 +50,7 @@ export default function initializeRecordingRoutes(app: express.Application, dyna
   app.get('/api/recordings/:streamId/:page', jwtAuth, async (req, res) => {
     const { streamId, page } = req.params;
     const username = (req as any).user.username;
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const pageNum = Math.max(1, parseInt(page, 10) ?? 1);
     const PAGE_SIZE = 50;
 
     const total = await prisma.motionRecording.count({ where: { streamId } });
@@ -186,7 +186,7 @@ export default function initializeRecordingRoutes(app: express.Application, dyna
   app.get('/api/recordings/:streamId/:filename/nickname', jwtAuth, async (req, res) => {
     const { streamId, filename } = req.params;
     const record = await prisma.motionRecording.findUnique({ where: { streamId_filename: { filename, streamId } } });
-    res.json({ nickname: record?.nickname || '' });
+    res.json({ nickname: record?.nickname ?? '' });
   });
 
   app.post('/api/recordings/:streamId/:filename/nickname', jwtAuth, express.json(), async (req, res) => {

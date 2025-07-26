@@ -33,8 +33,8 @@ export function getDeviceFingerprint(): DeviceInfo {
 
   return {
     userAgent: navigator.userAgent,
-    platform: navigator.platform,
-    vendor: navigator.vendor || 'Unknown',
+    platform: navigator.platform ?? 'Unknown',
+    vendor: navigator.vendor ?? 'Unknown',
     language: navigator.language,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     screen: `${screen.width}x${screen.height}`,

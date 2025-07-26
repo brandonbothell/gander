@@ -49,7 +49,7 @@ export function Recording({
   const [hover, setHover] = useState(false);
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const videoRef = externalVideoRef || useRef<HTMLVideoElement>(null);
+  const videoRef = externalVideoRef ?? useRef<HTMLVideoElement>(null);
   // Controls fade-away logic
   const [isControlBarVisible, setIsControlBarVisible] = useState(false);
   const [isPaused, setIsPaused] = useState(false);

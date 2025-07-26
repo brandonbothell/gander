@@ -220,7 +220,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
           >
             {activeStream && filteredRecordings.map(({ filename }) => {
               const checked = selected.includes(filename);
-              const recordingsStream = viewingRecordingsFrom || activeStream;
+              const recordingsStream = viewingRecordingsFrom ?? activeStream;
               return (
                 <RecordingThumbItem
                   recordingsListRef={recordingsListRef}
@@ -247,7 +247,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
       )}
       {/* Load more button - only show for final 50 recordings */}
       {activeStream && (() => {
-        const recordingsStream = viewingRecordingsFrom || activeStream;
+        const recordingsStream = viewingRecordingsFrom ?? activeStream;
         const totalRemaining = (totalRecordings[recordingsStream.id] || 0) - (cachedRecordings[recordingsStream.id]?.length || 0);
         const shouldShowButton = totalRemaining > 0 && totalRemaining <= 50;
 
@@ -270,7 +270,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
             disabled={isLoadingMore}
             onClick={async () => {
               setIsLoadingMore(true);
-              const recordingsStream = viewingRecordingsFrom || activeStream;
+              const recordingsStream = viewingRecordingsFrom ?? activeStream;
               if (!recordingsStream) {
                 alert('No active stream to load more recordings for');
                 setIsLoadingMore(false);

@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken';
 import { notify } from "./notifications";
 
 export default function initializeAuthRoutes(app: express.Express, dynamicStreams: Record<string, StreamManager>) {
-  const JWT_SECRET = process.env.JWT_SECRET || config.jwtSecret;
+  const JWT_SECRET = process.env.JWT_SECRET ?? config.jwtSecret;
 
   app.post('/api/login', express.json(), async (req, res) => {
     const { username, password, deviceInfo }: { username: string, password: string, deviceInfo: DeviceInfo } = req.body;
@@ -23,7 +23,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
 
     // Sanitize deviceInfo fields to avoid prototype pollution and ensure only expected keys
     const safeDeviceInfo: DeviceInfo = {
-      userAgent: typeof deviceInfo?.userAgent === 'string' ? deviceInfo.userAgent : (req.headers['user-agent'] || 'Unknown'),
+      userAgent: typeof deviceInfo?.userAgent === 'string' ? deviceInfo.userAgent : (req.headers['user-agent'] ?? 'Unknown'),
       platform: typeof deviceInfo?.platform === 'string' ? deviceInfo.platform : 'Unknown',
       vendor: typeof deviceInfo?.vendor === 'string' ? deviceInfo.vendor : 'Unknown',
       language: typeof deviceInfo?.language === 'string' ? deviceInfo.language : 'Unknown',
@@ -63,7 +63,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
         // Update existing user
         let trustedDevices: TrustedDevice[] = [];
         try {
-          trustedDevices = JSON.parse(user.trustedIps || '[]');
+          trustedDevices = JSON.parse(user.trustedIps ?? '[]');
         } catch {
           trustedDevices = [];
         }
@@ -90,9 +90,9 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
           device.loginCount++;
 
           // Update IP if it changed (network switching)
-          if (device.ip !== (req.ip || 'Unknown')) {
+          if (device.ip !== (req.ip ?? 'Unknown')) {
             console.log(`[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${req.ip}`);
-            device.ip = req.ip || 'Unknown';
+            device.ip = req.ip ?? 'Unknown';
           }
 
           // Update device info if provided
@@ -108,7 +108,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
             tag: 'security_event'
           }, user.username);
           trustedDevices.push({
-            ip: req.ip || 'Unknown',
+            ip: req.ip ?? 'Unknown',
             deviceInfo: safeDeviceInfo,
             firstSeen: now,
             lastSeen: now,
@@ -143,7 +143,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
 
   // Update the refresh token endpoint
   app.post('/api/refresh-token', async (req, res) => {
-    const refreshToken = String(req.headers['refresh-token'] || '');
+    const refreshToken = String(req.headers['refresh-token'] ?? '');
     const { deviceInfo }: { deviceInfo?: DeviceInfo } = req.body;
 
     if (!refreshToken || !deviceInfo) {
@@ -154,7 +154,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
 
     // Sanitize deviceInfo fields to avoid prototype pollution and ensure only expected keys
     const safeDeviceInfo: DeviceInfo = {
-      userAgent: typeof deviceInfo?.userAgent === 'string' ? deviceInfo.userAgent : (req.headers['user-agent'] || 'Unknown'),
+      userAgent: typeof deviceInfo?.userAgent === 'string' ? deviceInfo.userAgent : (req.headers['user-agent'] ?? 'Unknown'),
       platform: typeof deviceInfo?.platform === 'string' ? deviceInfo.platform : 'Unknown',
       vendor: typeof deviceInfo?.vendor === 'string' ? deviceInfo.vendor : 'Unknown',
       language: typeof deviceInfo?.language === 'string' ? deviceInfo.language : 'Unknown',
@@ -182,7 +182,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
 
     let tokens: string[] = [];
     try {
-      tokens = JSON.parse(user.refreshTokens || '[]');
+      tokens = JSON.parse(user.refreshTokens ?? '[]');
     } catch (err) {
       logAuth(`Failed to parse refresh tokens for user: ${user.username}`, 'error');
       res.status(500).json({ error: 'Failed to parse refresh tokens' });
@@ -221,7 +221,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
     // Update trusted devices
     let trustedDevices: TrustedDevice[] = [];
     try {
-      trustedDevices = JSON.parse(user.trustedIps || '[]');
+      trustedDevices = JSON.parse(user.trustedIps ?? '[]');
     } catch {
       trustedDevices = [];
     }
@@ -244,9 +244,9 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       device.loginCount++;
 
       // Update IP if it changed (network switching)
-      if (device.ip !== (req.ip || 'Unknown')) {
+      if (device.ip !== (req.ip ?? 'Unknown')) {
         logAuth(`[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${req.ip}`, 'warn');
-        device.ip = req.ip || 'Unknown';
+        device.ip = req.ip ?? 'Unknown';
       }
 
       // Update device info if provided
@@ -291,7 +291,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
     }
 
     try {
-      const trustedDevices: TrustedDevice[] = JSON.parse(user.trustedIps || '[]');
+      const trustedDevices: TrustedDevice[] = JSON.parse(user.trustedIps ?? '[]');
       res.json(trustedDevices);
     } catch {
       res.json([]);
@@ -307,7 +307,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       const users = await prisma.user.findMany({ where: { refreshTokens: { contains: `"${refreshToken}"` } } });
       for (const user of users) {
         try {
-          const tokens = JSON.parse(user.refreshTokens || '[]');
+          const tokens = JSON.parse(user.refreshTokens ?? '[]');
           if (Array.isArray(tokens) && tokens.includes(refreshToken)) {
             const newTokens = tokens.filter((t: string) => t !== refreshToken);
             await prisma.user.update({
@@ -315,7 +315,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
               data: {
                 refreshTokens: JSON.stringify(newTokens),
                 trustedIps: JSON.stringify(
-                  (JSON.parse(user.trustedIps || '[]') as TrustedDevice[])
+                  (JSON.parse(user.trustedIps ?? '[]') as TrustedDevice[])
                     .filter(device => device.deviceInfo.clientId ? device.deviceInfo.clientId !== clientId : true)
                 )
               }

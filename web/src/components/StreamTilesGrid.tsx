@@ -174,15 +174,20 @@ export function StreamTilesGrid({
   return (
     <div className="stream-tiles-grid" ref={gridRef}>
       {streams.map(stream => (
-        <button
+        <div
           key={stream.id}
           className="stream-tile-button"
           data-stream-id={stream.id}
           onClick={() => setActiveStream(stream)}
           style={{
-            // Ensure hardware acceleration is enabled for better mobile performance
             willChange: 'transform',
             backfaceVisibility: 'hidden',
+            cursor: 'pointer',
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') setActiveStream(stream);
           }}
         >
           <div className="stream-tile">
@@ -435,7 +440,7 @@ export function StreamTilesGrid({
               </button>
             </div>
           </div>
-        </button>
+        </div>
       ))}
       {canAddStream && (
         <button

@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+import '@dotenvx/dotenvx/config'
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
@@ -24,7 +24,6 @@ import initializeMaskRoutes from './routes/masks';
 import initializeStreamRoutes from './routes/streams';
 import { logMotion } from './logMotion';
 
-dotenv.config();
 process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(__dirname, '..', 'security-cam-credentials.json');
 
 export const prisma = new PrismaClient();
@@ -40,7 +39,7 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || config.jwtSecret;
+const JWT_SECRET = process.env.JWT_SECRET ?? config.jwtSecret;
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -224,17 +223,17 @@ loadStreamsFromDb().then(cleanupExpiredTokensAndDevices).then(setupStreamMotionM
   // Use Greenlock for production
   Greenlock.init({
     packageRoot: path.join(__dirname, '..'),
-    configDir: config.greenlockConfigDir || path.join(__dirname, '..', 'greenlock.d'),
+    configDir: config.greenlockConfigDir ?? path.join(__dirname, '..', 'greenlock.d'),
     maintainerEmail: config.maintainerEmail,
     cluster: false
   }).serve(app);
 
   setInterval(syncDeletedRecordings, 1000 * 60 * 60); // Sync deleted recordings every hour
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.API_ENV !== 'production') {
     // Use HTTP for development
     // Always use Greenlock for HTTPS, but also start HTTP server in development for convenience
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT ?? 3000;
     require('http').createServer(app).listen(port, () => {
       console.log(`Development HTTP server running on http://localhost:${port}`);
       setTimeout(() => {
@@ -261,7 +260,7 @@ async function cleanupExpiredTokensAndDevices() {
 
     // --- JWTs ---
     let jwts: string[] = [];
-    try { jwts = JSON.parse(user.jwts || '[]'); } catch { jwts = []; }
+    try { jwts = JSON.parse(user.jwts ?? '[]'); } catch { jwts = []; }
     const validJwts = jwts.filter(token => {
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
@@ -272,7 +271,7 @@ async function cleanupExpiredTokensAndDevices() {
 
     // --- Refresh Tokens ---
     let refreshTokens: string[] = [];
-    try { refreshTokens = JSON.parse(user.refreshTokens || '[]'); } catch { refreshTokens = []; }
+    try { refreshTokens = JSON.parse(user.refreshTokens ?? '[]'); } catch { refreshTokens = []; }
     const validRefreshTokens = refreshTokens.filter(token => {
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
@@ -283,7 +282,7 @@ async function cleanupExpiredTokensAndDevices() {
 
     // --- Trusted Devices ---
     let trustedDevices: TrustedDevice[] = [];
-    try { trustedDevices = JSON.parse(user.trustedIps || '[]'); } catch { trustedDevices = []; }
+    try { trustedDevices = JSON.parse(user.trustedIps ?? '[]'); } catch { trustedDevices = []; }
     const filteredDevices = trustedDevices.filter(device => {
       const lastSeen = new Date(device.lastSeen).getTime();
       return !isNaN(lastSeen) && now - lastSeen < SEVEN_DAYS_MS;
@@ -311,7 +310,8 @@ async function cleanupExpiredTokensAndDevices() {
 
 // --- CORS ---
 app.use(cors({
-  origin: (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000']).concat([config.baseUrl]),
+  origin: (process.env.API_ENV === 'production' ? [] : ['http://localhost:3000'])
+    .concat(process.env.VITE_BASE_URL ? [process.env.VITE_BASE_URL] : []),
   credentials: true
 }));
 
@@ -394,7 +394,7 @@ initializeStreamRoutes(app, dynamicStreams);
 // --- Helper to create a signed URL
 function createSignedUrl(streamId: string, filename: string, type: 'video' | 'thumbnail', expiresInSeconds = 300) {
   const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const secret = process.env.SIGNED_URL_SECRET || JWT_SECRET;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
   const data = `${streamId}:${filename}:${type}:${expires}`;
   const sig = crypto.createHmac('sha256', secret).update(data).digest('hex');
   return { url: `/signed/${type}/${streamId}/${encodeURIComponent(filename)}?expires=${expires}&sig=${sig}`, expiresAt: expires };
@@ -402,7 +402,7 @@ function createSignedUrl(streamId: string, filename: string, type: 'video' | 'th
 
 // Function to verify signed URL
 function verifySignedUrl(streamId: string, filename: string, type: 'video' | 'thumbnail', expires: string, sig: string) {
-  const secret = process.env.SIGNED_URL_SECRET || JWT_SECRET;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
   const data = `${streamId}:${filename}:${type}:${expires}`;
   const expectedSig = crypto.createHmac('sha256', secret).update(data).digest('hex');
   if (sig !== expectedSig) return false;
@@ -413,7 +413,7 @@ function verifySignedUrl(streamId: string, filename: string, type: 'video' | 'th
 // --- Helper to create a signed stream playlist URL for a specific stream ---
 function createSignedStreamUrl(streamId: string, expiresInSeconds = 300) {
   const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const secret = process.env.SIGNED_URL_SECRET || JWT_SECRET;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
   const data = `stream:${streamId}:${expires}`;
   const sig = crypto.createHmac('sha256', secret).update(data).digest('hex');
   return `/signed/stream/${streamId}/stream.m3u8?expires=${expires}&sig=${sig}`;
@@ -421,7 +421,7 @@ function createSignedStreamUrl(streamId: string, expiresInSeconds = 300) {
 
 // --- Helper to verify a signed stream playlist/segment URL ---
 function verifySignedStreamUrl(streamId: string, expires: string, sig: string) {
-  const secret = process.env.SIGNED_URL_SECRET || JWT_SECRET;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
   const data = `stream:${streamId}:${expires}`;
   const expectedSig = crypto.createHmac('sha256', secret).update(data).digest('hex');
   if (sig !== expectedSig) return false;
@@ -436,7 +436,7 @@ function verifySignedStreamUrl(streamId: string, expires: string, sig: string) {
 // --- Helper to create a signed latest thumbnail URL for a stream ---
 function createSignedLatestThumbUrl(streamId: string, expiresInSeconds = 300) {
   const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const secret = process.env.SIGNED_URL_SECRET || JWT_SECRET;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
   const data = `latest-thumb:${streamId}:${expires}`;
   const sig = crypto.createHmac('sha256', secret).update(data).digest('hex');
   return `/signed/recordings/${streamId}/thumbnails/latest.jpg?expires=${expires}&sig=${sig}`;
@@ -444,7 +444,7 @@ function createSignedLatestThumbUrl(streamId: string, expiresInSeconds = 300) {
 
 // --- Helper to verify a signed latest thumbnail URL for a stream ---
 function verifySignedLatestThumbUrl(streamId: string, expires: string, sig: string) {
-  const secret = process.env.SIGNED_URL_SECRET || JWT_SECRET;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
   const data = `latest-thumb:${streamId}:${expires}`;
   const expectedSig = crypto.createHmac('sha256', secret).update(data).digest('hex');
   if (sig !== expectedSig) return false;
@@ -812,8 +812,8 @@ export function createStreamManager(stream: any) {
     recordDir,
     thumbDir,
     ffmpegInput: stream.ffmpegInput,
-    rtspUser: stream.rtspUser || undefined,
-    rtspPass: stream.rtspPass || undefined
+    rtspUser: stream.rtspUser ?? undefined,
+    rtspPass: stream.rtspPass ?? undefined
   });
 }
 

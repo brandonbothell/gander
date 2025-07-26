@@ -30,7 +30,7 @@ export default function LoginPage({ onLogin }: { onLogin: (token: string, refres
         }
         onLogin(data.token, data.refreshToken);
       } else {
-        setError(data.message || 'Login failed');
+        setError(data.message ?? 'Login failed');
       }
     } catch {
       setError('Login failed. Please try again.');
