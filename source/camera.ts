@@ -110,6 +110,23 @@ async function loadStreamsFromDb() {
       dynamicStreams[s.id].startFFmpeg();
     }
   }
+
+  // --- Monitor for FFmpeg cooldowns and alert ---
+  setInterval(() => {
+    for (const streamId in dynamicStreams) {
+      const stream = dynamicStreams[streamId];
+      if (stream && (stream as any).ffmpegCooldownUntil && Date.now() < (stream as any).ffmpegCooldownUntil) {
+        logMotion(`[${streamId}] FFmpeg restart cooldown active until ${new Date((stream as any).ffmpegCooldownUntil).toLocaleTimeString()}`, 'warn');
+        notifyMotion(streamId, {
+          title: 'Stream Restart Cooldown',
+          body: `Stream ${streamId} is in FFmpeg restart cooldown due to repeated failures.`,
+          icon: 'push_icon',
+          sound: 'default',
+          channelId: 'security_event_channel'
+        });
+      }
+    }
+  }, 60000); // Check every minute
 }
 loadStreamsFromDb().then(cleanupExpiredTokensAndDevices).then(setupStreamMotionMonitoring).then(() => {
   // --- Start server ---

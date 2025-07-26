@@ -19,6 +19,11 @@ export class StreamManager {
   webrtcProcess: ReturnType<typeof spawn> | null = null;
   private webrtcClients = new Set<string>();
   private ffmpegRestarting = false;
+  private ffmpegRestartTimestamps: number[] = [];
+  private static readonly MAX_RESTARTS = 5;
+  private static readonly RESTART_WINDOW_MS = 60 * 1000; // 1 minute
+  private static readonly COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+  private ffmpegCooldownUntil: number = 0;
 
   constructor(config: StreamConfig) {
     this.config = config;
@@ -163,6 +168,22 @@ export class StreamManager {
 
   // Main HLS stream - balanced for stability and performance
   startFFmpeg() {
+    // --- Add cooldown check ---
+    if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
+      logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Next restart allowed at ${new Date(this.ffmpegCooldownUntil).toLocaleTimeString()}`, 'warn');
+      return;
+    }
+
+    // --- Restart rate limiting logic ---
+    const now = Date.now();
+    this.ffmpegRestartTimestamps = this.ffmpegRestartTimestamps.filter(ts => now - ts < StreamManager.RESTART_WINDOW_MS);
+    this.ffmpegRestartTimestamps.push(now);
+    if (this.ffmpegRestartTimestamps.length > StreamManager.MAX_RESTARTS) {
+      this.ffmpegCooldownUntil = now + StreamManager.COOLDOWN_MS;
+      logMotion(`[${this.config.id}] Too many FFmpeg restarts (${this.ffmpegRestartTimestamps.length} in ${StreamManager.RESTART_WINDOW_MS / 1000}s). Entering cooldown for ${StreamManager.COOLDOWN_MS / 60000} minutes.`, 'error');
+      return;
+    }
+
     // CRITICAL: Clean the HLS directory before starting reencoding
     // This prevents segment number conflicts
     try {
@@ -281,6 +302,11 @@ export class StreamManager {
           logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (restarting FFmpeg)`, 'warn');
           if (!this.ffmpegRestarting) {
             this.ffmpegRestarting = true;
+            // --- Add cooldown check before restart ---
+            if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
+              logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
+              return;
+            }
             this.stopFFmpegAndWait().then(() => {
               this.ffmpegRestarting = false;
               setTimeout(() => this.startFFmpeg(), 1000);
@@ -329,6 +355,11 @@ export class StreamManager {
     const handleFfmpegExit = (code: number | null, signal: NodeJS.Signals | null) => {
       this.ffmpeg = null; // Always clear reference on exit
       console.log(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
+      // --- Add cooldown check before restart ---
+      if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
+        logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
+        return;
+      }
       // Only try reencoding if stream copy failed and we got no segments
       if (!hasErrored && inputIsRtsp && code !== 0 && signal !== 'SIGTERM' && segmentCount === 0) {
         console.log(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
