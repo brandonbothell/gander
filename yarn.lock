@@ -3283,6 +3283,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"chalk@npm:^5.4.1":
+  version: 5.4.1
+  resolution: "chalk@npm:5.4.1"
+  checksum: 10c0/b23e88132c702f4855ca6d25cb5538b1114343e41472d5263ee8a37cccfccd9c4216d111e1097c6a27830407a1dc81fecdf2a56f2c63033d4dbbd88c10b0dcef
+  languageName: node
+  linkType: hard
+
 "charm@npm:~0.1.1":
   version: 0.1.2
   resolution: "charm@npm:0.1.2"
@@ -3461,6 +3468,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"console-stamp@npm:^3.1.2":
+  version: 3.1.2
+  resolution: "console-stamp@npm:3.1.2"
+  dependencies:
+    chalk: "npm:^4.1.2"
+    dateformat: "npm:^4.6.3"
+  checksum: 10c0/ba296fdcd172db4d4698507eac02359011f2bb576b656229f5706795063cadd3cb691ecd5616a1f7da999eac410db677e44ddfec08807501963c10d5efd58503
+  languageName: node
+  linkType: hard
+
 "content-disposition@npm:^1.0.0":
   version: 1.0.0
   resolution: "content-disposition@npm:1.0.0"
@@ -3607,6 +3624,13 @@ __metadata:
   version: 6.0.2
   resolution: "data-uri-to-buffer@npm:6.0.2"
   checksum: 10c0/f76922bf895b3d7d443059ff278c9cc5efc89d70b8b80cd9de0aa79b3adc6d7a17948eefb8692e30398c43635f70ece1673d6085cc9eba2878dbc6c6da5292ac
+  languageName: node
+  linkType: hard
+
+"dateformat@npm:^4.6.3":
+  version: 4.6.3
+  resolution: "dateformat@npm:4.6.3"
+  checksum: 10c0/e2023b905e8cfe2eb8444fb558562b524807a51cdfe712570f360f873271600b5c94aebffaf11efb285e2c072264a7cf243eadb68f3eba0f8cc85fb86cd25df6
   languageName: node
   linkType: hard
 
@@ -4770,8 +4794,10 @@ __metadata:
     "@types/session-file-store": "npm:^1"
     "@types/web-push": "npm:^3"
     "@yarnpkg/pnpify": "npm:^4.1.5"
+    chalk: "npm:^5.4.1"
     chokidar: "npm:^4.0.3"
     concurrently: "npm:^9.1.2"
+    console-stamp: "npm:^3.1.2"
     cookie-parser: "npm:^1.4.7"
     copyfiles: "npm:^2.4.1"
     cors: "npm:^2.8.5"

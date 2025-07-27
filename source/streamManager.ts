@@ -60,14 +60,14 @@ export class StreamManager {
       this.startWebRTCStream();
     }
     this.webrtcClients.add(clientId);
-    console.log(`[${this.config.id}] WebRTC client ${clientId} added. Total clients: ${this.webrtcClients.size}`);
+    console.info(`[${this.config.id}] WebRTC client ${clientId} added. Total clients: ${this.webrtcClients.size}`);
     return true;
   }
 
   // Remove client from WebRTC stream
   removeWebRTCClient(clientId: string): void {
     this.webrtcClients.delete(clientId);
-    console.log(`[${this.config.id}] WebRTC client ${clientId} removed. Total clients: ${this.webrtcClients.size}`);
+    console.info(`[${this.config.id}] WebRTC client ${clientId} removed. Total clients: ${this.webrtcClients.size}`);
 
     if (this.webrtcClients.size === 0) {
       this.stopWebRTCStream();
@@ -77,7 +77,7 @@ export class StreamManager {
   // Start WebRTC stream optimized for Pi 4
   private startWebRTCStream(): void {
     if (this.webrtcProcess) {
-      console.log(`[${this.config.id}] WebRTC stream already running`);
+      console.info(`[${this.config.id}] WebRTC stream already running`);
       return;
     }
 
@@ -122,7 +122,7 @@ export class StreamManager {
       '-'
     ];
 
-    console.log(`[${this.config.id}] Starting WebRTC stream...`);
+    console.info(`[${this.config.id}] Starting WebRTC stream...`);
     this.webrtcProcess = spawn('ffmpeg', webrtcArgs, {
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false
@@ -136,11 +136,11 @@ export class StreamManager {
     });
 
     this.webrtcProcess.on('exit', (code, signal) => {
-      console.log(`[${this.config.id}] WebRTC FFmpeg exited with code ${code} and signal ${signal}`);
+      console.info(`[${this.config.id}] WebRTC FFmpeg exited with code ${code} and signal ${signal}`);
       this.webrtcProcess = null;
 
       if (this.webrtcClients.size > 0 && code !== 0 && signal !== 'SIGTERM') {
-        console.log(`[${this.config.id}] Restarting WebRTC stream...`);
+        console.info(`[${this.config.id}] Restarting WebRTC stream...`);
         setTimeout(() => this.startWebRTCStream(), 2000);
       }
     });
@@ -148,7 +148,7 @@ export class StreamManager {
 
   private stopWebRTCStream(): void {
     if (this.webrtcProcess) {
-      console.log(`[${this.config.id}] Stopping WebRTC stream...`);
+      console.info(`[${this.config.id}] Stopping WebRTC stream...`);
       this.webrtcProcess.kill('SIGTERM');
       this.webrtcProcess = null;
     }
@@ -197,11 +197,11 @@ export class StreamManager {
         }
         const elapsed = Date.now() - start;
         if (elapsed > 500) {
-          console.log(`[${this.config.id}] HLS directory cleanup took ${elapsed}ms`);
+          console.warn(`[${this.config.id}] HLS directory cleanup took ${elapsed}ms`);
         }
-        console.log(`[${this.config.id}] Cleaned HLS directory: ${this.config.hlsDir}`);
+        console.debug(`[${this.config.id}] Cleaned HLS directory: ${this.config.hlsDir}`);
       } catch (error) {
-        console.log(`[${this.config.id}] Could not clean HLS directory: ${error}`);
+        console.warn(`[${this.config.id}] Could not clean HLS directory: ${error}`);
       }
     })();
 
@@ -281,7 +281,7 @@ export class StreamManager {
       ];
     }
 
-    console.log(`[${this.config.id}] Starting FFmpeg with args:`, ffmpegArgs.join(' '));
+    console.info(`[${this.config.id}] Starting FFmpeg with args:`, ffmpegArgs.join(' '));
 
     this.ffmpeg = spawn('ffmpeg', ffmpegArgs, {
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -339,7 +339,7 @@ export class StreamManager {
         );
 
         if (hasRealError) {
-          console.log(`[${this.config.id}] Stream copy failed, switching to reencoding...`);
+          console.warn(`[${this.config.id}] Stream copy failed, switching to reencoding...`);
           hasErrored = true;
           if (!this.ffmpegRestarting) {
             this.ffmpegRestarting = true;
@@ -352,16 +352,15 @@ export class StreamManager {
         }
       }
 
-      // Minimal logging for performance
       if (output.includes('Error') && !output.includes('Non-monotonous DTS')) {
-        console.log(`[${this.config.id}] FFmpeg: ${output.trim()}`);
+        console.error(`[${this.config.id}] FFmpeg: ${output.trim()}`);
       }
     });
 
     // Auto-restart FFmpeg on crash/exit
     const handleFfmpegExit = (code: number | null, signal: NodeJS.Signals | null) => {
       this.ffmpeg = null; // Always clear reference on exit
-      console.log(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
+      console.warn(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
       // --- Add cooldown check before restart ---
       if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
         logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
@@ -369,7 +368,7 @@ export class StreamManager {
       }
       // Only try reencoding if stream copy failed and we got no segments
       if (!hasErrored && inputIsRtsp && code !== 0 && signal !== 'SIGTERM' && segmentCount === 0) {
-        console.log(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
+        console.warn(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
         hasErrored = true;
         if (!this.ffmpegRestarting) {
           this.ffmpegRestarting = true;
@@ -421,7 +420,7 @@ export class StreamManager {
 
   // Fallback reencoding with balanced settings
   private startFFmpegWithReencoding() {
-    console.log(`[${this.config.id}] Starting FFmpeg with reencoding...`);
+    console.info(`[${this.config.id}] Starting FFmpeg with reencoding...`);
 
     const inputUrl = this.getRtspUrlWithAuth();
 
@@ -468,7 +467,7 @@ export class StreamManager {
       path.join(this.config.hlsDir, 'stream.m3u8')
     ];
 
-    console.log(`[${this.config.id}] Reencoding FFmpeg args:`, ffmpegArgs.join(' '));
+    console.info(`[${this.config.id}] Reencoding FFmpeg args:`, ffmpegArgs.join(' '));
 
     this.ffmpeg = spawn('ffmpeg', ffmpegArgs, {
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -480,13 +479,13 @@ export class StreamManager {
       if (!output.includes('frame=') &&
         !output.includes('bitrate=') &&
         !output.includes('speed=')) {
-        console.log(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
+        console.error(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
       }
     });
 
     this.ffmpeg.on('exit', (code, signal) => {
       this.ffmpeg = null; // Always clear reference on exit
-      console.log(`[${this.config.id}] FFmpeg (reencoded) exited with code ${code} and signal ${signal}`);
+      console.info(`[${this.config.id}] FFmpeg (reencoded) exited with code ${code} and signal ${signal}`);
     });
   }
 
