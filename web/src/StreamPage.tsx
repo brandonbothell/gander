@@ -138,7 +138,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [viewingRecordingsFrom, setViewingRecordingsFrom] = useState<Stream | null>(null);
   const [recordingBeingViewed, setRecordingOverlay] = useState<{ streamId: string, filename: string } | null>(null);
   const [recordingsListInView, setRecordingsListInView] = useState(true);
-  const [lastVideoSize, setLastVideoSize] = useState({ width: 640, height: 360 });
+  const [lastVideoSize, setLastVideoSize] = useLocalStorageState('lastVideoSize', { width: 640, height: 360 });
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [showMobileLogout, setShowMobileLogout] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
@@ -1382,7 +1382,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     let preCacheInterval: ReturnType<typeof setInterval> | null = null;
 
     (async () => {
-      // Poll latest recordings every 10 seconds
+      // Poll latest recordings every 5 seconds
       const pollLatest = async () => {
         console.log('Polling latest recordings...');
         if (!activeStream || cancelled) return;
@@ -1427,7 +1427,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         }, 5000);
       };
 
-      preCacheInterval = setInterval(pollLatest, 10000);
+      preCacheInterval = setInterval(pollLatest, 5000);
     })();
 
     return () => {
@@ -1891,20 +1891,17 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     });
   }
 
-  // Update live thumbnails every 2 seconds, but only fetch if needed
+  // Update live thumbnails every 5 seconds, but only fetch if needed
   useEffect(() => {
     fetchSignedThumbUrls(); // Fetch immediately
 
-    const timeout = setTimeout(() => {
-      const interval = setInterval(() => {
-        // Always fetch if missing or expiring soon
-        fetchSignedThumbUrls();
-      }, 5000);
-      (window as any)._thumbInterval = interval;
+    const interval = setInterval(() => {
+      // Always fetch if missing or expiring soon
+      fetchSignedThumbUrls();
     }, 5000);
+    (window as any)._thumbInterval = interval;
 
     return () => {
-      clearTimeout(timeout);
       if ((window as any)._thumbInterval) clearInterval((window as any)._thumbInterval);
     };
   }, [activeStream]);
@@ -2019,13 +2016,13 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     } catch { }
   }
 
-  // Fetch masks when mask editor is shown, and poll every second while open
+  // Fetch masks when mask editor is shown, and poll every 5 seconds while open
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
     let cancelled = false;
 
     if (showMaskEditor && Date.now() > pauseMaskPollingUntil.current) {
-      interval = setInterval(() => { if (!cancelled) { fetchMasks() } }, 1000);
+      interval = setInterval(() => { if (!cancelled) { fetchMasks() } }, 5000);
     }
 
     return () => {
@@ -2109,6 +2106,16 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       if (resizeObserver) resizeObserver.disconnect();
     };
   }, [videoRef, activeStream]);
+
+  // Add this effect to set video size on mount using lastVideoSize
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (lastVideoSize.width > 0 && lastVideoSize.height > 0) {
+      video.style.width = '100%';
+      video.style.height = `${lastVideoSize.height}px`;
+    }
+  }, [videoRef]);
 
   // Optimistic mask move handler
   const handleMaskMove = (maskId: string, newPos: { x: number; y: number; w: number; h: number }) => {
