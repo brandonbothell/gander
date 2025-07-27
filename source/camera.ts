@@ -11,7 +11,7 @@ import webpush from 'web-push';
 import * as chokidar from 'chokidar';
 import { PrismaClient } from './generated/prisma';
 import { StreamManager } from './streamManager';
-import { detectMotion, cleanFrameCache } from './motionDetector';
+import { detectMotion, cleanFrameCache, debugLog } from './motionDetector';
 import { TrustedDevice } from './types/deviceInfo';
 import Greenlock from 'greenlock-express';
 import config from '../config.json'
@@ -94,6 +94,7 @@ export interface StreamMotionState {
   currentSaveProcess: any | null;
   saveRetryCount: number;
   startedRecordingAt: number; // New field - timestamp when recording started
+  lastSegmentProcessAt?: number; // Add for throttling segment processing
 }
 
 const streamStates: Record<string, StreamMotionState> = {};
@@ -113,7 +114,8 @@ async function setupStreamMotionMonitoring() {
       savingInProgress: false,
       currentSaveProcess: null,
       saveRetryCount: 0,
-      startedRecordingAt: 0 // Initialize to 0
+      startedRecordingAt: 0,
+      lastSegmentProcessAt: 0 // Initialize
     };
 
     logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
@@ -122,6 +124,18 @@ async function setupStreamMotionMonitoring() {
     chokidar.watch(dynamicStreams[streamId].config.hlsDir, { ignoreInitial: true }).on('add', segmentPath => {
       if (!/segment_\d+\.ts$/.test(path.basename(segmentPath))) return;
       const state = streamStates[streamId];
+
+      // --- Throttle segment processing to avoid busy loop ---
+      const now = Date.now();
+      const MIN_SEGMENT_PROCESS_INTERVAL = 300; // ms
+      if (state.lastSegmentProcessAt && now - state.lastSegmentProcessAt < MIN_SEGMENT_PROCESS_INTERVAL) {
+        if ((now - state.lastSegmentProcessAt) > 0) {
+          debugLog(`[${streamId}] Throttling segment processing: last at ${now - state.lastSegmentProcessAt}ms ago`);
+        }
+        return;
+      }
+      state.lastSegmentProcessAt = now;
+
       state.recentSegments.push(segmentPath);
       if (state.recentSegments.length > RECENT_SEGMENT_BUFFER) {
         const expiredSegment = state.recentSegments.shift();
@@ -850,6 +864,11 @@ app.get('/signed/stream/:streamId/:segment', (req, res) => {
 
 // --- Safe unlink function ---
 export async function safeUnlinkWithRetry(filePath: string, retries = 3) {
+  const RETRY_DELAY_MS = 1000;
+  if (retries <= 0) {
+    logMotion(`[safeUnlinkWithRetry] Giving up deleting ${filePath} after retries`, 'warn');
+    return;
+  }
   return fs.promises.rm(filePath, { force: true, recursive: true }).catch((error) => {
     if (error) {
       if (error.code === 'ENOENT' || error.code === 'EPERM') {
@@ -857,10 +876,9 @@ export async function safeUnlinkWithRetry(filePath: string, retries = 3) {
         return;
       }
 
-      if (error.code === 'EBUSY' && retries > 0) {
-        // File is busy, retry after delay
-        setTimeout(() => safeUnlinkWithRetry(filePath, retries - 1), 1000);
-        console.warn(`Failed to delete file ${filePath} after ${3 - retries + 1} attempts:`, error);
+      if (error.code === 'EBUSY') {
+        setTimeout(() => safeUnlinkWithRetry(filePath, retries - 1), RETRY_DELAY_MS);
+        logMotion(`[safeUnlinkWithRetry] Failed to delete file ${filePath} (EBUSY), will retry (${retries - 1} left)`, 'warn');
         return;
       }
     }

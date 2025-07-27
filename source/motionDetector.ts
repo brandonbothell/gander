@@ -14,10 +14,9 @@ import { StreamManager } from './streamManager';
 const STANDARD_WIDTH = 160;   // Much smaller for performance
 const STANDARD_HEIGHT = 90;
 
-// Debug logging flag
-const DEBUG_MOTION = process.env.DEBUG_MOTION === 'true';
-
-function debugLog(message: string) {
+// Debug logging
+export function debugLog(message: string) {
+  const DEBUG_MOTION = process.env.DEBUG_MOTION === 'true';
   if (DEBUG_MOTION) {
     logMotion(message);
   }
@@ -214,6 +213,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
             } catch {
               debugLog(`[Motion] No output file found at ${outputPath} after FFmpeg success`);
               // List directory to debug
+              const DEBUG_MOTION = process.env.DEBUG_MOTION === 'true';
               if (DEBUG_MOTION) {
                 try {
                   const dir = path.dirname(outputPath);
@@ -365,7 +365,7 @@ export async function detectMotion(
         // Log motion detection results - always show actual motion, debug for all attempts
         if (motionDetected || diffPercent > 0.02) {
           logMotion(`[${streamId}] diff=${(diffPercent * 100).toFixed(2)}% motion=${motionDetected} threshold=${isAboveDiffThreshold} camMove=${aboveCameraMovementThreshold} (mov:${movementCount}/${streamMovementHistory[streamId].length}, mot:${motionCount}/${streamMotionHistory[streamId].length})`);
-        } else if (DEBUG_MOTION) {
+        } else {
           debugLog(`[${streamId}] [Motion] diff=${(diffPercent * 100).toFixed(2)}% motion=${motionDetected} threshold=${isAboveDiffThreshold} camMove=${aboveCameraMovementThreshold} (mov:${movementCount}/${streamMovementHistory[streamId].length}, mot:${motionCount}/${streamMotionHistory[streamId].length})`);
         }
       } else {
@@ -391,7 +391,14 @@ export async function detectMotion(
   }
 }
 
+let cleanFrameCacheRunning = false;
 export function cleanFrameCache(dynamicStreams: Record<string, StreamManager>, streamStates: Record<string, StreamMotionState>) {
+  if (cleanFrameCacheRunning) {
+    // Prevent overlapping runs
+    return;
+  }
+  cleanFrameCacheRunning = true;
+  const start = Date.now();
   for (const streamId in dynamicStreams) {
     const stream = dynamicStreams[streamId];
     if (streamStates[streamId]?.motionPaused) continue;
@@ -415,6 +422,11 @@ export function cleanFrameCache(dynamicStreams: Record<string, StreamManager>, s
       }
     });
   }
+  const elapsed = Date.now() - start;
+  if (elapsed > 500) {
+    debugLog(`[cleanFrameCache] Took ${elapsed}ms`);
+  }
+  cleanFrameCacheRunning = false;
 }
 
 // --- Async safeUnlink ---
