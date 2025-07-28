@@ -101,9 +101,6 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
           await notify(dynamicStreams, 'login', {
             title: 'New Device Detected',
             body: `A login from a new ${getDeviceDisplayName(safeDeviceInfo)} device was detected from IP: ${req.ip}`,
-            icon: 'push_icon',
-            sound: 'default',
-            tag: 'security_event'
           }, user.username);
           trustedDevices.push({
             ip: req.ip ?? 'Unknown',
@@ -128,9 +125,6 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       await notify(dynamicStreams, 'login', {
         title: 'Login Detected',
         body: `New log in from IP: ${req.ip}`,
-        icon: 'push_icon',
-        sound: 'default',
-        tag: 'login_event'
       }, username);
 
       res.json({ success: true, token, refreshToken });
@@ -255,9 +249,6 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       await notify(dynamicStreams, 'login', {
         title: 'Suspicious Activity Detected',
         body: `Unauthorized activity detected from IP: ${req.ip}`,
-        icon: 'push_icon',
-        sound: 'default',
-        tag: 'security_event'
       }, user.username);
       res.status(403).json({ error: 'Unauthorized activity detected' });
       logAuth(`[${user.username}] Unauthorized activity detected from IP: ${req.ip}`, 'warn');

@@ -6,6 +6,7 @@ interface StreamControlsProps {
   shouldNotifyOnMotion: boolean;
   isLoadingMotionNotifications: boolean;
   setShouldNotifyOnMotion: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsLoadingMotionNotifications: React.Dispatch<React.SetStateAction<boolean>>;
   showMaskEditor: boolean;
   setShowMaskEditor: React.Dispatch<React.SetStateAction<boolean>>;
   onShowSessionMonitor?: () => void;
@@ -23,6 +24,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
   shouldNotifyOnMotion,
   isLoadingMotionNotifications,
   setShouldNotifyOnMotion,
+  setIsLoadingMotionNotifications,
   showMaskEditor,
   setShowMaskEditor,
   onShowSessionMonitor,
@@ -140,7 +142,10 @@ const StreamControls: React.FC<StreamControlsProps> = ({
           e.currentTarget.style.color = color;
         }}
         aria-label={shouldNotifyOnMotion ? "Disable Motion Notifications" : "Enable Motion Notifications"}
-        onClick={() => setShouldNotifyOnMotion(v => !v)}
+        onClick={() => {
+          setIsLoadingMotionNotifications(true);
+          setShouldNotifyOnMotion(v => !v)
+        }}
         disabled={isLoadingMotionNotifications}
       >
         {shouldNotifyOnMotion ? (

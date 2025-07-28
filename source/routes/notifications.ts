@@ -106,9 +106,9 @@ export async function notify(
   const title = custom?.title ?? 'Motion Detected!';
   const body = custom?.body ?? `Motion was detected by ${nickname}.`;
   const icon = custom?.icon ?? 'push_icon';
-  const sound = custom?.sound ?? 'motion_alert';
-  const channelId = custom?.channelId ?? 'motion_event_channel';
-  const tag = custom?.tag ?? 'motion_event';
+  const sound = custom?.sound ?? 'default';
+  const channelId = custom?.channelId;
+  const tag = custom?.tag;
 
   const subs = await prisma.pushSubscription.findMany(username ? { where: { sid: username } } : undefined);
   for (const sub of subs) {
@@ -151,6 +151,10 @@ export async function notify(
     // FCM Push
     if (sub.fcmToken) {
       try {
+        const withOptional = {
+          ...(tag ? { tag } : {}),
+          ...(channelId ? { channelId } : {})
+        };
         await admin.messaging().send({
           android: {
             priority: 'high',
@@ -160,8 +164,6 @@ export async function notify(
               icon,
               color: '#2196F3',
               sound,
-              tag,
-              channelId,
               visibility: 'public',
               sticky: false,
               localOnly: false,
@@ -169,6 +171,7 @@ export async function notify(
               eventTimestamp: new Date(),
               notificationCount: 1,
               vibrateTimingsMillis: [0, 500, 500, 500],
+              ...withOptional,
               // clickAction: 'OPEN_STREAM',
             }
           },

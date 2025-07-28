@@ -1168,3 +1168,50 @@ label[style*="align-items: center"] {
   opacity: 0;
   pointer-events: none;
 }
+
+.error-modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(20,30,60,0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-modal {
+  background: #232b4a;
+  color: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px #1a2980cc;
+  padding: 2em 2.5em;
+  min-width: 280px;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.error-modal h3 {
+  font-family: 'Orbitron', 'Roboto', Arial, sans-serif;
+  font-size: 1.5em;
+  margin-bottom: 1em;
+  color: #ff5f5f;
+}
+
+.error-modal-btn {
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7em 2em;
+  font-weight: 700;
+  font-size: 1.1em;
+  cursor: pointer;
+  margin-top: 1.5em;
+  box-shadow: 0 1px 4px #1a298055;
+  transition: background 0.2s;
+}
+
+.error-modal-btn:hover, .error-modal-btn:focus {
+  background: #1cf1d1;
+  color: #232b4a;
+}

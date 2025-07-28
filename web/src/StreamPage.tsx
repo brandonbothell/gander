@@ -26,6 +26,7 @@ import { DebugInfo } from './components/DebugInfo';
 import RecordingsListContent from './components/RecordingsListContent';
 import StreamControls from './components/StreamControls';
 import { fetchWithRetry } from './main';
+import ErrorModal from './components/ErrorModal';
 
 export type ClientMask = StreamMask & { pendingUpdate?: boolean, pendingUpdateSince?: number };
 
@@ -147,6 +148,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [_, setDebugLongPressActive] = useState(false);
   const debugLongPressTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isAtBottomOfPage, setIsAtBottomOfPage] = useState(false);
+  const [errorModalOpen, setErrorModalOpen] = useState(false);
+  const [errorModalMsg, setErrorModalMsg] = useState('');
 
   // Handler for copyright long-press (touch devices)
   function handleCopyrightTouchStart() {
@@ -1780,9 +1783,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   // If the user toggles ON but denies permission, just leave the toggle ON and show an error/toast if desired.
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
-      setIsLoadingMotionNotifications(true);
+      if (!isLoadingMotionNotifications) {
+        return;
+      }
 
       if (shouldNotifyOnMotion) {
         // Enable notifications (user toggled ON)
@@ -1791,26 +1795,39 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           try {
             await setupPushNotifications();
           } catch (err) {
-            // Optionally show a toast or alert here
             console.error('Failed to enable push notifications:', err);
-            // Do NOT call setShouldNotifyOnMotion(false) here!
+            setIsLoadingMotionNotifications(false);
+            setShouldNotifyOnMotion(false);
           }
         } else {
           // Web platform
+          if (!navigator.serviceWorker) {
+            setIsLoadingMotionNotifications(false);
+            setShouldNotifyOnMotion(false);
+            setErrorModalMsg('Service Worker not supported. Please use a modern browser.');
+            setErrorModalOpen(true);
+            return console.warn('Service Worker not supported');
+          }
           const permission = await Notification.requestPermission();
           if (permission !== 'granted') {
-            // Optionally show a toast or alert here
             console.warn('Notification permission not granted');
-            // Do NOT call setShouldNotifyOnMotion(false) here!
             setIsLoadingMotionNotifications(false);
+            setShouldNotifyOnMotion(false);
+            setErrorModalMsg('Notification permission not granted.');
+            setErrorModalOpen(true);
             return;
           }
           try {
             await subscribeToWebPush();
           } catch (err) {
-            // Optionally show a toast or alert here
             console.error('Failed to subscribe to web push:', err);
-            // Do NOT call setShouldNotifyOnMotion(false) here!
+            // Reminder to install as PWA
+            setIsLoadingMotionNotifications(false);
+            setShouldNotifyOnMotion(false);
+            setErrorModalMsg(
+              'Failed to enable motion notifications. For best results, install this app as a PWA from your browser menu.'
+            );
+            setErrorModalOpen(true);
           }
         }
       } else {
@@ -1818,6 +1835,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         if (Capacitor.getPlatform() === 'web') {
           // Web platform
           if (!navigator.serviceWorker) {
+            setIsLoadingMotionNotifications(false);
+            setShouldNotifyOnMotion(false);
+            setErrorModalMsg('Service Worker not supported. Please use a modern browser.');
+            setErrorModalOpen(true);
             return console.warn('Service Worker not supported');
           }
           const reg = await navigator.serviceWorker.ready;
@@ -1842,10 +1863,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         }
       }
 
-      if (!cancelled) setIsLoadingMotionNotifications(false);
+      setIsLoadingMotionNotifications(false);
     })();
-
-    return () => { cancelled = true; };
   }, [shouldNotifyOnMotion]);
 
   // Attach event listeners to the video element
@@ -2258,6 +2277,11 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   return (
     <div className="App with-side-padding">
       {showDebug && <DebugInfo onClose={() => { setShowDebug(false); recordingsListRef.current?.focus() }} />}
+      <ErrorModal
+        open={errorModalOpen}
+        message={errorModalMsg}
+        onClose={() => setErrorModalOpen(false)}
+      />
       <div style={{ userSelect: 'none' }}>
         {/* Main video and mask editor remain unchanged, but use activeStream */}
         <div
@@ -2287,6 +2311,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           <div className="stream-video-container" style={{ position: 'relative' }}>
             <StreamControls
               shouldNotifyOnMotion={shouldNotifyOnMotion}
+              setIsLoadingMotionNotifications={setIsLoadingMotionNotifications}
               isLoadingMotionNotifications={isLoadingMotionNotifications}
               setShouldNotifyOnMotion={setShouldNotifyOnMotion}
               showMaskEditor={showMaskEditor}
