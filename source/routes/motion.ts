@@ -234,6 +234,8 @@ async function saveMotionSegments(
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
 
+  state.savingInProgress = true;
+
   // Gather flushed recordings
   let flushedFiles: string[] = [];
   try {
