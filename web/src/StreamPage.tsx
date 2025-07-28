@@ -118,12 +118,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [isMobileWidth, setIsMobileWidth] = useState(window.innerWidth < 600);
   const searchToolsRef = useRef<HTMLDivElement>(null);
   const recordingsListBottomSentinelRef = useRef<HTMLDivElement>(null);
-  const [isMobileRefreshing, setIsMobileRefreshing] = useState(false);
   const [isDesktopRefreshing, setIsDesktopRefreshing] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
-  const pullThreshold = 160; // px to trigger refresh
-  const [refreshIconState, setRefreshIconState] = useState<'idle' | 'snap' | 'spinning' | 'hide'>('idle');
+  const pullThreshold = 100; // px to exit recordings list
   const [isTouchInput, setIsTouchInput] = useState(false);
   const [recordingsListOpen, setRecordingsListOpen] = useState(false);
   const [transferScrollToPage, setTransferScrollToPage] = useState(false);
@@ -582,7 +580,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     // Fetch signed URL from API
     try {
-      const response = await fetchWithRetry(() => authFetch(url.startsWith('/') ? `${API_BASE}${url}` : url));
+      const response = await fetchWithRetry(() => authFetch(url));
       url = `${API_BASE}${(await response.json()).url}`;
     } catch {
       console.error('Failed to fetch signed stream URL');
@@ -1120,16 +1118,14 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
       setIsAtBottomOfPage(distanceFromBottom <= bottomThreshold);
 
-
-      if (keyboardTransitioningRef.current || isKeyboardOpen || forceSticky) return; // Ignore scroll events while keyboard is transitioning
+      if (keyboardTransitioningRef.current || isKeyboardOpen || forceSticky) return;
       const currentScrollY = window.scrollY;
-      if (
-        (currentScrollY > lastScrollY)
-      ) {
-        // Only open if scrolling down or already at bottom, and not recently closed
-        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 32 &&
+      if ((currentScrollY > lastScrollY)) {
+        if (
+          window.innerHeight + window.scrollY >= document.body.offsetHeight - 32 &&
           !recordingsListOpen &&
-          Date.now() - lastRecordingsListCloseTime.current > 1000) {
+          Date.now() - lastRecordingsListCloseTime.current > 1000
+        ) {
           setRecordingsListOpen(true);
           setTimeout(() => {
             const list = recordingsListRef.current;
@@ -1137,33 +1133,58 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
               const rect = list.getBoundingClientRect();
               const scrollY = window.scrollY || window.pageYOffset;
               const targetY = rect.top + scrollY - (window.innerHeight / 2) + (rect.height / 2);
-              setTimeout(() => recordingsListRef.current?.scrollTo(0, 0), 450); // Reset scroll position
+              setTimeout(() => recordingsListRef.current?.scrollTo(0, 0), 450);
               window.scrollTo({ top: targetY, behavior: 'smooth' });
             }
-          }, 400); // Wait for the open animation to finish (adjust if needed)
+          }, 400);
         } else if (recordingsListOpen) {
-          // If already open, just reset scroll position
           const list = recordingsListRef.current;
           if (list) {
             const rect = list.getBoundingClientRect();
             const halfway = rect.height / 2;
-            // If the top of the list is above halfway up the viewport, and the bottom is still visible
             if (rect.top < window.innerHeight / 2 - halfway) {
-              // Scroll so the list is centered
               const scrollY = window.scrollY || window.pageYOffset;
               const targetY = rect.top + scrollY - (window.innerHeight / 2) + (rect.height / 2);
-              autoScrollUntilRef.current = Date.now() + 700; // Ignore scroll events for .7s
+              autoScrollUntilRef.current = Date.now() + 700;
               window.scrollTo({ top: targetY, behavior: 'smooth' });
             }
           }
         }
       }
-
       lastScrollY = currentScrollY;
     }
 
+    // iOS momentum scroll fix: check at touchend and after a short delay
+    function handleTouchEnd() {
+      setTimeout(() => {
+        const atBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 32;
+        if (
+          atBottom &&
+          !recordingsListOpen &&
+          Date.now() - lastRecordingsListCloseTime.current > 1000
+        ) {
+          setRecordingsListOpen(true);
+          setTimeout(() => {
+            const list = recordingsListRef.current;
+            if (list) {
+              const rect = list.getBoundingClientRect();
+              const scrollY = window.scrollY || window.pageYOffset;
+              const targetY = rect.top + scrollY - (window.innerHeight / 2) + (rect.height / 2);
+              setTimeout(() => recordingsListRef.current?.scrollTo(0, 0), 450);
+              window.scrollTo({ top: targetY, behavior: 'smooth' });
+            }
+          }, 400);
+        }
+      }, 200); // Short delay to allow momentum scroll to finish
+    }
+
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
   }, [recordingsListOpen]);
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -1717,7 +1738,9 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
       if (state.recordingBeingViewed) {
         const { streamId, filename } = state.recordingBeingViewed;
+        setOpeningRecording(true);
         setRecordingBeingViewed({ streamId, filename });
+        setOpeningRecording(false);
         if (!viewed.find(viewed => viewed.filename === filename && viewed.streamId === streamId)) {
           const updated = [...viewed, { filename, streamId }];
           setViewed(updated);
@@ -1757,7 +1780,13 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const handleView = (filename: string) => {
     if (!activeStream) return;
     const recordingsStream = viewingRecordingsFrom ?? activeStream;
+    setOpeningRecording(true);
     setRecordingBeingViewed({ streamId: recordingsStream.id, filename });
+    autoScrollUntilRef.current = Date.now() + 1000;
+    setTimeout(() => {
+      setOpeningRecording(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 700); // match controls bar animation duration
     if (!viewed.find(viewed => viewed.filename === filename && viewed.streamId === recordingsStream.id)) {
       const updated = [...viewed, { filename, streamId: recordingsStream.id }];
       setViewed(updated);
@@ -2316,9 +2345,11 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             cachedRecordings={recordingBeingViewed ? cachedRecordings[recordingBeingViewed.streamId] || [] : []}
             onNavigate={filename => {
               if (!activeStream) return;
+              setOpeningRecording(true);
               setRecordingBeingViewed(
                 recordingBeingViewed ? { streamId: recordingBeingViewed.streamId, filename } : null
               )
+              setOpeningRecording(false);
               const recordingsStream = viewingRecordingsFrom ?? activeStream;
               if (!viewed.find(viewed => viewed.filename === filename && viewed.streamId === recordingsStream.id)) {
                 const updated = [...viewed, { filename, streamId: recordingsStream.id }];
@@ -2678,28 +2709,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         onTouchEnd={async () => {
           setIsRecordingsListScrolling(false);
           if (pullStartY.current !== null && pullDistance > pullThreshold) {
-            setRefreshIconState('snap');
-            setIsMobileRefreshing(true);
-            setTimeout(() => setRefreshIconState('spinning'), 180);
-            const recordingsStream = viewingRecordingsFrom ?? activeStream;
-            const start = Date.now();
-
-            if (recordingsStream) await pollLatestRecordings(recordingsStream);
-            else alert('No active stream to refresh recordings for');
-
-            setIsMobileRefreshing(false);
-            setTimeout(() => {
-              setRefreshIconState('hide');
-              setTimeout(() => setRefreshIconState('idle'), 350);
-            }, Math.max(0, 600 - (Date.now() - start)));
-          } else {
-            setRefreshIconState('hide');
-            setTimeout(() => setRefreshIconState('idle'), 350);
-            // Only scroll into view if user was at the top and pulled down, but not enough to refresh
-            if (pullStartY.current !== null && pullDistance > 0 && pullDistance <= pullThreshold) {
-              setTimeout(() => window.scrollTo({ behavior: 'smooth', top: 0 }), 450);
-              setRecordingsListOpen(false);
-            }
+            setRecordingsListOpen(false);
+            setTransferScrollToPage(false);
+            lastRecordingsListCloseTime.current = Date.now();
+            setTimeout(() => window.scrollTo({ behavior: 'smooth', top: 0 }), 450);
           }
 
           pullStartY.current = null;
@@ -2726,11 +2739,9 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       >
         <RecordingsListContent
           recordingsListOpen={recordingsListOpen}
-          refreshIconState={refreshIconState}
           pullDistance={pullDistance}
           pullThreshold={pullThreshold}
           pullStartY={pullStartY}
-          isMobileRefreshing={isMobileRefreshing}
           isMobile={isMobileWidth}
           filteredRecordings={filteredRecordings}
           search={search}
@@ -2785,8 +2796,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             WebkitTapHighlightColor: 'transparent',
           }}
           onTouchStart={e => {
-
-
             if (selected.length === 0 && isAtBottomOfPage) {
               e.preventDefault();
               handleCopyrightTouchStart();

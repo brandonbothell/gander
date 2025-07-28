@@ -1,14 +1,12 @@
-import { FiRefreshCw, FiChevronUp } from "react-icons/fi";
+import { FiChevronUp, FiArrowUp } from "react-icons/fi";
 import { isIOS } from "../StreamPage";
 import { RecordingThumbItem } from "./RecordingThumbItem";
 
 interface RecordingsListContentProps {
   recordingsListOpen: boolean;
-  refreshIconState: string;
   pullDistance: number;
   pullThreshold: number;
   pullStartY: React.RefObject<number | null>;
-  isMobileRefreshing: boolean;
   isMobile: boolean;
   filteredRecordings: Array<any>;
   search: string;
@@ -47,11 +45,9 @@ interface RecordingsListContentProps {
 export default function RecordingsListContent(props: RecordingsListContentProps) {
   const {
     recordingsListOpen,
-    refreshIconState,
     pullDistance,
     pullThreshold,
     pullStartY,
-    isMobileRefreshing,
     isMobile,
     filteredRecordings,
     search,
@@ -107,41 +103,18 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
             left: '50%',
             top: 0,
             // Animation logic:
-            transform:
-              refreshIconState === 'spinning'
-                ? `translateX(-50%) translateY(130px)`
-                : refreshIconState === 'snap'
-                  ? `translateX(-50%) translateY(130px)`
-                  : refreshIconState === 'hide'
-                    ? `translateX(-50%) translateY(0px)`
-                    : `translateX(-50%) translateY(${pullDistance < pullThreshold ? 0 : Math.min(pullDistance * 0.2, 120)}px)`,
-            opacity:
-              refreshIconState === 'hide'
-                ? 0
-                : pullStartY.current !== null && pullDistance > 0
-                  ? 1
-                  : isMobileRefreshing || refreshIconState === 'spinning'
-                    ? 1
-                    : 0,
-            transition:
-              refreshIconState === 'snap'
-                ? 'transform 0.18s cubic-bezier(.4,2,.6,1)'
-                : refreshIconState === 'hide'
-                  ? 'transform 0.35s cubic-bezier(.4,2,.6,1), opacity 0.35s'
-                  : 'transform 0.1s cubic-bezier(.4,2,.6,1), opacity 0.15s',
+            transform: `translateX(-50%) translateY(${pullDistance < pullThreshold ? 0 : Math.min(pullDistance * 0.2, 120)}px)`,
+            opacity: pullStartY.current !== null && pullDistance > 0 ? 1 : 0,
+            transition: 'transform 0.1s cubic-bezier(.4,2,.6,1), opacity 0.15s',
             fontSize: 32 + Math.min(pullDistance, 120) / 6,
             zIndex: 3,
           }}
         >
-          <FiRefreshCw
+          <FiArrowUp
             style={{
               transition: 'color 0.2s, filter 0.2s, font-size 0.2s',
               color: `rgb(28, 241, 209)`,
-              fontSize: 32 + Math.min(pullDistance, 120) / 6,
-              animation:
-                isMobileRefreshing || refreshIconState === 'spinning'
-                  ? 'spin 0.7s linear infinite'
-                  : undefined,
+              fontSize: 32 + Math.min(pullDistance, 120) / 6
             }}
           />
         </div>

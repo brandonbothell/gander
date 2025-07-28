@@ -42,8 +42,7 @@ export function Recording({
   onNavigate,
   setNicknames,
   videoRef: externalVideoRef,
-  setAutoScrollUntilRef,
-  setOpeningRecording
+  setAutoScrollUntilRef
 }: RecordingProps & { videoRef?: React.RefObject<HTMLVideoElement | null> }) {
   const [nickname, setNickname] = useState('');
   const [hover, setHover] = useState(false);
@@ -60,6 +59,8 @@ export function Recording({
   const [isSeeking, setIsSeeking] = useState(false);
   const hideTimeoutRef = useRef<number | null>(null);
   const isSeekingRef = useRef(isSeeking);
+  const filenameRef = useRef(filename);
+  const lastFilenameRef = useRef(filename);
 
   const videoUrl = useSignedUrl(filename, 'video', streamId);
   const thumbUrl = useSignedUrl(filename.replace(/\.mp4$/, '.jpg'), 'thumbnail', streamId);
@@ -67,6 +68,11 @@ export function Recording({
   useEffect(() => {
     isSeekingRef.current = isSeeking;
   }, [isSeeking]);
+
+  useEffect(() => {
+    lastFilenameRef.current = filenameRef.current;
+    filenameRef.current = filename;
+  }, [filename]);
 
   const scheduleHide = useCallback(() => {
     if (hideTimeoutRef.current) {
@@ -256,6 +262,19 @@ export function Recording({
   };
 
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    const prevTime = video.currentTime;
+    const wasPaused = video.paused;
+
+    const handleLoaded = () => {
+      video.currentTime = prevTime;
+      if (!wasPaused) {
+        video.play().catch(() => { });
+      }
+    };
+
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
@@ -266,15 +285,11 @@ export function Recording({
       videoRef.current.pause();
       videoRef.current.src = '';
     } else if (open && videoUrl && videoRef.current) {
-      setAutoScrollUntilRef?.(Date.now() + 1000);
-      setOpeningRecording(true);
-      setTimeout(() => {
-        setOpeningRecording(false);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 700); // match controls bar animation duration
-      videoRef.current.src = videoUrl;
+      video.src = videoUrl;
       videoRef.current.load();
-      videoRef.current.play().catch(() => { videoRef.current!.play(); });
+
+      if (filenameRef.current !== lastFilenameRef.current) video.play().catch(() => { setTimeout(video.play, 1000); });
+      else video.addEventListener('loadedmetadata', handleLoaded);
     }
 
     return () => {
@@ -286,6 +301,7 @@ export function Recording({
         videoRef.current.pause();
         videoRef.current.src = '';
       }
+      video.removeEventListener('loadedmetadata', handleLoaded);
     };
   }, [open, videoUrl, videoRef]);
 
