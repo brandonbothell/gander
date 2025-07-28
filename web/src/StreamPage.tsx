@@ -137,7 +137,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [forceSticky, setForceSticky] = useState(false);
   const [viewingRecordingsFrom, setViewingRecordingsFrom] = useState<Stream | null>(null);
-  const [recordingBeingViewed, setRecordingOverlay] = useState<{ streamId: string, filename: string } | null>(null);
+  const [recordingBeingViewed, setRecordingBeingViewed] = useState<{ streamId: string, filename: string } | null>(null);
   const [recordingsListInView, setRecordingsListInView] = useState(true);
   const [lastVideoSize, setLastVideoSize] = useLocalStorageState('lastVideoSize', { width: 640, height: 360 });
   const [isLoadingStream, setIsLoadingStream] = useState(false);
@@ -1714,6 +1714,19 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           ''
         );
       }
+
+      if (state.recordingBeingViewed) {
+        const { streamId, filename } = state.recordingBeingViewed;
+        setRecordingBeingViewed({ streamId, filename });
+        if (!viewed.find(viewed => viewed.filename === filename && viewed.streamId === streamId)) {
+          const updated = [...viewed, { filename, streamId }];
+          setViewed(updated);
+        }
+        window.history.replaceState(
+          { ...state, recordingBeingViewed: undefined },
+          ''
+        );
+      }
     }
   }, [location.state, streams]);
 
@@ -1744,7 +1757,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const handleView = (filename: string) => {
     if (!activeStream) return;
     const recordingsStream = viewingRecordingsFrom ?? activeStream;
-    setRecordingOverlay({ streamId: recordingsStream.id, filename });
+    setRecordingBeingViewed({ streamId: recordingsStream.id, filename });
     if (!viewed.find(viewed => viewed.filename === filename && viewed.streamId === recordingsStream.id)) {
       const updated = [...viewed, { filename, streamId: recordingsStream.id }];
       setViewed(updated);
@@ -2299,11 +2312,19 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             open={!!recordingBeingViewed}
             streamId={recordingBeingViewed?.streamId ?? ''}
             filename={recordingBeingViewed?.filename ?? ''}
-            onClose={() => setRecordingOverlay(null)}
+            onClose={() => setRecordingBeingViewed(null)}
             cachedRecordings={recordingBeingViewed ? cachedRecordings[recordingBeingViewed.streamId] || [] : []}
-            onNavigate={filename => setRecordingOverlay(
+            onNavigate={filename => {
+              if (!activeStream) return;
+              setRecordingBeingViewed(
               recordingBeingViewed ? { streamId: recordingBeingViewed.streamId, filename } : null
-            )}
+              )
+              const recordingsStream = viewingRecordingsFrom ?? activeStream;
+              if (!viewed.find(viewed => viewed.filename === filename && viewed.streamId === recordingsStream.id)) {
+                const updated = [...viewed, { filename, streamId: recordingsStream.id }];
+                setViewed(updated);
+              }
+            }}
             setAutoScrollUntilRef={until => { autoScrollUntilRef.current = until; }}
             setNicknames={setNicknames}
             setOpeningRecording={setOpeningRecording}
