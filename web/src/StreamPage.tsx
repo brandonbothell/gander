@@ -2317,7 +2317,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             onNavigate={filename => {
               if (!activeStream) return;
               setRecordingBeingViewed(
-              recordingBeingViewed ? { streamId: recordingBeingViewed.streamId, filename } : null
+                recordingBeingViewed ? { streamId: recordingBeingViewed.streamId, filename } : null
               )
               const recordingsStream = viewingRecordingsFrom ?? activeStream;
               if (!viewed.find(viewed => viewed.filename === filename && viewed.streamId === recordingsStream.id)) {

@@ -237,7 +237,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
         debugLog(`[Motion] FFmpeg spawn error: ${err}`);
         reject(err);
       });
-    }).catch(err => {
+    }).catch(() => {
       debugLog(`[Motion] Segment file missing: ${segmentPath}`);
       reject(new Error(`Segment file missing: ${segmentPath}`));
     });

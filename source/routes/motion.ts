@@ -175,23 +175,23 @@ async function flushMotionSegments(
 
   if (state.motionSegments.length === 0) return;
 
-  // Determine flush number
-  const flushFiles = await fs.promises.readdir(stream.config.flushDir)
-    .then(files => files.filter(f => f.startsWith(state.recordingTitle + '_flush_')))
-    .catch(() => []);
-  const flushNumber = flushFiles.length + 1;
-
-  const uniqueSegments = [...new Set(state.motionSegments)];
-  const existingSegmentsPromises = uniqueSegments.map(async segmentPath => {
+  state.flushingSegments = [...new Set(state.motionSegments)];
+  state.motionSegments = [];
+  const existingSegmentsPromises = state.flushingSegments.map(async segmentPath => {
     return { segmentPath, exists: await fs.promises.access(segmentPath).then(() => true).catch(() => false) };
   });
   const existingSegments = (await Promise.all(existingSegmentsPromises)).filter(seg => seg.exists);
 
   if (existingSegments.length === 0) {
     logMotion(`[${streamId}] No existing segments to flush`);
-    state.motionSegments = [];
     return;
   }
+
+  // Determine flush number
+  const flushFiles = await fs.promises.readdir(stream.config.flushDir)
+    .then(files => files.filter(f => f.startsWith(state.recordingTitle + '_flush_')))
+    .catch(() => []);
+  const flushNumber = flushFiles.length + 1;
 
   const listFile = path.join(stream.config.flushDir, `concat_list_flush_${flushNumber}.txt`);
   const flushOutFile = path.join(stream.config.flushDir, `${state.recordingTitle}_flush_${flushNumber}.ts`);
@@ -207,19 +207,20 @@ async function flushMotionSegments(
       await safeUnlinkWithRetry(listFile);
       if (err) {
         logMotion(`[${streamId}] FFmpeg flush failed: ${err}`, 'error');
-        state.motionSegments = [];
+        state.motionSegments = state.flushingSegments; // Restore segments on error
+        state.flushingSegments = [];
         reject(err);
         return;
       }
       // Remove flushed segments except recent ones
-      const promises = existingSegments.map(segment => {
-        state.flushedSegments.push(segment.segmentPath);
-        if (!state.recentSegments.includes(segment.segmentPath)) {
-          return safeUnlinkWithRetry(segment.segmentPath);
+      const promises = state.flushingSegments.map(segment => {
+        state.flushedSegments.push(segment);
+        if (!state.recentSegments.includes(segment)) {
+          return safeUnlinkWithRetry(segment);
         }
       });
       await Promise.all(promises);
-      state.motionSegments = [];
+      state.flushingSegments = [];
       resolve();
     });
   });
@@ -233,6 +234,11 @@ async function saveMotionSegments(
 ): Promise<void> {
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
+
+  if (state.flushingSegments.length > 0) {
+    setTimeout(() => saveMotionSegments(streamStates, dynamicStreams, streamId), 1000);
+    return;
+  }
 
   state.savingInProgress = true;
 

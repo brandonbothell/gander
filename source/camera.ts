@@ -121,6 +121,7 @@ export interface StreamMotionState {
   motionTimeout: NodeJS.Timeout | null;
   motionRecordingTimeoutAt: number;
   motionSegments: string[];
+  flushingSegments: string[]; // Segments currently being flushed
   recentSegments: string[];
   motionPaused: boolean;
   startupTime: number;
@@ -145,6 +146,7 @@ async function setupStreamMotionMonitoring() {
       motionTimeout: null,
       motionRecordingTimeoutAt: 0,
       motionSegments: [],
+      flushingSegments: [],
       recentSegments: [],
       flushedSegments: [],
       motionPaused: persistedStates[streamId]?.motionPaused ?? false,
@@ -153,7 +155,7 @@ async function setupStreamMotionMonitoring() {
       currentSaveProcess: null,
       saveRetryCount: 0,
       startedRecordingAt: 0,
-      lastSegmentProcessAt: 0, // Initialize
+      lastSegmentProcessAt: 0,
       recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
     };
 
