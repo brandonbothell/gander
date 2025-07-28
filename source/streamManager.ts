@@ -8,6 +8,7 @@ export interface StreamConfig {
   hlsDir: string;
   recordDir: string;
   thumbDir: string;
+  flushDir: string;
   ffmpegInput: string;
   rtspUser?: string;
   rtspPass?: string;
@@ -28,7 +29,7 @@ export class StreamManager {
   constructor(config: StreamConfig) {
     this.config = config;
     this.deleteHlsDir();
-    [config.hlsDir, config.recordDir, config.thumbDir].forEach(dir => {
+    [config.hlsDir, config.recordDir, config.thumbDir, config.flushDir].forEach(dir => {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     });
   }

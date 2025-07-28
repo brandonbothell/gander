@@ -16,7 +16,7 @@ import { TrustedDevice } from './types/deviceInfo';
 import Greenlock from 'greenlock-express';
 import config from '../config.json'
 import { jwtAuth } from './middleware/jwtAuth';
-import initializeMotionRoutes, { saveMotionSegmentsWithRetry } from './routes/motion';
+import initializeMotionRoutes, { flushMotionSegmentsWithRetry, saveMotionSegmentsWithRetry } from './routes/motion';
 import initializeAuthRoutes from './routes/auth';
 import initializeNotificationRoutes, { notify } from './routes/notifications';
 import initializeRecordingRoutes from './routes/recordings';
@@ -127,8 +127,11 @@ export interface StreamMotionState {
   savingInProgress: boolean;
   currentSaveProcess: any | null;
   saveRetryCount: number;
-  startedRecordingAt: number; // New field - timestamp when recording started
-  lastSegmentProcessAt?: number; // Add for throttling segment processing
+  startedRecordingAt: number;
+  lastSegmentProcessAt?: number;
+  flushTimer?: NodeJS.Timeout; // Timer for flushing segments
+  flushedSegments: string[]; // Segments that have been flushed
+  recordingTitle: string; // Title for the current recording
 }
 
 const streamStates: Record<string, StreamMotionState> = {};
@@ -143,13 +146,15 @@ async function setupStreamMotionMonitoring() {
       motionRecordingTimeoutAt: 0,
       motionSegments: [],
       recentSegments: [],
+      flushedSegments: [],
       motionPaused: persistedStates[streamId]?.motionPaused ?? false,
       startupTime: Date.now(),
       savingInProgress: false,
       currentSaveProcess: null,
       saveRetryCount: 0,
       startedRecordingAt: 0,
-      lastSegmentProcessAt: 0 // Initialize
+      lastSegmentProcessAt: 0, // Initialize
+      recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
     };
 
     logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
@@ -173,7 +178,9 @@ async function setupStreamMotionMonitoring() {
       state.recentSegments.push(segmentPath);
       if (state.recentSegments.length > RECENT_SEGMENT_BUFFER) {
         const expiredSegment = state.recentSegments.shift();
-        if (!state.motionRecordingActive && !state.savingInProgress && expiredSegment) {
+        if (expiredSegment &&
+          ((!state.motionRecordingActive && !state.savingInProgress && expiredSegment) ||
+            state.flushedSegments.includes(expiredSegment))) {
           safeUnlinkWithRetry(expiredSegment);
         }
       }
@@ -200,11 +207,19 @@ async function setupStreamMotionMonitoring() {
           if (!state.motionRecordingActive) {
             state.motionRecordingActive = true;
             state.startedRecordingAt = Date.now(); // Set when recording starts
+            state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
             state.notificationSent = false;
             if (state.motionTimeout) clearTimeout(state.motionTimeout);
             state.recentSegments.forEach(recentPath => {
               if (!state.motionSegments.includes(recentPath)) state.motionSegments.push(recentPath);
             });
+
+            // Start periodic flush
+            state.flushTimer = setInterval(() => {
+              flushMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId);
+              // After saving, clear motionSegments so new ones accumulate
+              // state.motionSegments = [];
+            }, 10000); // flush every 10 seconds
           }
           if (!state.motionSegments.includes(segmentPath)) state.motionSegments.push(segmentPath);
 
@@ -234,6 +249,10 @@ async function setupStreamMotionMonitoring() {
             state.motionRecordingActive = false;
             state.startedRecordingAt = 0; // Reset when recording stops
             state.motionRecordingTimeoutAt = 0;
+            if (state.flushTimer) {
+              clearInterval(state.flushTimer);
+              state.flushTimer = undefined;
+            }
           }, motionRecordingTimeoutMs);
           state.motionRecordingTimeoutAt = Date.now() + motionRecordingTimeoutMs;
         } else if (state.motionRecordingActive) {
@@ -923,12 +942,14 @@ export function createStreamManager(stream: any) {
   // Use unique folders for each stream
   const hlsDir = path.join(__dirname, '..', `hls_${stream.id}`);
   const recordDir = path.join(config.recordingsDirectory, stream.id);
+  const flushDir = path.join(recordDir, 'flush');
   const thumbDir = path.join(recordDir, 'thumbnails');
   return new StreamManager({
     id: stream.id,
     hlsDir,
     recordDir,
     thumbDir,
+    flushDir,
     ffmpegInput: stream.ffmpegInput,
     rtspUser: stream.rtspUser ?? undefined,
     rtspPass: stream.rtspPass ?? undefined

@@ -12,9 +12,9 @@ export async function logMotion(message: string, level: 'info' | 'error' | 'warn
     console.error('Failed to write to motion log:', error);
   }
   if (level === 'error') {
-    console.error(logEntry);
+    console.error(message);
   } else if (level === 'warn') {
-    console.warn(logEntry);
+    console.warn(message);
   }
 }
 
@@ -28,8 +28,8 @@ export async function logAuth(message: string, level: 'info' | 'error' | 'warn' 
   }
 
   if (level === 'error') {
-    console.error(logEntry);
+    console.error(message);
   } else if (level === 'warn') {
-    console.warn(logEntry);
+    console.warn(message);
   }
 }
