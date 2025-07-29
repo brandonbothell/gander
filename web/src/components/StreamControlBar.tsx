@@ -196,6 +196,8 @@ export function StreamControlBar({
     } else {
       video.pause();
     }
+
+    scheduleHide();
   };
 
   const handleMuteToggle = () => {

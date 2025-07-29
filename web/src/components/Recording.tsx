@@ -180,6 +180,7 @@ export function Recording({
       setIsPaused(false);
       setVideoHeight(getElementHeight());
       if (!isControlBarVisible) handleShowControls();
+      else scheduleHide();
     };
     const handlePause = () => {
       setIsPaused(true);
