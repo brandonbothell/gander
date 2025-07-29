@@ -61,8 +61,8 @@ export function Recording({
   const isSeekingRef = useRef(isSeeking);
   const filenameRef = useRef(filename);
   const lastFilenameRef = useRef(filename);
-
   const videoUrl = useSignedUrl(filename, 'video', streamId);
+  const lastPlaybackTimeRef = useRef<number>(0);
   const thumbUrl = useSignedUrl(filename.replace(/\.mp4$/, '.jpg'), 'thumbnail', streamId);
 
   useEffect(() => {
@@ -232,14 +232,10 @@ export function Recording({
     if (!video) return;
 
     const value = Number(e.target.value);
+    if (!isSeeking) setIsSeeking(true);
     setCurrentTime(value);
     video.currentTime = value;
-
-    if (!isSeeking) setIsSeeking(true);
-    if (!isPaused) {
-      video.pause();
-      setIsPaused(true);
-    }
+    setIsSeeking(false);
   };
 
   const handleSeekPointerDown = () => {
@@ -263,14 +259,41 @@ export function Recording({
 
   useEffect(() => {
     const video = videoRef.current;
+    if (!video) return;
+
+    const handleTimeUpdate = () => {
+      // Only update playback time if not reset by reload
+      if (video.currentTime !== 0 || isSeekingRef.current) {
+        lastPlaybackTimeRef.current = video.currentTime;
+      }
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [videoRef]);
+
+  useEffect(() => {
+    const video = videoRef.current;
     if (!video || !videoUrl) return;
 
-    const prevTime = video.currentTime;
-    const wasPaused = video.paused;
-
+    // Restore playback position after video loads new URL
     const handleLoaded = () => {
-      video.currentTime = prevTime;
-      if (!wasPaused) {
+      console.log(
+        'Video loaded:', video.src,
+        'Last playback position:', lastPlaybackTimeRef.current + 's',
+        'Video duration:', video.duration + 's'
+      );
+      if (
+        lastPlaybackTimeRef.current > 0 &&
+        video.duration > lastPlaybackTimeRef.current
+      ) {
+        video.currentTime = lastPlaybackTimeRef.current;
+      }
+      // Optionally play if not paused
+      if (!video.paused) {
         video.play().catch(() => { });
       }
     };
@@ -285,11 +308,14 @@ export function Recording({
       videoRef.current.pause();
       videoRef.current.src = '';
     } else if (open && videoUrl && videoRef.current) {
-      video.src = videoUrl;
+      videoRef.current.src = videoUrl;
       videoRef.current.load();
 
-      if (filenameRef.current !== lastFilenameRef.current) video.play().catch(() => { setTimeout(video.play, 1000); });
-      else video.addEventListener('loadedmetadata', handleLoaded);
+      if (filenameRef.current !== lastFilenameRef.current) {
+        videoRef.current.play().catch(() => { setTimeout(() => videoRef.current?.play(), 1000); });
+      } else {
+        videoRef.current.addEventListener('loadedmetadata', handleLoaded);
+      }
     }
 
     return () => {
@@ -303,7 +329,7 @@ export function Recording({
       }
       video.removeEventListener('loadedmetadata', handleLoaded);
     };
-  }, [open, videoUrl, videoRef]);
+  }, [open, videoUrl, videoRef, filenameRef.current]);
 
   // Fetch nickname from server
   useEffect(() => {
@@ -336,13 +362,6 @@ export function Recording({
       inputRef.current.select();
     }
   }, [editing]);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(() => { videoRef.current!.play(); });
-    }
-  }, [filename, videoUrl]);
 
   const idx = cachedRecordings.findIndex(r => r.filename === filename);
   const prev = idx > 0 ? cachedRecordings[idx - 1] : null;

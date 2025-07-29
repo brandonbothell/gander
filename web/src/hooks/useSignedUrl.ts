@@ -187,8 +187,8 @@ async function cleanupAndRefreshCache() {
     console.log(`Cleaned up ${expiredCount} expired signed URLs`);
   }
 
-  // 2. Find URLs expiring within 5 minutes
-  const soonToExpireKeys = findSoonToExpireUrls(cleanedCache, now, 300);
+  // 2. Find URLs expiring within 1 minute
+  const soonToExpireKeys = findSoonToExpireUrls(cleanedCache, now, 60);
 
   if (soonToExpireKeys.length > 0) {
     console.log(`Refreshing ${soonToExpireKeys.length} soon-to-expire signed URLs`);
