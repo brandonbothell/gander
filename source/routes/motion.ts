@@ -173,6 +173,11 @@ async function flushMotionSegments(
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
 
+  if (state.savingInProgress) {
+    setTimeout(() => flushMotionSegments(streamStates, dynamicStreams, streamId), 1000);
+    return;
+  }
+
   if (state.motionSegments.length === 0) return;
 
   state.flushingSegments = [...new Set(state.motionSegments)];
@@ -221,6 +226,7 @@ async function flushMotionSegments(
       });
       await Promise.all(promises);
       state.flushingSegments = [];
+      state.flushRecordings.push(flushOutFile);
       resolve();
     });
   });
@@ -243,11 +249,13 @@ async function saveMotionSegments(
   state.savingInProgress = true;
 
   // Gather flushed recordings
-  let flushedFiles: string[] = [];
-  try {
-    flushedFiles = await fs.promises.readdir(stream.config.flushDir)
-      .then(files => files.filter(f => f.endsWith('.ts')).map(f => path.join(stream.config.flushDir, f)));
-  } catch { }
+  const flushedFiles = [...new Set(state.flushRecordings)];
+  const existingFlushedPromises = flushedFiles.map(async filePath => {
+    return { filePath, exists: await fs.promises.access(filePath).then(() => true).catch(() => false) };
+  });
+  const existingFlushedFiles = (await Promise.all(existingFlushedPromises))
+    .filter(f => f.exists)
+    .map(f => f.filePath);
 
   // Gather unflushed segments
   const uniqueSegments = [...new Set(state.motionSegments)];
@@ -258,7 +266,7 @@ async function saveMotionSegments(
 
   // Build concat list: flushed files first, then remaining segments
   const concatList: string[] = [
-    ...flushedFiles.map(f => `file '${f.replace(/\\/g, '/')}'`),
+    ...existingFlushedFiles.map(f => `file '${f.replace(/\\/g, '/')}'`),
     ...existingSegments.map(seg => `file '${seg.replace(/\\/g, '/')}'`)
   ];
 
@@ -277,7 +285,7 @@ async function saveMotionSegments(
   const thumbFile = path.join(stream.config.thumbDir, path.basename(outFile).replace(/\.mp4$/, '.jpg'));
   const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outFile}"`;
 
-  logMotion(`[${streamId}] Saving ${concatList.length} items (${flushedFiles.length
+  logMotion(`[${streamId}] Saving ${concatList.length} items (${existingFlushedFiles.length
     } flushed + ${existingSegments.length} segments) to ${path.basename(outFile)}`);
 
   const ffmpegProcess = exec(ffmpegConcatCmd, async (err) => {
@@ -295,6 +303,7 @@ async function saveMotionSegments(
       state.currentSaveProcess = null;
       state.motionSegments = [];
       state.flushedSegments = [];
+      state.flushRecordings = [];
       await safeUnlinkWithRetry(listFile);
       return;
     }
@@ -309,13 +318,14 @@ async function saveMotionSegments(
             return safeUnlinkWithRetry(segment);
           }
         }),
-        ...flushedFiles.map(f => safeUnlinkWithRetry(f)),
+        ...existingFlushedFiles.map(f => safeUnlinkWithRetry(f)),
         safeUnlinkWithRetry(listFile)
       ];
       await Promise.all(promises);
 
       logMotion(`[${streamId}] Cleared flushDir and saved segments`);
       state.motionSegments = [];
+      state.flushRecordings = [];
       state.flushedSegments = [];
       state.savingInProgress = false;
       state.currentSaveProcess = null;
@@ -354,6 +364,7 @@ async function saveMotionSegments(
       logMotion(`[${streamId}] Save operation timed out, killing process`);
       state.currentSaveProcess.kill('SIGTERM');
       state.motionSegments = [];
+      state.flushRecordings = [];
       state.savingInProgress = false;
       state.currentSaveProcess = null;
     }

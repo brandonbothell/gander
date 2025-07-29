@@ -132,6 +132,7 @@ export interface StreamMotionState {
   lastSegmentProcessAt?: number;
   flushTimer?: NodeJS.Timeout; // Timer for flushing segments
   flushedSegments: string[]; // Segments that have been flushed
+  flushRecordings: string[]; // Filenames of that have been flushed
   recordingTitle: string; // Title for the current recording
 }
 
@@ -157,6 +158,7 @@ async function setupStreamMotionMonitoring() {
       startedRecordingAt: 0,
       lastSegmentProcessAt: 0,
       recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
+      flushRecordings: [],
     };
 
     logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
