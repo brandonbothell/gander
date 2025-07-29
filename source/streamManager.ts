@@ -185,16 +185,20 @@ export class StreamManager {
       return;
     }
 
-    // CRITICAL: Clean the HLS directory before starting reencoding
+    // CRITICAL: Clean the HLS directory before starting FFmpeg
     // This prevents segment number conflicts
     (async () => {
       try {
         const start = Date.now();
         const files = await fs.promises.readdir(this.config.hlsDir);
-        for (const file of files) {
-          if (file.endsWith('.ts') || file.endsWith('.m3u8')) {
-            await fs.promises.unlink(path.join(this.config.hlsDir, file)).catch(() => { });
-          }
+        const BATCH_SIZE = 100; // Delete in batches to avoid blocking
+        for (let i = 0; i < files.length; i += BATCH_SIZE) {
+          const batch = files.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(file => {
+            if (file.endsWith('.ts') || file.endsWith('.m3u8')) {
+              return fs.promises.unlink(path.join(this.config.hlsDir, file)).catch(() => { });
+            }
+          }));
         }
         const elapsed = Date.now() - start;
         if (elapsed > 500) {
