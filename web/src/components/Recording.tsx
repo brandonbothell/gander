@@ -52,6 +52,7 @@ export function Recording({
   // Controls fade-away logic
   const [isControlBarVisible, setIsControlBarVisible] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(isPaused);
   const [isMuted, setIsMuted] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -64,6 +65,10 @@ export function Recording({
   const videoUrl = useSignedUrl(filename, 'video', streamId);
   const lastPlaybackTimeRef = useRef<number>(0);
   const thumbUrl = useSignedUrl(filename.replace(/\.mp4$/, '.jpg'), 'thumbnail', streamId);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   useEffect(() => {
     isSeekingRef.current = isSeeking;
@@ -83,7 +88,7 @@ export function Recording({
         // While seeking, keep controls visible and reschedule
         scheduleHide();
       } else {
-        setIsControlBarVisible(false);
+        if (!isPausedRef.current) setIsControlBarVisible(false);
       }
     }, 3000);
   }, []);
@@ -174,7 +179,7 @@ export function Recording({
     const handlePlay = () => {
       setIsPaused(false);
       setVideoHeight(getElementHeight());
-      if (open) handleShowControls();
+      if (!isControlBarVisible) handleShowControls();
     };
     const handlePause = () => {
       setIsPaused(true);

@@ -1658,19 +1658,34 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       const video = videoRef.current;
       const hls = video ? (video as any)._hls : null;
 
-      if (video && hls && hls.liveSyncPosition !== undefined) {
+      if (
+        video &&
+        hls &&
+        hls.liveSyncPosition !== undefined &&
+        !isVideoPaused
+      ) {
         const latency = hls.liveSyncPosition - video.currentTime;
-
-        // Be more conservative - only correct if really far behind and video is well established
-        if (latency > 12 && video.readyState >= 3 && !video.paused && video.currentTime > 10) {
+        if (latency > 12 && video.readyState >= 3 && video.currentTime > 10) {
           console.log(`Auto-correcting high latency: ${latency.toFixed(1)}s`);
           seekToLiveEdge(videoRef, hls);
         }
       }
-    }, 10000); // Check every 10 seconds instead of 5
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [activeStream, isVideoPaused]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const hls = video ? (video as any)._hls : null;
+
+    if (!hls) return;
+    if (isVideoPaused) {
+      hls.stopLoad();
+    } else {
+      hls.startLoad();
+    }
+  }, [isVideoPaused]);
 
   // Add cleanup for HLS instance
   useEffect(() => {
@@ -2973,7 +2988,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
 function seekToLiveEdgeGentle(videoRef: React.RefObject<HTMLVideoElement | null>, hls?: any) {
   const video = videoRef.current;
-  if (!video) return;
+  if (!video || video.paused) return;
 
   if (hls && hls.liveSyncPosition !== undefined) {
     // Be more conservative for initial seek - stay further from live edge
@@ -2995,7 +3010,7 @@ function seekToLiveEdgeGentle(videoRef: React.RefObject<HTMLVideoElement | null>
 // Enhanced live seeking function
 function seekToLiveEdge(videoRef: React.RefObject<HTMLVideoElement | null>, hls?: any) {
   const video = videoRef.current;
-  if (!video) return;
+  if (!video || video.paused) return;
 
   if (hls && hls.liveSyncPosition !== undefined) {
     // Use HLS.js live sync position for most accurate live edge
@@ -3018,7 +3033,7 @@ function seekToLiveEdge(videoRef: React.RefObject<HTMLVideoElement | null>, hls?
 // Update the existing seekToLive function
 function seekToLive(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const video = videoRef.current;
-  if (!video) return;
+  if (!video || video.paused) return;
 
   // Get HLS instance if available
   const hls = (video as any)._hls;

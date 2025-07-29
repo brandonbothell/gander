@@ -16,10 +16,15 @@ export function StreamControlBar({
 }: StreamControlBarProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(isPaused);
   const [isMuted, setIsMuted] = useState(true);
   const [videoRect, setVideoRect] = useState<{ width: number; height: number; top: number; left: number } | null>(null);
   const hideTimeoutRef = useRef<number | null>(null);
   const lastActiveStreamRef = useRef(activeStream);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   // Calculate responsive sizes based on video dimensions
   const getResponsiveSizes = () => {
@@ -157,7 +162,7 @@ export function StreamControlBar({
       clearTimeout(hideTimeoutRef.current);
     }
     hideTimeoutRef.current = window.setTimeout(() => {
-      setIsVisible(false);
+      if (!isPausedRef.current) setIsVisible(false);
     }, 3000);
   };
 
@@ -191,7 +196,6 @@ export function StreamControlBar({
     } else {
       video.pause();
     }
-    handleShowControls();
   };
 
   const handleMuteToggle = () => {
