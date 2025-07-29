@@ -250,7 +250,10 @@ async function saveMotionSegments(
 
   // Gather flushed recordings
   const flushedFiles = [...new Set(state.flushRecordings)];
-  const existingFlushedPromises = flushedFiles.map(async filePath => {
+  const existingFlushedPromises = flushedFiles.sort((a, b) => {
+    const getNum = (fname: string) => parseInt(fname.match(/_flush_(\d+)\.ts$/)?.[1] || '0', 10);
+    return getNum(a) - getNum(b);
+  }).map(async filePath => {
     return { filePath, exists: await fs.promises.access(filePath).then(() => true).catch(() => false) };
   });
   const existingFlushedFiles = (await Promise.all(existingFlushedPromises))
