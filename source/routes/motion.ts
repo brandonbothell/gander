@@ -69,7 +69,7 @@ export default function initializeMotionRoutes(
       if (state.motionRecordingActive) {
         if (state.motionTimeout) clearTimeout(state.motionTimeout);
         // Save any pending segments before pausing
-        if (state.motionSegments.length > 0) {
+        if (state.motionSegments.length > 0 || state.flushingSegments.length > 0) {
           saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId).then(() => {
             state.notificationSent = false;
             state.motionRecordingActive = false;
