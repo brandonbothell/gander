@@ -304,7 +304,7 @@ export function Recording({
     }
     if (!open && videoRef.current) {
       setAutoScrollUntilRef?.(Date.now() + 1000);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 450);
       videoRef.current.pause();
       videoRef.current.src = '';
     } else if (open && videoUrl && videoRef.current) {
