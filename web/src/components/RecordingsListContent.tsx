@@ -1,12 +1,33 @@
-import { FiChevronUp, FiArrowUp } from "react-icons/fi";
-import { isIOS } from "../StreamPage";
+import { VariableSizeGrid as Grid } from "react-window";
+import { useRef, useEffect, useState } from "react";
 import { RecordingThumbItem } from "./RecordingThumbItem";
+import { FiArrowUp, FiChevronUp } from "react-icons/fi";
+import { isIOS } from "../StreamPage";
+
+// Helper to measure nickname height
+function measureNicknameHeight(nickname: string, width: number, font = "bold 1.1em sans-serif") {
+  if (!nickname) return 0;
+  // Create offscreen span for measurement
+  const span = document.createElement("span");
+  span.style.visibility = "hidden";
+  span.style.position = "absolute";
+  span.style.font = font;
+  span.style.whiteSpace = "pre-wrap";
+  span.style.width = width + "px";
+  span.style.lineHeight = "1.2";
+  span.innerText = nickname;
+  document.body.appendChild(span);
+  const height = span.offsetHeight;
+  document.body.removeChild(span);
+  return height;
+}
 
 interface RecordingsListContentProps {
   recordingsListOpen: boolean;
   pullDistance: number;
   pullThreshold: number;
   pullStartY: React.RefObject<number | null>;
+  gridOuterRef: React.RefObject<HTMLDivElement | null>;
   isMobile: boolean;
   filteredRecordings: Array<any>;
   search: string;
@@ -31,7 +52,6 @@ interface RecordingsListContentProps {
   isLoadingMore: boolean;
   setIsLoadingMore: (loading: boolean) => void;
   setCurrentPage: (page: number) => void;
-  setFilteredRecordingsPage: (fn: (page: number) => number) => void;
   loadPage: (stream: any, page: number, append: boolean) => Promise<void>;
   currentPage: number;
   mobileSearchSticky: boolean;
@@ -40,24 +60,20 @@ interface RecordingsListContentProps {
   lastRecordingsListCloseTime: React.RefObject<number>;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   openingRecording: boolean;
+  onRequestClose: () => void;
+  setPullDistance: (distance: number) => void;
+  transferScrollToPage: boolean; // Optional prop for pull-to-close
 }
 
-export default function RecordingsListContent(props: RecordingsListContentProps) {
+
+// Item renderer as recommended by react-window docs
+const Cell = ({ columnIndex, rowIndex, style, data }: any) => {
   const {
-    recordingsListOpen,
-    pullDistance,
-    pullThreshold,
-    pullStartY,
-    isMobile,
+    numColumns,
     filteredRecordings,
-    search,
-    isNicknamedOnly,
-    dateRange,
-    isSearching,
-    userTyping,
-    activeStream,
     selected,
     viewingRecordingsFrom,
+    activeStream,
     hovered,
     setHovered,
     recordingsListRef,
@@ -67,212 +83,271 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
     handleCheckboxChange,
     nicknames,
     viewed,
-    totalRecordings,
-    cachedRecordings,
-    isLoadingMore,
-    setIsLoadingMore,
-    setCurrentPage,
-    setFilteredRecordingsPage,
-    loadPage,
-    currentPage,
-    mobileSearchSticky,
-    setRecordingsListOpen,
-    setTransferScrollToPage,
-    lastRecordingsListCloseTime,
-    videoRef,
-    openingRecording
-  } = props;
-  // Component logic goes here
-  return <>
-    {recordingsListOpen && (<>
-      {/* Animated refresh icon */}
+    THUMB_WIDTH,
+    THUMB_HEIGHT,
+    GRID_GAP,
+  } = data;
+
+  const idx = rowIndex * numColumns + columnIndex;
+  if (idx >= filteredRecordings.length) return null;
+  const rec = filteredRecordings[idx];
+  const checked = selected.includes(rec.filename);
+  const recordingsStream = viewingRecordingsFrom ?? activeStream;
+  const nickname = nicknames[rec.filename];
+
+  return (
+    <div style={style}>
       <div
         style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: 48,
-          pointerEvents: 'none',
-          zIndex: 2,
+          width: THUMB_WIDTH,
+          minHeight: THUMB_HEIGHT,
+          margin: `${GRID_GAP / 2}px auto`,
+          boxSizing: "border-box",
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: 0,
-            // Animation logic:
-            transform: `translateX(-50%) translateY(${pullDistance < pullThreshold ? 0 : Math.min(pullDistance * 0.2, 120)}px)`,
-            opacity: pullStartY.current !== null && pullDistance > 0 ? 1 : 0,
-            transition: 'transform 0.1s cubic-bezier(.4,2,.6,1), opacity 0.15s',
-            fontSize: 32 + Math.min(pullDistance, 120) / 6,
-            zIndex: 3,
-          }}
-        >
-          <FiArrowUp
-            style={{
-              transition: 'color 0.2s, filter 0.2s, font-size 0.2s',
-              color: `rgb(28, 241, 209)`,
-              fontSize: 32 + Math.min(pullDistance, 120) / 6
-            }}
-          />
-        </div>
+        <RecordingThumbItem
+          recordingsListRef={recordingsListRef}
+          streamId={recordingsStream.id}
+          filename={rec.filename}
+          checked={checked}
+          hovered={hovered === rec.filename}
+          anySelected={selected.length > 0}
+          onMouseEnter={() => setHovered(rec.filename)}
+          onMouseLeave={() => setHovered(null)}
+          onTouchStart={() => handleTouchStart(rec.filename, checked)}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          onClick={() => handleView(rec.filename)}
+          onCheckboxChange={checked => handleCheckboxChange(rec.filename, checked)}
+          nickname={nickname}
+          viewed={viewed.find((v: { filename: string; streamId: string }) =>
+            v.filename === rec.filename && v.streamId === recordingsStream.id) !== undefined}
+        />
       </div>
-      {/* {isRefreshing && (
-          <div className="refreshing-indicator">
-            <span className="spinner" />
-            Refreshing...
-          </div>
-        )} */}
-      {/* Recordings List content update - with stable DOM during search */}
-      {filteredRecordings.length === 0 ? (
-        <em
+    </div>
+  );
+};
+
+export default function RecordingsListContent(props: RecordingsListContentProps) {
+  // Responsive sizing
+  const [containerWidth, setContainerWidth] = useState(360);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function updateWidth() {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      } else {
+        setContainerWidth(window.innerWidth);
+      }
+    }
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
+
+  // Mobile: 2 columns, fill width; Desktop: 4 columns
+  const isMobile = props.isMobile;
+  const numColumns = isMobile ? 2 : 4;
+  const THUMB_WIDTH = isMobile ? containerWidth / 2 - 12 : 240; // 16px margin
+  const THUMB_HEIGHT = isMobile ? 180 : 150;
+  const GRID_GAP = isMobile ? 12 : 16;
+
+  // Calculate row count
+  const rowCount = Math.ceil(props.filteredRecordings.length / numColumns);
+
+  // --- Dynamic row heights for nicknames ---
+  // Precompute nickname heights for each row
+  const [rowHeights, setRowHeights] = useState<number[]>([]);
+
+  useEffect(() => {
+    const heights: number[] = [];
+    for (let row = 0; row < rowCount; row++) {
+      let maxHeight = THUMB_HEIGHT;
+      for (let col = 0; col < numColumns; col++) {
+        const idx = row * numColumns + col;
+        if (idx < props.filteredRecordings.length) {
+          const rec = props.filteredRecordings[idx];
+          const nickname = props.nicknames[rec.filename];
+          if (nickname) {
+            const nicknameHeight = measureNicknameHeight(nickname, THUMB_WIDTH - 24); // 24px padding
+            maxHeight = Math.max(maxHeight, THUMB_HEIGHT + nicknameHeight + 8);
+          }
+        }
+      }
+      heights[row] = maxHeight + GRID_GAP;
+    }
+    setRowHeights(heights);
+    // eslint-disable-next-line
+  }, [props.filteredRecordings, props.nicknames, THUMB_WIDTH, rowCount, numColumns, THUMB_HEIGHT, GRID_GAP]);
+
+  // VariableSizeGrid rowHeight/columnWidth
+  const rowHeight = (rowIdx: number) => rowHeights[rowIdx] || THUMB_HEIGHT + GRID_GAP;
+  const columnWidth = () => THUMB_WIDTH + GRID_GAP;
+
+  // Compose all needed data for the cell renderer
+  const itemData = {
+    ...props,
+    numColumns,
+    THUMB_WIDTH,
+    THUMB_HEIGHT,
+    GRID_GAP,
+  };
+
+  // Ref for VariableSizeGrid to reset row heights if nicknames change
+  const gridRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (gridRef.current) {
+      gridRef.current.resetAfterRowIndex(0, true);
+    }
+  }, [rowHeights]);
+
+  // --- Touch handling for pull-to-refresh ---
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const gridAtTop = props.gridOuterRef.current?.scrollTop !== undefined ? props.gridOuterRef.current.scrollTop <= 50 : false;
+    if (gridAtTop) {
+      props.pullStartY.current = e.touches[0].clientY;
+      props.setPullDistance(0);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const gridAtTop = props.gridOuterRef.current?.scrollTop !== undefined ? props.gridOuterRef.current.scrollTop <= 50 : false;
+    if (
+      props.pullStartY.current !== null &&
+      !props.transferScrollToPage &&
+      gridAtTop
+    ) {
+      const delta = e.touches[0].clientY - props.pullStartY.current;
+      if (delta > 0) {
+        props.setPullDistance(delta);
+      }
+    } else if (props.transferScrollToPage) {
+      const deltaY = e.touches[0].clientY - (props.pullStartY.current ?? e.touches[0].clientY);
+      window.scrollBy({ top: -deltaY, behavior: 'instant' });
+      props.pullStartY.current = e.touches[0].clientY;
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (
+      props.pullStartY.current !== null &&
+      props.pullDistance > props.pullThreshold
+    ) {
+      props.onRequestClose();
+    }
+    props.pullStartY.current = null;
+    props.setPullDistance(0);
+  };
+
+  // --- Render ---
+  const gridWidth = numColumns * (THUMB_WIDTH + GRID_GAP);
+
+  return (
+    <>
+      {props.recordingsListOpen && (
+        <div
+          ref={containerRef}
+          className="recordings-grid"
           style={{
-            display: 'block',
-            paddingTop: isMobile ? 48 : 0,
-            textAlign: 'center',
-            color: '#999',
-            fontSize: '1.1em',
-            padding: '40px 20px',
+            minHeight: props.filteredRecordings.length > 0 ? 'auto' : '200px',
+            transition: props.userTyping ? 'none' : 'min-height 0.2s ease-out',
+            position: 'relative',
+            opacity: props.isSearching ? 0.3 : 1,
+            pointerEvents: props.isSearching ? 'none' : 'auto',
+            width: isMobile ? "100%" : gridWidth,
+            margin: '0 auto',
           }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
-          {((search && search.length >= 2) || isNicknamedOnly || dateRange.from || dateRange.to)
-            ? 'No recordings match your search criteria.'
-            : 'No recordings yet.'}
-        </em>
-      ) : (
-        <>
-          {/* Always render the search animation container, but only show it when needed */}
-          <div
-            style={{
-              display: isSearching || userTyping || openingRecording ? 'flex' : 'none',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '40px 20px',
-              color: '#1cf1d1',
-              fontSize: '1.1em',
-              position: 'absolute',
-              top: recordingsListRef.current?.scrollTop || 0,
-              left: 0,
-              right: 0,
-              height: '60vh',
-              bottom: 0,
-              background: 'rgba(20,30,60,0.9)',
-              zIndex: 100,
-            }}
-          >
+          {isMobile && (
             <div
               style={{
-                width: 40,
-                height: 40,
-                border: '4px solid rgba(28, 241, 209, 0.3)',
-                borderTop: '4px solid #1cf1d1',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                marginBottom: 16,
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 48,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+                zIndex: 10,
+                opacity: props.pullDistance > 0 ? 1 : 0,
+                transition: "opacity 0.2s",
+                // Blur only, no background color
+                backdropFilter: "blur(10px)",
+                WebkitBackdropFilter: "blur(10px)",
+                borderBottom: "1px solid rgba(0,0,0,0.06)",
               }}
-            />
-            {openingRecording ? 'Opening recording...' : 'Searching recordings...'}
-          </div>
+            >
+              <FiArrowUp
+                size={28}
+                style={{
+                  transform: `translateY(${Math.min(props.pullDistance, props.pullThreshold)
+                    }px) rotate(${props.pullDistance > props.pullThreshold ? 180 : 0
+                    }deg)`,
+                  color:
+                    props.pullDistance > props.pullThreshold
+                      ? "#1cf1d1"
+                      : "#888",
+                  transition: "transform 0.2s, color 0.2s",
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  left: 0,
+                  right: 0,
+                  textAlign: "center",
+                  fontSize: "0.95em",
+                  color: "#fff",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                  opacity: props.pullDistance > 10 ? 1 : 0,
+                  transition: "opacity 0.2s",
+                  pointerEvents: "none",
+                  // Blur only, no background color
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
+                  borderRadius: 8,
+                  margin: "0 24px",
+                  padding: "2px 8px",
+                  display: "inline-block",
+                }}
+              >
+                {props.pullDistance > props.pullThreshold
+                  ? "Release to close"
+                  : "Pull up to close"}
+              </div>
+            </div>
+          )}
 
-          {/* Always render the recordings grid to maintain DOM stability */}
-          <div
-            className="recordings-grid"
-            key={userTyping ? 'typing-mode' : 'normal-mode'} // Stable key during typing
-            style={{
-              // Add these styles to minimize layout shifts
-              minHeight: filteredRecordings.length > 0 ? 'auto' : '200px',
-              transition: userTyping ? 'none' : 'min-height 0.2s ease-out', // Disable transitions during typing
-              position: 'relative',
-              // Slightly dim the grid during search but keep it rendered
-              opacity: isSearching ? 0.3 : 1,
-              pointerEvents: isSearching ? 'none' : 'auto',
-            }}
+          <Grid
+            ref={gridRef}
+            outerRef={props.gridOuterRef}
+            columnCount={numColumns}
+            columnWidth={columnWidth}
+            height={Math.min(6, rowCount) * (THUMB_HEIGHT + GRID_GAP) + 40}
+            rowCount={rowCount}
+            rowHeight={rowHeight}
+            width={isMobile ? containerWidth : gridWidth}
+            itemData={itemData}
+            estimatedRowHeight={THUMB_HEIGHT + 32 + GRID_GAP}
+            estimatedColumnWidth={THUMB_WIDTH + GRID_GAP}
+            overscanRowCount={2}
+            overscanColumnCount={1}
           >
-            {activeStream && filteredRecordings.map(({ filename }) => {
-              const checked = selected.includes(filename);
-              const recordingsStream = viewingRecordingsFrom ?? activeStream;
-              return (
-                <RecordingThumbItem
-                  recordingsListRef={recordingsListRef}
-                  streamId={recordingsStream.id}
-                  key={filename}
-                  filename={filename}
-                  checked={checked}
-                  hovered={hovered === filename}
-                  anySelected={selected.length > 0}
-                  onMouseEnter={() => setHovered(filename)}
-                  onMouseLeave={() => setHovered(null)}
-                  onTouchStart={() => handleTouchStart(filename, checked)}
-                  onTouchEnd={handleTouchEnd}
-                  onTouchCancel={handleTouchEnd}
-                  onClick={() => handleView(filename)}
-                  onCheckboxChange={checked => handleCheckboxChange(filename, checked)}
-                  nickname={nicknames[filename]}
-                  viewed={viewed.find(v => v.filename === filename && v.streamId === recordingsStream.id) !== undefined}
-                />
-              );
-            })}
-          </div>
-        </>
+            {Cell}
+          </Grid>
+        </div>
       )}
-      {/* Load more button - only show for final 50 recordings */}
-      {activeStream && (() => {
-        const recordingsStream = viewingRecordingsFrom ?? activeStream;
-        const totalRemaining = (totalRecordings[recordingsStream.id] || 0) - (cachedRecordings[recordingsStream.id]?.length || 0);
-        const shouldShowButton = totalRemaining > 0 && totalRemaining <= 50;
-
-        return shouldShowButton && (
-          <button
-            style={{
-              margin: '24px auto 32px',
-              display: 'block',
-              padding: '10px 32px',
-              fontSize: 16,
-              borderRadius: 8,
-              background: '#2196f3',
-              color: '#fff',
-              border: 'none',
-              cursor: isLoadingMore ? 'not-allowed' : 'pointer',
-              fontWeight: 600,
-              boxShadow: '0 2px 8px #1a298055',
-              opacity: isLoadingMore ? 0.7 : 1
-            }}
-            disabled={isLoadingMore}
-            onClick={async () => {
-              setIsLoadingMore(true);
-              const recordingsStream = viewingRecordingsFrom ?? activeStream;
-              if (!recordingsStream) {
-                alert('No active stream to load more recordings for');
-                setIsLoadingMore(false);
-                return;
-              }
-              const nextPage = currentPage + 1;
-              setCurrentPage(nextPage);
-              setFilteredRecordingsPage(page => page + 1);
-              await loadPage(recordingsStream, nextPage, true);
-              setIsLoadingMore(false);
-            }}
-          >
-            {isLoadingMore ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="spinner" style={{
-                  width: 18, height: 18, border: '3px solid #fff', borderTop: '3px solid #2196f3',
-                  borderRadius: '50%', animation: 'spin 1s linear infinite', display: 'inline-block'
-                }} />
-                Loading...
-              </span>
-            ) : (
-              `Load final ${totalRemaining} recordings...`
-            )}
-          </button>
-        );
-      })()}
-
       {/* Handle */}
-      {recordingsListOpen && (
+      {props.recordingsListOpen && (
         <div
           className="recordings-list-handle-parent"
           style={{
@@ -290,7 +365,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
             cursor: 'pointer',
             background: 'none',
             border: '0 2px 8px #1a298044',
-            transform: mobileSearchSticky && isMobile
+            transform: props.mobileSearchSticky && isMobile
               ? `translateY(${isIOS() ? 0 : window.innerHeight * .02}px)`
               : 'translateY(0px)',
             transition: 'transform 0.5s cubic-bezier(.4,2,.6,1)',
@@ -298,11 +373,11 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
           tabIndex={0}
           aria-label="Recordings list handle"
           onClick={() => {
-            setRecordingsListOpen(false);
-            setTransferScrollToPage(false);
-            lastRecordingsListCloseTime.current = Date.now();
+            props.setRecordingsListOpen(false);
+            props.setTransferScrollToPage(false);
+            props.lastRecordingsListCloseTime.current = Date.now();
             setTimeout(() => {
-              videoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              props.videoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 450);
           }}
         >
@@ -324,6 +399,6 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
           </div>
         </div>
       )}
-    </>)}
-  </>
+    </>
+  );
 }

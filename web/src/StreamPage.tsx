@@ -113,7 +113,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [lastSeenRecording, setLastSeenRecording] = useLocalStorageState<{ [streamId: string]: string | null }>('lastSeenRecording', {});
   const [reachedLastSeen, setReachedLastSeen] = useState(false);
   const [totalRecordings, setTotalRecordings] = useState<{ [streamId: string]: number }>({});
-  const [filteredRecordingsPage, setFilteredRecordingsPage] = useState<number>(1);
+  const gridOuterRef = useRef<HTMLDivElement>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isMobileWidth, setIsMobileWidth] = useState(window.innerWidth < 600);
   const searchToolsRef = useRef<HTMLDivElement>(null);
@@ -248,20 +248,18 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     // If user is actively typing and we have frozen results, return those to prevent DOM changes
     if (userTyping && frozenFilteredRecordings.length > 0) {
       // <-- PAGINATE frozen results
-      return frozenFilteredRecordings.slice(0, filteredRecordingsPage * PAGE_SIZE);
+      return frozenFilteredRecordings
     }
 
-    // If no search filters are active, return paginated results immediately
+    // If no search filters are active, return results immediately
     if ((!search || search.length < 2) && !isNicknamedOnly && !dateRange.from && !dateRange.to) {
       const sorted = notDeleted.sort((a, b) => b.filename.localeCompare(a.filename));
-      const result = sorted.slice(0, filteredRecordingsPage * PAGE_SIZE);
-      return result;
+      return sorted;
     }
 
     // For searches, return cached results if available, otherwise perform immediate sync search
     if (filteredRecordingsCache.length > 0 || isSearching) {
-      // <-- PAGINATE search results
-      return filteredRecordingsCache.slice(0, filteredRecordingsPage * PAGE_SIZE);
+      return filteredRecordingsCache;
     }
 
     // Fallback: perform immediate synchronous search if cache is empty
@@ -311,13 +309,12 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       return true;
     });
 
-    // Sort and return immediate results, paginated
+    // Sort and return immediate results
     return immediateResults
       .sort((a, b) => b.filename.localeCompare(a.filename))
-      .slice(0, filteredRecordingsPage * PAGE_SIZE);
   }, [
     cachedRecordings, nicknames, search,
-    isNicknamedOnly, dateRange, filteredRecordingsPage,
+    isNicknamedOnly, dateRange,
     activeStream, deletedRecordings, viewingRecordingsFrom,
     userTyping, frozenFilteredRecordings, filteredRecordingsCache,
     isSearching
@@ -345,14 +342,12 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           allCached;
 
         const sorted = notDeleted.sort((a, b) => b.filename.localeCompare(a.filename));
-        const result = sorted.slice(0, filteredRecordingsPage * PAGE_SIZE);
-        setFrozenFilteredRecordings(result);
+        setFrozenFilteredRecordings(sorted);
       }
     }
   }, [
     search, isNicknamedOnly, dateRange.from, dateRange.to,
-    cachedRecordings, deletedRecordings,
-    filteredRecordingsPage, activeStream,
+    cachedRecordings, deletedRecordings, activeStream,
     viewingRecordingsFrom, userTyping, isSearching
   ]);
 
@@ -683,7 +678,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
                   console.log('Network error, reloading...');
-                  hls.startLoad();
+                  setTimeout(() => loadStream(), 1000);
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
                   console.log('Media error, recovering...');
@@ -1012,19 +1007,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         if (cachedLen < (totalRecordings[recordingsStream.id] || 0)) {
           setIsLoadingMore(true);
           setCurrentPage(nextPage);
-          setFilteredRecordingsPage(page => page + 1);
           loadPage(recordingsStream, nextPage, true).finally(() => {
             setIsLoadingMore(false);
           });
         }
-      }
-
-      // Existing filtered recordings pagination logic (for search results)
-      if (
-        activeStream && isNearBottom &&
-        filteredRecordingsPage * PAGE_SIZE < (cachedRecordings[recordingsStream.id]?.length || 0)
-      ) {
-        setFilteredRecordingsPage(page => page + 1);
       }
 
       // Existing fallback logic for when we reach the end unexpectedly
@@ -1038,7 +1024,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           ...prev,
           [recordingsStream.id]: []
         }));
-        setFilteredRecordingsPage(1);
         setCurrentPage(1);
         setReachedLastSeen(false);
         loadPage(recordingsStream, 1, true);
@@ -1048,7 +1033,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     list.addEventListener('scroll', onScroll, { passive: true });
     return () => list.removeEventListener('scroll', onScroll);
-  }, [filteredRecordingsPage, cachedRecordings, activeStream, viewingRecordingsFrom, currentPage, totalRecordings, isLoadingMore]);
+  }, [cachedRecordings, activeStream, viewingRecordingsFrom, currentPage, totalRecordings, isLoadingMore]);
 
   useEffect(() => {
     const list = recordingsListRef.current;
@@ -1077,7 +1062,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       setIsLoadingMore(true);
       const nextPage = currentPage + 1;
       setCurrentPage(nextPage);
-      setFilteredRecordingsPage(page => page + 1);
       loadPage(recordingsStream, nextPage, true).finally(() => {
         setIsLoadingMore(false);
       });
@@ -1092,8 +1076,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     activeStream,
     viewingRecordingsFrom,
     loadPage,
-    setCurrentPage,
-    setFilteredRecordingsPage,
+    setCurrentPage
   ]);
 
   // Open the recordings list when swiping up at the bottom of the page
@@ -1273,7 +1256,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       // 2. Only close if scrolling up by at least 20px
       const scrollDelta = lastScrollY - currentScrollY;
       if (
-        recordingsListRef.current?.scrollTop === 0 &&
+        gridOuterRef.current?.scrollTop === 0 && // <-- Only close if grid is also at top
         scrollDelta > 20 &&
         window.innerHeight + currentScrollY < document.body.offsetHeight - window.innerHeight * 0.1 &&
         recordingsListOpen
@@ -1452,7 +1435,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     const cachedLen = recordingsStream ? cachedRecordings[recordingsStream.id]?.length || 0 : 0;
     const initialPage = Math.max(1, Math.ceil(cachedLen / PAGE_SIZE));
     setCurrentPage(initialPage);
-    setFilteredRecordingsPage(1);
     setReachedLastSeen(!recordingsStream); // reachedLastSeen is false if activeStream is set, true if not
     // Fetch the first page of recordings
     if (recordingsStream) loadPage(recordingsStream, 1, true);
@@ -1910,7 +1892,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   // If the user toggles ON but denies permission, just leave the toggle ON and show an error/toast if desired.
 
   useEffect(() => {
-    (async () => {
+    setTimeout(async () => {
       if (!isLoadingMotionNotifications) {
         return;
       }
@@ -1991,7 +1973,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       }
 
       setIsLoadingMotionNotifications(false);
-    })();
+    }, 1000); // Wait 1 second to allow UI to update
   }, [shouldNotifyOnMotion]);
 
   // Attach event listeners to the video element
@@ -2782,40 +2764,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         className='recordings-list'
         ref={recordingsListRef}
         tabIndex={-1}
-        onTouchStart={e => {
-          if (recordingsListRef.current && recordingsListRef.current.scrollTop === 0) {
-            pullStartY.current = e.touches[0].clientY;
-            setPullDistance(0);
-          }
-        }}
-        onTouchMove={e => {
-          if (pullStartY.current !== null && !transferScrollToPage) {
-            const delta = e.touches[0].clientY - pullStartY.current;
-            if (delta > 0 && recordingsListRef.current && recordingsListRef.current.scrollTop === 0) {
-              setPullDistance(delta);
-              // Optionally, you can visually indicate pull progress here
-            }
-          } else if (transferScrollToPage) {
-            // Get the touch delta
-            const deltaY = e.touches[0].clientY - (pullStartY.current ?? e.touches[0].clientY);
-            window.scrollBy({ top: -deltaY, behavior: 'instant' });
-            pullStartY.current = e.touches[0].clientY;
-            // Prevent default to stop the list from scrolling
-            e.preventDefault();
-          }
-        }}
-        onTouchEnd={async () => {
-          setIsRecordingsListScrolling(false);
-          if (pullStartY.current !== null && pullDistance > pullThreshold) {
-            setRecordingsListOpen(false);
-            setTransferScrollToPage(false);
-            lastRecordingsListCloseTime.current = Date.now();
-            setTimeout(() => window.scrollTo({ behavior: 'smooth', top: 0 }), 450);
-          }
-
-          pullStartY.current = null;
-          setPullDistance(0);
-        }}
         onScroll={() => {
           setIsRecordingsListScrolling(true);
           // Debounce: set back to false after scrolling stops for 120ms
@@ -2840,6 +2788,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           pullDistance={pullDistance}
           pullThreshold={pullThreshold}
           pullStartY={pullStartY}
+          gridOuterRef={gridOuterRef}
           isMobile={isMobileWidth}
           filteredRecordings={filteredRecordings}
           search={search}
@@ -2864,7 +2813,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           isLoadingMore={isLoadingMore}
           setIsLoadingMore={setIsLoadingMore}
           setCurrentPage={setCurrentPage}
-          setFilteredRecordingsPage={setFilteredRecordingsPage}
           loadPage={loadPage}
           currentPage={currentPage}
           mobileSearchSticky={mobileSearchSticky}
@@ -2873,6 +2821,14 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           lastRecordingsListCloseTime={lastRecordingsListCloseTime}
           openingRecording={openingRecording}
           videoRef={videoRef}
+          onRequestClose={() => {
+            setRecordingsListOpen(false);
+            setTransferScrollToPage(false);
+            lastRecordingsListCloseTime.current = Date.now();
+            setTimeout(() => window.scrollTo({ behavior: 'smooth', top: 0 }), 450);
+          }}
+          setPullDistance={setPullDistance}
+          transferScrollToPage={transferScrollToPage}
         />
         <div ref={recordingsListBottomSentinelRef} style={{ height: 1 }} />
       </div>
