@@ -2373,7 +2373,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             streamId={recordingBeingViewed?.streamId ?? ''}
             filename={recordingBeingViewed?.filename ?? ''}
             onClose={() => setRecordingBeingViewed(null)}
-            cachedRecordings={recordingBeingViewed ? cachedRecordings[recordingBeingViewed.streamId] || [] : []}
+            cachedRecordings={recordingBeingViewed ? cachedRecordings[recordingBeingViewed.streamId] ?? [] : []}
             onNavigate={filename => {
               if (!activeStream) return;
               setOpeningRecording(true);
