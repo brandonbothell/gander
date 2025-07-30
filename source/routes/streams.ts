@@ -78,6 +78,22 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
     }
   });
 
+  // Reconnect a stream (restart FFmpeg, clear state, restart monitoring)
+  app.post('/api/streams/:id/reconnect', jwtAuth, async (req, res) => {
+    const { id } = req.params;
+    const stream = dynamicStreams[id];
+    if (!stream) {
+      res.status(404).json({ error: 'Stream not found.' });
+      return;
+    }
+    try {
+      await stream.reconnect();
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to reconnect stream.' });
+    }
+  });
+
   // Delete a stream
   app.delete('/api/streams/:id', jwtAuth, async (req, res) => {
     const { id } = req.params;

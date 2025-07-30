@@ -1,7 +1,8 @@
 import path from 'path';
 import fs from 'fs';
-import { spawn } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { logMotion } from './logMotion';
+import { setupStreamMotionMonitoring, stopStreamMotionMonitoring } from './camera';
 
 export interface StreamConfig {
   id: string;
@@ -397,6 +398,101 @@ export class StreamManager {
 
     this.ffmpeg.addListener('exit', handleFfmpegExit);
     setTimeout(() => { this.ffmpeg?.removeListener('exit', handleFfmpegExit); }, 20000);
+  }
+
+  /**
+   * Reconnects the stream:
+   * - Calls stopStreamMotionMonitoring for this stream
+   * - Kills all ffmpeg processes using this stream's HLS dir
+   * - Cleans HLS and flush directories
+   * - Restarts FFmpeg
+   * - Calls setupStreamMotionMonitoring for this stream
+   */
+  async reconnect(): Promise<void> {
+    const streamId = this.config.id;
+
+    // 1. Stop motion monitoring and clear state
+    try {
+      await stopStreamMotionMonitoring(streamId);
+      logMotion(`[${streamId}] Stopped stream motion monitoring`);
+    } catch (e) {
+      logMotion(`[${streamId}] Error stopping stream motion monitoring: ${e}`, 'warn');
+    }
+
+    // 2. Kill all ffmpeg processes for this stream (by matching hlsDir in command line)
+    try {
+      const hlsDir = this.config.hlsDir;
+      if (process.platform === 'win32') {
+        // Windows: use WMIC
+        const searchStr = hlsDir.replace(/\\/g, '\\\\');
+        exec(`wmic process where "CommandLine like '%${searchStr}%'" get ProcessId,CommandLine /FORMAT:CSV`, (err, stdout) => {
+          if (!err && stdout) {
+            const lines = stdout.split('\n').filter(l => l.toLowerCase().includes('ffmpeg'));
+            for (const line of lines) {
+              const match = line.match(/,ffmpeg.*?(\d+)\s*$/i);
+              if (match) {
+                const pid = match[1];
+                logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
+                try { process.kill(Number(pid), 'SIGKILL'); } catch { }
+              }
+            }
+          }
+        });
+      } else {
+        // Linux/macOS: use ps/grep/awk
+        // Escape the hlsDir for grep (spaces, etc)
+        const grepStr = hlsDir.replace(/(["'$`\\])/g, '\\$1');
+        // Find all ffmpeg processes with the hlsDir in their command line
+        exec(`ps -eo pid,command | grep '[f]fmpeg' | grep '${grepStr}' | awk '{print $1}'`, (err, stdout) => {
+          if (!err && stdout) {
+            const pids = stdout.split('\n').map(line => line.trim()).filter(Boolean);
+            for (const pid of pids) {
+              logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
+              try { process.kill(Number(pid), 'SIGKILL'); } catch { }
+            }
+          }
+        });
+      }
+      // Also kill the managed ffmpeg process if still running
+      this.ffmpeg?.kill('SIGKILL');
+      this.ffmpeg = null;
+    } catch (e) {
+      logMotion(`[${streamId}] Error killing ffmpeg processes: ${e}`, 'warn');
+    }
+
+    // 3. Clean HLS and flush directories
+    try {
+      if (fs.existsSync(this.config.hlsDir)) {
+        fs.rmSync(this.config.hlsDir, { recursive: true, force: true });
+        logMotion(`[${streamId}] Deleted HLS directory: ${this.config.hlsDir}`);
+      }
+      if (fs.existsSync(this.config.flushDir)) {
+        fs.rmSync(this.config.flushDir, { recursive: true, force: true });
+        logMotion(`[${streamId}] Deleted flush directory: ${this.config.flushDir}`);
+      }
+      // Recreate directories
+      [this.config.hlsDir, this.config.flushDir].forEach(dir => {
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      });
+    } catch (e) {
+      logMotion(`[${streamId}] Error cleaning directories: ${e}`, 'warn');
+    }
+
+    // 4. Restart FFmpeg
+    try {
+      this.startFFmpeg();
+      logMotion(`[${streamId}] FFmpeg restarted via reconnect`);
+    } catch (e) {
+      logMotion(`[${streamId}] Error restarting FFmpeg: ${e}`, 'error');
+    }
+
+    // 5. Restart motion monitoring for this stream
+    try {
+      await setupStreamMotionMonitoring(streamId);
+      logMotion(`[${streamId}] Motion monitoring re-initialized`);
+    } catch (e) {
+      logMotion(`[${streamId}] Error re-initializing motion monitoring: ${e}`, 'error');
+    }
   }
 
   // Helper to stop FFmpeg and wait for exit before restarting

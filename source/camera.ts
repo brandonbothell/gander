@@ -138,9 +138,12 @@ export interface StreamMotionState {
 
 const streamStates: Record<string, StreamMotionState> = {};
 
-async function setupStreamMotionMonitoring() {
+const watchers = new Map<string, chokidar.FSWatcher>();
+
+export async function setupStreamMotionMonitoring(streamId?: string) {
   const persistedStates = await loadPersistedStreamStates();
-  for (const streamId in dynamicStreams) {
+
+  const setupMotionMonitoring = async (streamId: string) => {
     streamStates[streamId] = {
       notificationSent: false,
       motionRecordingActive: false,
@@ -164,109 +167,141 @@ async function setupStreamMotionMonitoring() {
     logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
 
     // --- Motion Detection Watcher ---
-    chokidar.watch(dynamicStreams[streamId].config.hlsDir, { ignoreInitial: true }).on('add', segmentPath => {
-      if (!/segment_\d+\.ts$/.test(path.basename(segmentPath))) return;
-      const state = streamStates[streamId];
+    watchers.set(streamId,
+      chokidar.watch(dynamicStreams[streamId].config.hlsDir, { ignoreInitial: true }).on('add', segmentPath => {
+        if (!/segment_\d+\.ts$/.test(path.basename(segmentPath))) return;
+        const state = streamStates[streamId];
 
-      // --- Throttle segment processing to avoid busy loop ---
-      const now = Date.now();
-      const MIN_SEGMENT_PROCESS_INTERVAL = 300; // ms
-      if (state.lastSegmentProcessAt && now - state.lastSegmentProcessAt < MIN_SEGMENT_PROCESS_INTERVAL) {
-        if ((now - state.lastSegmentProcessAt) > 0) {
-          debugLog(`[${streamId}] Throttling segment processing: last at ${now - state.lastSegmentProcessAt}ms ago`);
+        // --- Throttle segment processing to avoid busy loop ---
+        const now = Date.now();
+        const MIN_SEGMENT_PROCESS_INTERVAL = 300; // ms
+        if (state.lastSegmentProcessAt && now - state.lastSegmentProcessAt < MIN_SEGMENT_PROCESS_INTERVAL) {
+          if ((now - state.lastSegmentProcessAt) > 0) {
+            debugLog(`[${streamId}] Throttling segment processing: last at ${now - state.lastSegmentProcessAt}ms ago`);
+          }
+          return;
         }
-        return;
-      }
-      state.lastSegmentProcessAt = now;
+        state.lastSegmentProcessAt = now;
 
-      state.recentSegments.push(segmentPath);
-      if (state.recentSegments.length > RECENT_SEGMENT_BUFFER) {
-        const expiredSegment = state.recentSegments.shift();
-        if (expiredSegment &&
-          ((!state.motionRecordingActive && !state.savingInProgress && expiredSegment) ||
-            state.flushedSegments.includes(expiredSegment))) {
-          safeUnlinkWithRetry(expiredSegment);
+        state.recentSegments.push(segmentPath);
+        if (state.recentSegments.length > RECENT_SEGMENT_BUFFER) {
+          const expiredSegment = state.recentSegments.shift();
+          if (expiredSegment &&
+            ((!state.motionRecordingActive && !state.savingInProgress && expiredSegment) ||
+              state.flushedSegments.includes(expiredSegment))) {
+            safeUnlinkWithRetry(expiredSegment);
+          }
         }
-      }
-      setTimeout(async () => {
-        if (state.motionPaused) return;
-        if ((Date.now() - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD) return;
-        const motionStatus = await detectMotion(streamId, segmentPath);
-        if (motionStatus.motion) {
-          // If we're currently saving and detect new motion, cancel the save and continue recording
-          if (state.savingInProgress && state.currentSaveProcess) {
-            logMotion(`[${streamId}] New motion detected while saving, canceling save operation`);
-            state.currentSaveProcess.kill('SIGTERM');
-            state.savingInProgress = false;
-            state.currentSaveProcess = null;
-            state.saveRetryCount = 0;
+        setTimeout(async () => {
+          if (state.motionPaused) return;
+          if ((Date.now() - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD) return;
+          const motionStatus = await detectMotion(streamId, segmentPath);
+          if (motionStatus.motion) {
+            // If we're currently saving and detect new motion, cancel the save and continue recording
+            if (state.savingInProgress && state.currentSaveProcess) {
+              logMotion(`[${streamId}] New motion detected while saving, canceling save operation`);
+              state.currentSaveProcess.kill('SIGTERM');
+              state.savingInProgress = false;
+              state.currentSaveProcess = null;
+              state.saveRetryCount = 0;
 
-            // Clear the motion timeout since we're continuing to record
-            if (state.motionTimeout) {
-              clearTimeout(state.motionTimeout);
-              state.motionTimeout = null;
+              // Clear the motion timeout since we're continuing to record
+              if (state.motionTimeout) {
+                clearTimeout(state.motionTimeout);
+                state.motionTimeout = null;
+              }
             }
-          }
 
-          if (!state.motionRecordingActive) {
-            state.motionRecordingActive = true;
-            state.startedRecordingAt = Date.now(); // Set when recording starts
-            state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
-            state.notificationSent = false;
-            if (state.motionTimeout) clearTimeout(state.motionTimeout);
-            state.recentSegments.forEach(recentPath => {
-              if (!state.motionSegments.includes(recentPath)) state.motionSegments.push(recentPath);
-            });
-
-            // Start periodic flush
-            state.flushTimer = setInterval(() => {
-              flushMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId);
-              // After saving, clear motionSegments so new ones accumulate
-              // state.motionSegments = [];
-            }, 10000); // flush every 10 seconds
-          }
-          if (!state.motionSegments.includes(segmentPath)) state.motionSegments.push(segmentPath);
-
-          // Log motion event
-          logMotion(`[${streamId}] Detected at ${new Date().toLocaleString()} in segment: ${path.basename(segmentPath)}`);
-
-          // --- Notify only once per motion event ---
-          if (!state.notificationSent) {
-            notify(dynamicStreams, streamId,
-              { channelId: 'motion_event_channel', sound: 'motion_alert' });
-            state.notificationSent = true;
-          }
-
-          // --- Set motion recording timeout ---
-          let motionRecordingTimeoutMs = MOTION_RECORDING_TIMEOUT_SECONDS[motionStatus.aboveCameraMovementThreshold ? 'cameraMovement' : 'normal'] * 1000;
-
-          if (state.motionRecordingTimeoutAt > 0 && Date.now() + motionRecordingTimeoutMs < state.motionRecordingTimeoutAt) {
-            // If the new timeout is shorter than the current one, keep the current timeout
-            motionRecordingTimeoutMs = state.motionRecordingTimeoutAt - Date.now();
-          }
-
-          if (state.motionTimeout) clearTimeout(state.motionTimeout);
-          state.motionTimeout = setTimeout(() => {
-            saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId).then(() => {
+            if (!state.motionRecordingActive) {
+              state.motionRecordingActive = true;
+              state.startedRecordingAt = Date.now(); // Set when recording starts
+              state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
               state.notificationSent = false;
-            });
-            state.motionRecordingActive = false;
-            state.startedRecordingAt = 0; // Reset when recording stops
-            state.motionRecordingTimeoutAt = 0;
-            if (state.flushTimer) {
-              clearInterval(state.flushTimer);
-              state.flushTimer = undefined;
+              if (state.motionTimeout) clearTimeout(state.motionTimeout);
+              state.recentSegments.forEach(recentPath => {
+                if (!state.motionSegments.includes(recentPath)) state.motionSegments.push(recentPath);
+              });
+
+              // Start periodic flush
+              state.flushTimer = setInterval(() => {
+                flushMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId);
+                // After saving, clear motionSegments so new ones accumulate
+                // state.motionSegments = [];
+              }, 10000); // flush every 10 seconds
             }
-          }, motionRecordingTimeoutMs);
-          state.motionRecordingTimeoutAt = Date.now() + motionRecordingTimeoutMs;
-        } else if (state.motionRecordingActive) {
-          if (!state.motionSegments.includes(segmentPath)) state.motionSegments.push(segmentPath);
-        }
-      }, 300);
-    });
+            if (!state.motionSegments.includes(segmentPath)) state.motionSegments.push(segmentPath);
+
+            // Log motion event
+            logMotion(`[${streamId}] Detected at ${new Date().toLocaleString()} in segment: ${path.basename(segmentPath)}`);
+
+            // --- Notify only once per motion event ---
+            if (!state.notificationSent) {
+              notify(dynamicStreams, streamId,
+                { channelId: 'motion_event_channel', sound: 'motion_alert' });
+              state.notificationSent = true;
+            }
+
+            // --- Set motion recording timeout ---
+            let motionRecordingTimeoutMs = MOTION_RECORDING_TIMEOUT_SECONDS[motionStatus.aboveCameraMovementThreshold ? 'cameraMovement' : 'normal'] * 1000;
+
+            if (state.motionRecordingTimeoutAt > 0 && Date.now() + motionRecordingTimeoutMs < state.motionRecordingTimeoutAt) {
+              // If the new timeout is shorter than the current one, keep the current timeout
+              motionRecordingTimeoutMs = state.motionRecordingTimeoutAt - Date.now();
+            }
+
+            if (state.motionTimeout) clearTimeout(state.motionTimeout);
+            state.motionTimeout = setTimeout(() => {
+              saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId).then(() => {
+                state.notificationSent = false;
+              });
+              state.motionRecordingActive = false;
+              state.startedRecordingAt = 0; // Reset when recording stops
+              state.motionRecordingTimeoutAt = 0;
+              if (state.flushTimer) {
+                clearInterval(state.flushTimer);
+                state.flushTimer = undefined;
+              }
+            }, motionRecordingTimeoutMs);
+            state.motionRecordingTimeoutAt = Date.now() + motionRecordingTimeoutMs;
+          } else if (state.motionRecordingActive) {
+            if (!state.motionSegments.includes(segmentPath)) state.motionSegments.push(segmentPath);
+          }
+        }, 300);
+      }));
+  }
+
+  if (streamId) {
+    setupMotionMonitoring(streamId)
+  } else {
+    for (const streamId in dynamicStreams) {
+      setupMotionMonitoring(streamId)
+    }
   }
 
   setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000);
+}
+
+export function stopStreamMotionMonitoring(streamId?: string) {
+  const stopMotionMonitoring = (streamId: string) => {
+    if (watchers.has(streamId)) {
+      watchers.get(streamId)?.close();
+      watchers.delete(streamId);
+    }
+    if (streamStates[streamId]) {
+      const state = streamStates[streamId];
+      if (state.flushTimer) clearInterval(state.flushTimer);
+      if (state.motionTimeout) clearTimeout(state.motionTimeout);
+      delete streamStates[streamId];
+    }
+  }
+
+  if (streamId && dynamicStreams[streamId]) {
+    stopMotionMonitoring(streamId);
+  } else {
+    for (const streamId in dynamicStreams) {
+      stopMotionMonitoring(streamId);
+    }
+  }
 }
 
 // Load streams from DB on startup
@@ -295,7 +330,7 @@ async function loadStreamsFromDb() {
   }, 60000); // Check every minute
 }
 
-loadStreamsFromDb().then(cleanupExpiredTokensAndDevices).then(setupStreamMotionMonitoring).then(() => {
+loadStreamsFromDb().then(cleanupExpiredTokensAndDevices).then(() => setupStreamMotionMonitoring()).then(() => {
   // --- Start server ---
   // Use Greenlock for production
   Greenlock.init({
