@@ -80,6 +80,8 @@ async function getMasksForStream(streamId: string): Promise<Array<{ x: number, y
 export function clearMotionHistory(streamId: string) {
   streamMotionHistory[streamId] = [];
   streamMovementHistory[streamId] = [];
+  delete lastFrame[streamId];
+  delete firstFrameSaved[streamId];
 }
 
 // Limit concurrent FFmpeg frame extractions
@@ -120,7 +122,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
     // Check if segmentPath exists before spawning ffmpeg
     fs.promises.stat(segmentPath).then(stats => {
       if (stats.size < 1000) {
-        debugLog(`[Motion] Segment file too small: ${segmentPath}`);
+        logMotion(`[Motion] Segment file too small: ${segmentPath}`, 'warn');
         reject(new Error('Segment file too small'));
         return;
       }
@@ -161,7 +163,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
                 debugLog(`[Motion] Successfully extracted frame (${stats.size} bytes)`);
                 resolve();
               } else {
-                debugLog(`[Motion] Frame file too small (${stats.size} bytes), retrying with PNG`);
+                logMotion(`[Motion] Frame file too small (${stats.size} bytes), retrying with PNG`, 'warn');
                 // Try PNG format instead
                 const pngPath = outputPath.replace('.jpg', '.png');
                 const pngFfmpeg = spawn('ffmpeg', [
@@ -190,28 +192,28 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
                         debugLog(`[Motion] PNG extraction successful, renamed to JPG`);
                         resolve();
                       } catch (e) {
-                        debugLog(`[Motion] PNG extraction successful but rename failed`);
+                        logMotion(`[Motion] PNG extraction successful but rename failed`, 'error');
                         reject(new Error('Rename failed'));
                       }
                     } else {
-                      logMotion(`Both JPG and PNG extraction failed`);
+                      logMotion(`Both JPG and PNG extraction failed`, 'error');
                       reject(new Error('Both formats failed'));
                     }
                   }
                   catch {
-                    logMotion(`Both JPG and PNG extraction failed`);
+                    logMotion(`Both JPG and PNG extraction failed`, 'error');
                     reject(new Error('Both formats failed'));
                   }
                 });
 
                 pngFfmpeg.on('error', (err) => {
                   clearTimeout(pngTimeout);
-                  debugLog(`[Motion] PNG FFmpeg spawn error: ${err}`);
+                  logMotion(`[Motion] PNG FFmpeg spawn error: ${err}`, 'error');
                   reject(err);
                 });
               }
             } catch {
-              debugLog(`[Motion] No output file found at ${outputPath} after FFmpeg success`);
+              logMotion(`[Motion] No output file found at ${outputPath} after FFmpeg success`, 'error');
               // List directory to debug
               const DEBUG_MOTION = process.env.DEBUG_MOTION === 'true';
               if (DEBUG_MOTION) {
@@ -226,7 +228,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
               reject(new Error('No output file'));
             }
           } else {
-            debugLog(`[Motion] FFmpeg failed with code ${code}: ${errorOutput}`);
+            logMotion(`[Motion] FFmpeg failed with code ${code}: ${errorOutput}`, 'error');
             reject(new Error(`FFmpeg failed with code ${code}`));
           }
         }, 50); // 50ms delay
@@ -234,11 +236,11 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
 
       ffmpeg.on('error', (err) => {
         clearTimeout(timeout);
-        debugLog(`[Motion] FFmpeg spawn error: ${err}`);
+        logMotion(`[Motion] FFmpeg spawn error: ${err}`, 'error');
         reject(err);
       });
     }).catch(() => {
-      debugLog(`[Motion] Segment file missing: ${segmentPath}`);
+      logMotion(`[Motion] Segment file missing: ${segmentPath}`, 'error');
       reject(new Error(`Segment file missing: ${segmentPath}`));
     });
   }));
@@ -257,11 +259,11 @@ export async function detectMotion(
     try {
       const stat = await fs.promises.stat(segmentPath);
       if (stat.size < 1000) {
-        debugLog(`[${streamId}] [Motion] Segment file too small: ${segmentPath}`);
+        logMotion(`[${streamId}] [Motion] Segment file too small: ${segmentPath}`, 'warn');
         return { motion: false, aboveCameraMovementThreshold: false };
       }
     } catch (err) {
-      debugLog(`[${streamId}] [Motion] Segment file missing: ${segmentPath}`);
+      logMotion(`[${streamId}] [Motion] Segment file missing: ${segmentPath}`, 'error');
       return { motion: false, aboveCameraMovementThreshold: false };
     }
 
@@ -275,7 +277,7 @@ export async function detectMotion(
     try {
       await extractFrame(segmentPath, framePath);
     } catch (error) {
-      debugLog(`[${streamId}] Failed to extract frame from ${segmentPath}: ${error}`);
+      logMotion(`[${streamId}] Failed to extract frame from ${segmentPath}: ${error}`, 'error');
       return { motion: false, aboveCameraMovementThreshold: false };
     }
 
@@ -287,7 +289,7 @@ export async function detectMotion(
       frameExists = false;
     }
     if (!frameExists) {
-      debugLog(`[${streamId}] [Motion] Frame extraction failed - no output file at ${framePath}`);
+      logMotion(`[${streamId}] [Motion] Frame extraction failed - no output file at ${framePath}`, 'error');
       return { motion: false, aboveCameraMovementThreshold: false };
     }
 
@@ -374,7 +376,7 @@ export async function detectMotion(
 
       lastFrame[streamId] = currentFrame;
     } catch (error) {
-      debugLog(`[${streamId}] Error processing frame: ${error}`);
+      logMotion(`[${streamId}] Error processing frame: ${error}`, 'error');
     }
 
     return {
@@ -383,7 +385,7 @@ export async function detectMotion(
     };
 
   } catch (error) {
-    debugLog(`[${streamId}] Motion detection failed: ${error}`);
+    logMotion(`[${streamId}] Motion detection failed: ${error}`, 'error');
     return {
       motion: false,
       aboveCameraMovementThreshold: false
