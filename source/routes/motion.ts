@@ -86,14 +86,16 @@ export default function initializeMotionRoutes(
         title: 'Motion Recording Paused',
         body: `Motion recording has been paused for ${nickname}.`,
         channelId: 'motion_event_low_channel',
-        tag: `motion_pause_${streamId}`
+        tag: `motion_pause_${streamId}`,
+        group: `motion_pause_${streamId}`
       });
     } else {
       await notify(dynamicStreams, streamId, {
         title: 'Motion Recording Resumed',
         body: `Motion recording has been resumed for ${nickname}.`,
         channelId: 'motion_event_low_channel',
-        tag: `motion_pause_${streamId}`
+        tag: `motion_pause_${streamId}`,
+        group: `motion_resume_${streamId}`
       });
     }
 

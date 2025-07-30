@@ -95,7 +95,7 @@ export default function initializeNotificationRoutes(app: express.Application) {
 export async function notify(
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
-  custom?: { title?: string; body?: string, icon?: string, sound?: string, channelId?: string, tag?: string },
+  custom?: { title?: string; body?: string, icon?: string, sound?: string, channelId?: string, tag?: string, group?: string },
   username?: string
 ) {
   let nickname;
@@ -109,6 +109,7 @@ export async function notify(
   const sound = custom?.sound ?? 'default';
   const channelId = custom?.channelId;
   const tag = custom?.tag;
+  const group = custom?.group || `stream_event_${streamId}`;
 
   const subs = await prisma.pushSubscription.findMany(username ? { where: { sid: username } } : undefined);
   for (const sub of subs) {
@@ -153,7 +154,7 @@ export async function notify(
       try {
         const withOptional = {
           ...(tag ? { tag } : {}),
-          ...(channelId ? { channelId } : {})
+          ...(channelId ? { channelId } : {}),
         };
         await admin.messaging().send({
           android: {
@@ -176,13 +177,10 @@ export async function notify(
             }
           },
           token: sub.fcmToken,
-          notification: {
-            title,
-            body
-          },
           data: {
             streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
             cameraId: streamId,
+            ...(group ? { group } : {}),
             // ...other custom data
           }
         });

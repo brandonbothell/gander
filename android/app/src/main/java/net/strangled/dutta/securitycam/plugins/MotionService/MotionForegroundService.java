@@ -36,8 +36,7 @@ public class MotionForegroundService extends Service {
     }
 
     Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-        .setContentTitle("SecurityCam")
-        .setContentText("Motion detection is active")
+        .setContentText("Notification service is active")
         .setSmallIcon(android.R.drawable.ic_menu_camera)
         .setOngoing(true)
         .setGroup("motion_service")

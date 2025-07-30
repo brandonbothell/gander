@@ -39,13 +39,49 @@ export async function subscribeToWebPush() {
 
 export async function setupPushNotifications() {
   try {
-    // await BatteryOptimization.prompt();
     const pushPermissions = await PushNotifications.requestPermissions();
 
     if (pushPermissions.receive === 'granted') {
+      PushNotifications.addListener('pushNotificationReceived', async (notification: PushNotificationSchema) => {
+        console.log('Push notification received:', notification);
+
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              title: notification.title ?? 'Notification',
+              body: notification.body ?? '',
+              id: Math.floor(Date.now() % 100000),
+              extra: notification.data,
+              group: notification.data.group,
+            },
+          ],
+        });
+      });
+
+      PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
+        console.log('Push notification action recieved:', action);
+        const url = action.notification.data?.streamUrl;
+        if (url) {
+          window.location.href = url;
+        }
+      });
+
+      LocalNotifications.addListener('localNotificationActionPerformed', (event) => {
+        console.log('Local notification tapped:', event);
+        const url = event.notification.extra?.streamUrl;
+        if (url) {
+          window.location.href = url;
+        }
+      });
+
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          console.log('App resumed')
+        }
+      });
+
       PushNotifications.register();
 
-      // Wait for registration and service start
       return new Promise<void>((resolve, reject) => {
         let resolved = false;
         PushNotifications.addListener('registration', async (token: Token) => {
@@ -67,49 +103,6 @@ export async function setupPushNotifications() {
           }
         });
 
-        // Handle foreground notifications
-        PushNotifications.addListener('pushNotificationReceived', async (notification: PushNotificationSchema) => {
-          console.log('Push notification received:', notification);
-
-          // Show a local notification if app is in foreground
-          await LocalNotifications.schedule({
-            notifications: [
-              {
-                title: notification.title ?? 'Notification',
-                body: notification.body ?? '',
-                id: Math.floor(Date.now() % 100000), // FIX: id is now a safe Java int
-                extra: notification.data,
-              },
-            ],
-          });
-        });
-
-        // Handle notification tap (background)
-        PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
-          console.log('Push notification action recieved:', action);
-          const url = action.notification.data?.streamUrl;
-          if (url) {
-            window.location.href = url;
-          }
-        });
-
-        // Handle local notification taps
-        LocalNotifications.addListener('localNotificationActionPerformed', (event) => {
-          console.log('Local notification tapped:', event);
-          const url = event.notification.extra?.streamUrl;
-          if (url) {
-            window.location.href = url;
-          }
-        });
-
-        // Optional: Handle app resume
-        App.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) {
-            console.log('App resumed')
-          }
-        });
-
-        // Timeout in case registration fails
         setTimeout(() => {
           if (!resolved) {
             reject(new Error('Push registration timed out'));
@@ -117,9 +110,9 @@ export async function setupPushNotifications() {
         }, 15000);
       });
     } else {
-      return Promise.reject('Permissions not granted');
+      return Promise.reject('Push permissions not granted');
     }
   } catch (err) {
-    return Promise.reject(err);
+    return Promise.reject('Push error: ' + (err instanceof Error ? err.message : String(err)));
   }
 }

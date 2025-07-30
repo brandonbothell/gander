@@ -87,7 +87,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useLocalStorageState<string[]>('selectedRecordings', [])
   const [hovered, setHovered] = useState<string | null>(null);
-  const [isLoadingMotionNotifications, setIsLoadingMotionNotifications] = useState(false);
+  const [isLoadingMotionNotifications, setIsLoadingMotionNotifications] = useState(true);
   const [search, setSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [isNicknamedOnly, setIsNicknamedOnly] = useState(false);
@@ -1875,7 +1875,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           if (!navigator.serviceWorker) {
             setIsLoadingMotionNotifications(false);
             setShouldNotifyOnMotion(false);
-            setErrorModalMsg('Service Worker not supported. Please use a modern browser.');
+            setErrorModalMsg('Service Worker not supported. Please use a modern browser to enable notifications.');
             setErrorModalOpen(true);
             return console.warn('Service Worker not supported');
           }
@@ -1908,7 +1908,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           if (!navigator.serviceWorker) {
             setIsLoadingMotionNotifications(false);
             setShouldNotifyOnMotion(false);
-            setErrorModalMsg('Service Worker not supported. Please use a modern browser.');
+            setErrorModalMsg('Service Worker not supported. Please use a modern browser to enable notifications.');
             setErrorModalOpen(true);
             return console.warn('Service Worker not supported');
           }
@@ -2419,6 +2419,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
                 style={
                   isLoadingStream
                     ? {
+                      minWidth: 'auto',
+                      minHeight: 'auto',
                       width: `${Math.max(lastVideoSize.width, 320)}px`,
                       height: `${Math.max(lastVideoSize.height, 180)}px`,
                       background: '#000',

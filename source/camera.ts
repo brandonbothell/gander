@@ -240,7 +240,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
             // --- Notify only once per motion event ---
             if (!state.notificationSent) {
               notify(dynamicStreams, streamId,
-                { channelId: 'motion_event_channel', sound: 'motion_alert' });
+                { channelId: 'motion_event_channel', sound: 'motion_alert', group: `motion_event_${streamId}` });
               state.notificationSent = true;
             }
 
@@ -327,7 +327,8 @@ async function loadStreamsFromDb() {
         notify(dynamicStreams, streamId, {
           title: 'Stream Restart Cooldown',
           body: `Stream ${streamId} is in FFmpeg restart cooldown due to repeated failures.`,
-          tag: 'server_event'
+          tag: `server_event_${streamId}`,
+          group: `stream_event_${streamId}`
         });
       }
     }
