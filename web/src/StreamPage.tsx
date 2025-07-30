@@ -1919,7 +1919,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             setErrorModalOpen(true);
             return console.warn('Service Worker not supported');
           }
-          const permission = await Notification.requestPermission();
+          const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
           if (permission !== 'granted') {
             console.warn('Notification permission not granted');
             setIsLoadingMotionNotifications(false);
