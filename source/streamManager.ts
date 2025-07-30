@@ -26,6 +26,9 @@ export class StreamManager {
   private static readonly RESTART_WINDOW_MS = 60 * 1000; // 1 minute
   private static readonly COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
   private ffmpegCooldownUntil: number = 0;
+  private segmentMonitorTimer: NodeJS.Timeout | null = null;
+  private lastSegmentTimestamp: number = Date.now();
+  private segmentCount: number = 0; // <-- Add this line
 
   constructor(config: StreamConfig) {
     this.config = config;
@@ -305,13 +308,14 @@ export class StreamManager {
 
       // Count successful segment creation and track timing
       if (output.includes("Opening") && output.includes("/segment_")) {
-        segmentCount++;
+        this.segmentCount++; // <-- Increment here
         const now = Date.now();
         const timeSinceLastSegment = now - lastSegmentTime;
         lastSegmentTime = now;
+        this.lastSegmentTimestamp = now;
 
         // Log if segments are taking too long (indicates stuttering)
-        if (segmentCount > 1 && timeSinceLastSegment > 10000) { // 10 seconds
+        if (this.segmentCount > 1 && timeSinceLastSegment > 10000) { // 10 seconds
           logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (restarting FFmpeg)`, 'warn');
           if (!this.ffmpegRestarting) {
             this.ffmpegRestarting = true;
@@ -325,13 +329,13 @@ export class StreamManager {
               setTimeout(() => this.startFFmpeg(), 1000);
             });
           }
-        } else if (segmentCount > 1 && timeSinceLastSegment > 3000) {
+        } else if (this.segmentCount > 1 && timeSinceLastSegment > 3000) {
           logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`);
         }
       }
 
       // Only check for real errors that require reencoding
-      if (inputIsRtsp && !hasErrored && segmentCount < 3) {
+      if (inputIsRtsp && !hasErrored && this.segmentCount < 3) {
         const hasRealError = (
           output.includes('Connection refused') ||
           output.includes('Connection timed out') ||
@@ -363,12 +367,30 @@ export class StreamManager {
       }
     });
 
+    // --- Add segment monitor timer ---
+    if (this.segmentMonitorTimer) clearInterval(this.segmentMonitorTimer);
+    setTimeout(() => this.segmentMonitorTimer = setInterval(() => {
+      const now = Date.now();
+      // Only check if at least one segment has been created
+      if (this.segmentCount > 0 && now - this.lastSegmentTimestamp > 15000) {
+        logMotion(`[${this.config.id}] No HLS segments created for 15s, restarting FFmpeg (auto health check)`, 'warn');
+        if (!this.ffmpegRestarting) {
+          this.reconnect();
+        }
+      }
+    }, 5000), 10000); // Start after 10 seconds to avoid false positives on startup
+
     // Robust exit handler
     ffmpegProcess.on('exit', (code, signal) => {
       // Only handle exit for the current process
       if (this.ffmpeg !== ffmpegProcess) return;
       this.ffmpeg = null;
       console.warn(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
+      // --- Clear segment monitor timer on exit ---
+      if (this.segmentMonitorTimer) {
+        clearInterval(this.segmentMonitorTimer);
+        this.segmentMonitorTimer = null;
+      }
       // --- Add cooldown check before restart ---
       if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
         logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
@@ -617,5 +639,9 @@ export class StreamManager {
     this.stopWebRTCStream();
     this.ffmpeg?.kill('SIGTERM');
     this.webrtcClients.clear();
+    if (this.segmentMonitorTimer) {
+      clearInterval(this.segmentMonitorTimer);
+      this.segmentMonitorTimer = null;
+    }
   }
 }
