@@ -656,9 +656,23 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           let hasStartedPlaying = false;
           let initialSeekDone = false;
 
-          // Add better error handling for buffer append errors
-          hls.on(Hls.Events.ERROR, (_event, data) => {
+          hls.on(Hls.Events.ERROR, async (_event, data) => {
             console.log('HLS error:', data.type, data.details, data);
+
+            // Check for 403 Forbidden on fragment/network errors
+            if (
+              data.type === Hls.ErrorTypes.NETWORK_ERROR &&
+              data.response &&
+              data.response.code === 403
+            ) {
+              console.warn('HLS 403 Forbidden: refreshing signed stream URL...');
+              setIsLoadingStream(true);
+              hls.destroy();
+              delete (videoRef.current as any)._hls;
+              // Fetch a new signed URL and reload the stream
+              await loadStream();
+              return;
+            }
 
             if (data.fatal) {
               switch (data.type) {
@@ -2400,16 +2414,23 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
                 ref={videoRef}
                 autoPlay
                 muted
-                playsInline
-                style={{
-                  width: '100%',
-                  background: '#000',
-                  // Maintain last known dimensions during loading to prevent flash
-                  minWidth: isLoadingStream ? lastVideoSize.width : 'auto',
-                  minHeight: isLoadingStream ? lastVideoSize.height : 'auto',
-                  aspectRatio: isLoadingStream ? `${lastVideoSize.width}/${lastVideoSize.height}` : 'auto',
-                  transition: isLoadingStream ? 'none' : 'all 0.2s ease-out'
-                }}
+                style={
+                  isLoadingStream
+                    ? {
+                      width: `${Math.max(lastVideoSize.width, 320)}px`,
+                      height: `${Math.max(lastVideoSize.height, 180)}px`,
+                      background: '#000',
+                      transition: 'none',
+                      display: 'block',
+                    }
+                    : {
+                      width: '100%',
+                      height: 'auto',
+                      background: '#000',
+                      transition: 'all 0.2s ease-out',
+                      display: 'block',
+                    }
+                }
               />
 
               {/* Optional: Add a loading overlay */}
