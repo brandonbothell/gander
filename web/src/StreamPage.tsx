@@ -16,7 +16,7 @@ import { type StreamMask, type Stream } from '../../source/types/shared';
 import { FiChevronDown } from 'react-icons/fi';
 import { StreamTilesGrid } from './components/StreamTilesGrid';
 import AddStreamModal from './components/AddStreamModal';
-import EditNicknameModal from './components/EditNicknameModal';
+import StreamSettingsModal from './components/StreamSettingsModal';
 import { RecordingBar } from './components/RecordingBar';
 import { StreamControlBar } from './components/StreamControlBar';
 import type { Recording } from './App';
@@ -71,7 +71,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
   const [showAddStreamModal, setShowAddStreamModal] = useState(false);
 
-  const [showEditNicknameModal, setShowEditNicknameModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingStream, setEditingStream] = useState<Stream | null>(null);
 
   const params = useParams<{ streamId?: string }>();
@@ -2310,12 +2310,12 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const gridStreams = orderedStreams.slice(0, maxStreams);
   const canAddStream = streams.length < maxStreams;
 
-  // --- Nickname editing logic ---
-  const handleStartEditNickname = (stream: Stream) => {
+  // --- Stream editing logic ---
+  const handleOpenSettings = (stream: Stream) => {
     setEditingStream(stream);
-    setShowEditNicknameModal(true);
+    setShowSettingsModal(true);
   };
-  const handleSaveNickname = async (stream: Stream, newNickname: string) => {
+  const handleSaveSettings = async (stream: Stream, newNickname: string) => {
     if (newNickname.trim() && newNickname !== stream.nickname) {
       await authFetch(`${API_BASE}/api/streams/${stream.id}`, {
         method: 'PATCH',
@@ -2327,7 +2327,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       const data = await res.json();
       setStreams(data || []);
     }
-    setShowEditNicknameModal(false);
+    setShowSettingsModal(false);
     setEditingStream(null);
   };
 
@@ -2538,7 +2538,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           canAddStream={canAddStream}
           setActiveStream={setActiveStream}
           onAddStream={() => setShowAddStreamModal(true)}
-          onEditNickname={handleStartEditNickname}
+          onOpenSettings={handleOpenSettings}
           onDeleteStream={async (stream) => {
             try {
               const res = await authFetch(`${API_BASE}/api/streams/${stream.id}`, {
@@ -2971,15 +2971,27 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         authFetch={authFetch}
         API_BASE={API_BASE}
       />
-      <EditNicknameModal
-        showModal={showEditNicknameModal}
+      <StreamSettingsModal
+        showModal={showSettingsModal}
         stream={editingStream}
         onClose={() => {
-          setShowEditNicknameModal(false);
+          setShowSettingsModal(false);
           setEditingStream(null);
         }}
         onSave={async (stream, newNickname) => {
-          await handleSaveNickname(stream, newNickname);
+          await handleSaveSettings(stream, newNickname);
+        }}
+        onReconnect={async (stream) => {
+          if (!stream) return;
+          setIsLoadingStream(true);
+          try {
+            await authFetch(`${API_BASE}/api/streams/${stream.id}/reconnect`, { method: 'POST' });
+          } catch (err: any) {
+            console.error('Failed to reconnect stream:', err);
+            alert(`Failed to reconnect stream: ${err.message || 'Network error'}`);
+          } finally {
+            setIsLoadingStream(false);
+          }
         }}
       />
     </div>

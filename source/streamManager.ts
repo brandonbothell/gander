@@ -289,19 +289,19 @@ export class StreamManager {
 
     console.info(`[${this.config.id}] Starting FFmpeg with args:`, ffmpegArgs.join(' '));
 
-    this.ffmpeg = spawn('ffmpeg', ffmpegArgs, {
+    const ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
       stdio: ['ignore', 'ignore', 'pipe'],
       shell: false
     });
 
+    this.ffmpeg = ffmpegProcess; // Track the current process
+
     let hasErrored = false;
-    let stderr = '';
     let segmentCount = 0;
     let lastSegmentTime = Date.now();
 
-    this.ffmpeg.stderr?.on('data', data => {
+    ffmpegProcess.stderr?.on('data', data => {
       const output = data.toString();
-      stderr += output;
 
       // Count successful segment creation and track timing
       if (output.includes("Opening") && output.includes("/segment_")) {
@@ -363,9 +363,11 @@ export class StreamManager {
       }
     });
 
-    // Auto-restart FFmpeg on crash/exit
-    const handleFfmpegExit = (code: number | null, signal: NodeJS.Signals | null) => {
-      this.ffmpeg = null; // Always clear reference on exit
+    // Robust exit handler
+    ffmpegProcess.on('exit', (code, signal) => {
+      // Only handle exit for the current process
+      if (this.ffmpeg !== ffmpegProcess) return;
+      this.ffmpeg = null;
       console.warn(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
       // --- Add cooldown check before restart ---
       if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
@@ -373,7 +375,7 @@ export class StreamManager {
         return;
       }
       // Only try reencoding if stream copy failed and we got no segments
-      if (!hasErrored && inputIsRtsp && code !== 0 && signal !== 'SIGTERM' && segmentCount === 0) {
+      if (!hasErrored && inputIsRtsp && code !== 0 && (signal !== 'SIGTERM' && signal !== 'SIGKILL') && segmentCount === 0) {
         console.warn(`[${this.config.id}] Stream copy failed on exit, trying reencoding...`);
         hasErrored = true;
         if (!this.ffmpegRestarting) {
@@ -394,10 +396,7 @@ export class StreamManager {
           });
         }
       }
-    };
-
-    this.ffmpeg.addListener('exit', handleFfmpegExit);
-    setTimeout(() => { this.ffmpeg?.removeListener('exit', handleFfmpegExit); }, 20000);
+    });
   }
 
   /**
@@ -420,45 +419,55 @@ export class StreamManager {
     }
 
     // 2. Kill all ffmpeg processes for this stream (by matching hlsDir in command line)
-    try {
-      const hlsDir = this.config.hlsDir;
-      if (process.platform === 'win32') {
-        // Windows: use WMIC
-        const searchStr = hlsDir.replace(/\\/g, '\\\\');
-        exec(`wmic process where "CommandLine like '%${searchStr}%'" get ProcessId,CommandLine /FORMAT:CSV`, (err, stdout) => {
-          if (!err && stdout) {
-            const lines = stdout.split('\n').filter(l => l.toLowerCase().includes('ffmpeg'));
-            for (const line of lines) {
-              const match = line.match(/,ffmpeg.*?(\d+)\s*$/i);
-              if (match) {
-                const pid = match[1];
+    const killFFmpegPromise = new Promise<void>((resolve) => {
+      // Also kill the managed ffmpeg process if still running
+      this.ffmpeg?.kill('SIGKILL');
+      this.ffmpeg = null;
+
+      try {
+        const hlsDir = this.config.hlsDir;
+        if (process.platform === 'win32') {
+          // Windows: use WMIC
+          const searchStr = hlsDir.replace(/\\/g, '\\\\');
+          exec(`wmic process where "CommandLine like '%${searchStr}%'" get ProcessId,CommandLine /FORMAT:CSV`, (err, stdout) => {
+            if (!err && stdout) {
+              const lines = stdout.split('\n').filter(l => l.toLowerCase().includes('ffmpeg'));
+              for (const line of lines) {
+                const match = line.match(/,ffmpeg.*?(\d+)\s*$/i);
+                if (match) {
+                  const pid = match[1];
+                  logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
+                  try { process.kill(Number(pid), 'SIGKILL'); } catch { }
+                }
+              }
+            }
+            resolve();
+          });
+        } else {
+          // Linux/macOS: use ps/grep/awk
+          // Escape the hlsDir for grep (spaces, etc)
+          const grepStr = hlsDir.replace(/(["'$`\\])/g, '\\$1');
+          // Find all ffmpeg processes with the hlsDir in their command line
+          exec(`ps -eo pid,command | grep '[f]fmpeg' | grep '${grepStr}' | awk '{print $1}'`, (err, stdout) => {
+            if (!err && stdout) {
+              const pids = stdout.split('\n').map(line => line.trim()).filter(Boolean);
+              for (const pid of pids) {
                 logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
                 try { process.kill(Number(pid), 'SIGKILL'); } catch { }
               }
             }
-          }
-        });
-      } else {
-        // Linux/macOS: use ps/grep/awk
-        // Escape the hlsDir for grep (spaces, etc)
-        const grepStr = hlsDir.replace(/(["'$`\\])/g, '\\$1');
-        // Find all ffmpeg processes with the hlsDir in their command line
-        exec(`ps -eo pid,command | grep '[f]fmpeg' | grep '${grepStr}' | awk '{print $1}'`, (err, stdout) => {
-          if (!err && stdout) {
-            const pids = stdout.split('\n').map(line => line.trim()).filter(Boolean);
-            for (const pid of pids) {
-              logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
-              try { process.kill(Number(pid), 'SIGKILL'); } catch { }
-            }
-          }
-        });
+            resolve();
+          });
+        }
+      } catch (e) {
+        logMotion(`[${streamId}] Error killing ffmpeg processes: ${e}`, 'warn');
       }
-      // Also kill the managed ffmpeg process if still running
-      this.ffmpeg?.kill('SIGKILL');
-      this.ffmpeg = null;
-    } catch (e) {
-      logMotion(`[${streamId}] Error killing ffmpeg processes: ${e}`, 'warn');
-    }
+    });
+
+    await killFFmpegPromise;
+
+    // 2.5. Wait a bit for OS/camera to release resources
+    await new Promise(res => setTimeout(res, 1500)); // 1.5 seconds
 
     // 3. Clean HLS and flush directories
     try {
@@ -580,7 +589,7 @@ export class StreamManager {
       if (!output.includes('frame=') &&
         !output.includes('bitrate=') &&
         !output.includes('speed=')) {
-        console.error(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
+        console.info(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
       }
     });
 

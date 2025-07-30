@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { type Stream } from '../../../source/types/shared';
 
-interface EditNicknameModalProps {
+interface StreamSettingsModalProps {
   showModal: boolean;
   stream: Stream | null;
   onClose: () => void;
   onSave: (stream: Stream, newNickname: string) => Promise<void>;
+  onReconnect: (stream: Stream) => Promise<void>; // <-- Add this prop
 }
 
-const EditNicknameModal: React.FC<EditNicknameModalProps> = ({
+const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
   showModal,
   stream,
   onClose,
   onSave,
+  onReconnect,
 }) => {
   const [nicknameDraft, setNicknameDraft] = useState('');
+  const [reconnecting, setReconnecting] = useState(false);
+  const [showReconnectedMessage, setShowReconnectedMessage] = useState(false);
+  const lastReconnectingRef = React.useRef<boolean>(reconnecting);
 
   // Update draft when stream changes
   useEffect(() => {
@@ -35,6 +40,24 @@ const EditNicknameModal: React.FC<EditNicknameModalProps> = ({
       handleClose();
     }
   };
+
+  const handleReconnect = async () => {
+    if (!stream) return;
+    setReconnecting(true);
+    try {
+      await onReconnect(stream);
+    } finally {
+      setReconnecting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (lastReconnectingRef.current !== reconnecting && !reconnecting) {
+      setShowReconnectedMessage(true);
+      setTimeout(() => setShowReconnectedMessage(false), 3000); // Show message for 3 seconds
+    }
+    lastReconnectingRef.current = reconnecting;
+  }, [reconnecting]);
 
   if (!showModal || !stream) return null;
 
@@ -67,8 +90,11 @@ const EditNicknameModal: React.FC<EditNicknameModalProps> = ({
         }}
         onClick={e => e.stopPropagation()}
       >
-        <h2 style={{ marginTop: 0 }}>Edit Nickname</h2>
+        <h2 style={{ marginTop: 0 }}>Stream Settings</h2>
         <form onSubmit={handleSubmit}>
+          <label style={{ fontWeight: 500, marginBottom: 6, display: 'block' }}>
+            Edit Nickname
+          </label>
           <input
             type="text"
             value={nicknameDraft}
@@ -113,6 +139,23 @@ const EditNicknameModal: React.FC<EditNicknameModalProps> = ({
             >
               Save
             </button>
+            <button
+              type="button"
+              onClick={handleReconnect}
+              disabled={reconnecting || showReconnectedMessage}
+              style={{
+                background: showReconnectedMessage ? 'rgb(30, 209, 51)' : '#1976d2',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 6,
+                padding: '8px 18px',
+                fontWeight: 600,
+                cursor: reconnecting ? 'not-allowed' : 'pointer',
+                opacity: reconnecting ? 0.7 : 1,
+              }}
+            >
+              {reconnecting ? 'Reconnecting...' : showReconnectedMessage ? 'Reconnected!' : 'Reconnect Camera'}
+            </button>
           </div>
         </form>
       </div>
@@ -120,4 +163,4 @@ const EditNicknameModal: React.FC<EditNicknameModalProps> = ({
   );
 };
 
-export default EditNicknameModal;
+export default StreamSettingsModal;

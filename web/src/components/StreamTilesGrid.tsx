@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { FiCircle, FiPause, FiPlay, FiX } from 'react-icons/fi';
+import { FiCircle, FiPause, FiPlay, FiSettings, FiX } from 'react-icons/fi';
 import { type Stream } from '../../../source/types/shared'
 
 interface StreamTilesGridProps {
   streams: Stream[];
   canAddStream: boolean;
   onAddStream: () => void;
-  onEditNickname: (stream: Stream) => void;
+  onOpenSettings: (stream: Stream) => void;
   getThumbUrl: (stream: Stream) => string;
   setActiveStream: (stream: Stream) => void;
   onViewRecordings: (stream: Stream) => void;
@@ -22,7 +22,7 @@ export function StreamTilesGrid({
   streams,
   canAddStream,
   onAddStream,
-  onEditNickname,
+  onOpenSettings,
   getThumbUrl,
   setActiveStream,
   onViewRecordings,
@@ -318,7 +318,7 @@ export function StreamTilesGrid({
               <button
                 onClick={e => {
                   e.stopPropagation();
-                  onEditNickname(stream);
+                  onOpenSettings(stream);
                 }}
                 style={{
                   background: 'transparent',
@@ -345,23 +345,8 @@ export function StreamTilesGrid({
                   e.currentTarget.style.color = '#fff';
                 }}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'middle' }}
-                  aria-hidden="true"
-                  focusable="false"
-                >
-                  <path d="M15.232 5.232l-10 10V17h1.768l10-10-1.768-1.768zM17.414 3.414a2 2 0 0 0-2.828 0l-1.172 1.172 2.828 2.828 1.172-1.172a2 2 0 0 0 0-2.828z" />
-                </svg>
-                Edit Nickname
+                <FiSettings style={{ marginRight: 8 }} />
+                Settings
               </button>
               <button
                 onClick={e => {
