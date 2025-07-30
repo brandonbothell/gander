@@ -1905,6 +1905,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
             await setupPushNotifications();
           } catch (err) {
             console.error('Failed to enable push notifications:', err);
+            setErrorModalMsg('Failed to enable motion notifications. Please check your device settings.');
+            setErrorModalOpen(true);
             setIsLoadingMotionNotifications(false);
             setShouldNotifyOnMotion(false);
           }
