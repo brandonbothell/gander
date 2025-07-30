@@ -7,7 +7,7 @@ interface FloatingMenuPopoutProps {
   open: boolean;
   selected: string[];
   setSelected: (sel: string[]) => void;
-  activeStreamId: string;
+  viewingStreamId: string;
   cachedRecordings: Recording[];
   setRecordings: (recs: Recording[]) => void;
   recordingsListRef: React.RefObject<HTMLDivElement | null>;
@@ -17,7 +17,7 @@ export function FloatingMenuPopout({
   open,
   selected,
   setSelected,
-  activeStreamId,
+  viewingStreamId,
   cachedRecordings,
   setRecordings,
   recordingsListRef,
@@ -36,7 +36,7 @@ export function FloatingMenuPopout({
           }}
         >
           <BatchDeleteButton
-            streamId={activeStreamId}
+            streamId={viewingStreamId}
             count={selected.length}
             selected={selected}
             recordings={cachedRecordings}

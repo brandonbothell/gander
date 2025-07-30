@@ -2033,10 +2033,12 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   function handleImmediateDeleteUpdate(deletedFilenames: string[]) {
     if (!activeStream) return;
 
+    const viewingStream = viewingRecordingsFrom ?? activeStream;
+
     // Remove from cachedRecordings
     setCachedRecordings(prev => {
-      const updated = (prev[activeStream.id] || []).filter(r => !deletedFilenames.includes(r.filename));
-      return { ...prev, [activeStream.id]: updated.sort((a, b) => b.filename.localeCompare(a.filename)) };
+      const updated = (prev[viewingStream.id] || []).filter(r => !deletedFilenames.includes(r.filename));
+      return { ...prev, [viewingStream.id]: updated.sort((a, b) => b.filename.localeCompare(a.filename)) };
     });
 
     // Remove from selected
@@ -2044,15 +2046,15 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     // Update lastSeenRecording if it was deleted
     setLastSeenRecording(prev => {
-      const currentLastSeen = prev[activeStream.id];
+      const currentLastSeen = prev[viewingStream.id];
       if (currentLastSeen && deletedFilenames.includes(currentLastSeen)) {
         // Find the next most recent recording that wasn't deleted
-        const remainingRecordings = (cachedRecordings[activeStream.id] || [])
+        const remainingRecordings = (cachedRecordings[viewingStream.id] || [])
           .filter(r => !deletedFilenames.includes(r.filename))
           .sort((a, b) => b.filename.localeCompare(a.filename));
 
         const newLastSeen = remainingRecordings.length > 0 ? remainingRecordings[0].filename : null;
-        return { ...prev, [activeStream.id]: newLastSeen };
+        return { ...prev, [viewingStream.id]: newLastSeen };
       }
       return prev;
     });
@@ -2962,18 +2964,20 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       {activeStream && (<FloatingMenuPopout
         selected={selected}
         setSelected={setSelected}
-        activeStreamId={activeStream.id}
-        cachedRecordings={cachedRecordings[activeStream.id]}
+        viewingStreamId={viewingRecordingsFrom?.id ?? activeStream.id}
+        cachedRecordings={cachedRecordings[viewingRecordingsFrom?.id ?? activeStream.id]}
         setRecordings={recs => {
           if (!activeStream) return;
 
+          const viewingStream = viewingRecordingsFrom ?? activeStream;
+
           setCachedRecordings(prev => ({
             ...prev,
-            [activeStream.id]: recs.sort((a, b) => b.filename.localeCompare(a.filename))
+            [viewingStream.id]: recs.sort((a, b) => b.filename.localeCompare(a.filename))
           }));
           setTotalRecordings(prev => ({
             ...prev,
-            [activeStream.id]: Math.max(0, (prev[activeStream.id] || 0) - selected.length)
+            [viewingStream.id]: Math.max(0, (prev[viewingStream.id] || 0) - selected.length)
           }));
           handleImmediateDeleteUpdate(selected);
           setMenuOpen(false); // <-- Close menu on batch delete
