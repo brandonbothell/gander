@@ -992,6 +992,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     function onScroll() {
       if (!activeStream) return;
+
+      // Don't trigger infinite scroll if searching or filtered results are empty
+      if (isSearching || filteredRecordings.length === 0) return;
+
       const recordingsStream = viewingRecordingsFrom ?? activeStream;
 
       const totalRemaining = (totalRecordings[recordingsStream.id] || 0) - (cachedRecordings[recordingsStream.id]?.length || 0);
@@ -1033,7 +1037,11 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     list.addEventListener('scroll', onScroll, { passive: true });
     return () => list.removeEventListener('scroll', onScroll);
-  }, [cachedRecordings, activeStream, viewingRecordingsFrom, currentPage, totalRecordings, isLoadingMore]);
+  }, [
+    cachedRecordings, activeStream, viewingRecordingsFrom,
+    currentPage, totalRecordings, isLoadingMore,
+    isSearching, filteredRecordings
+  ]);
 
   useEffect(() => {
     const list = recordingsListRef.current;
