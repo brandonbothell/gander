@@ -174,7 +174,11 @@ async function flushMotionSegments(
   const stream = dynamicStreams[streamId];
 
   if (state.savingInProgress) {
-    setTimeout(() => flushMotionSegments(streamStates, dynamicStreams, streamId), 1000);
+    state.flushingSegments = ['dummy']; // Prevent further saves while flushing
+    setTimeout(() => {
+      state.flushingSegments = [];
+      flushMotionSegments(streamStates, dynamicStreams, streamId);
+    }, 1000);
     return;
   }
 
@@ -182,21 +186,19 @@ async function flushMotionSegments(
 
   state.flushingSegments = [...new Set(state.motionSegments)];
   state.motionSegments = [];
+
+  const flushNumber = state.nextFlushNumber++;
   const existingSegmentsPromises = state.flushingSegments.map(async segmentPath => {
     return { segmentPath, exists: await fs.promises.access(segmentPath).then(() => true).catch(() => false) };
   });
-  const existingSegments = (await Promise.all(existingSegmentsPromises)).filter(seg => seg.exists);
+  const existingSegments = (await Promise.all(existingSegmentsPromises))
+    .filter(seg => seg.exists)
+    .sort((a, b) => path.basename(a.segmentPath).localeCompare(path.basename(b.segmentPath)));
 
   if (existingSegments.length === 0) {
     logMotion(`[${streamId}] No existing segments to flush`);
     return;
   }
-
-  // Determine flush number
-  const flushFiles = await fs.promises.readdir(stream.config.flushDir)
-    .then(files => files.filter(f => f.startsWith(state.recordingTitle + '_flush_')))
-    .catch(() => []);
-  const flushNumber = flushFiles.length + 1;
 
   const listFile = path.join(stream.config.flushDir, `concat_list_flush_${flushNumber}.txt`);
   const flushOutFile = path.join(stream.config.flushDir, `${state.recordingTitle}_flush_${flushNumber}.ts`);
@@ -265,7 +267,10 @@ async function saveMotionSegments(
   const existingSegmentsPromises = uniqueSegments.map(async segmentPath => {
     return { segmentPath, exists: await fs.promises.access(segmentPath).then(() => true).catch(() => false) };
   });
-  const existingSegments = (await Promise.all(existingSegmentsPromises)).filter(seg => seg.exists).map(seg => seg.segmentPath);
+  const existingSegments = (await Promise.all(existingSegmentsPromises))
+    .filter(seg => seg.exists)
+    .sort((a, b) => path.basename(a.segmentPath).localeCompare(path.basename(b.segmentPath)))
+    .map(seg => seg.segmentPath);
 
   // Build concat list: flushed files first, then remaining segments
   const concatList: string[] = [

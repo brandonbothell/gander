@@ -133,6 +133,7 @@ export interface StreamMotionState {
   flushTimer?: NodeJS.Timeout; // Timer for flushing segments
   flushedSegments: string[]; // Segments that have been flushed
   flushRecordings: string[]; // Filenames of that have been flushed
+  nextFlushNumber: number; // Next flush number to use for segment naming
   recordingTitle: string; // Title for the current recording
 }
 
@@ -162,6 +163,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       lastSegmentProcessAt: 0,
       recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
       flushRecordings: [],
+      nextFlushNumber: 1,
     };
 
     logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
@@ -214,9 +216,10 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
 
             if (!state.motionRecordingActive) {
               state.motionRecordingActive = true;
-              state.startedRecordingAt = Date.now(); // Set when recording starts
+              state.startedRecordingAt = Date.now();
               state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
               state.notificationSent = false;
+              state.nextFlushNumber = 1;
               if (state.motionTimeout) clearTimeout(state.motionTimeout);
               state.recentSegments.forEach(recentPath => {
                 if (!state.motionSegments.includes(recentPath)) state.motionSegments.push(recentPath);
@@ -257,6 +260,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
               state.motionRecordingActive = false;
               state.startedRecordingAt = 0; // Reset when recording stops
               state.motionRecordingTimeoutAt = 0;
+              state.nextFlushNumber = 1;
               if (state.flushTimer) {
                 clearInterval(state.flushTimer);
                 state.flushTimer = undefined;
