@@ -837,7 +837,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     // Add a small delay before hiding loading state to prevent flickering
     setTimeout(() => {
-      setIsLoadingStream(false);
+      // setIsLoadingStream(false);
       setLoading(false);
     }, 100);
   }
@@ -2152,7 +2152,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           video.style.width = '100%';
           video.style.height = '';
 
-          setIsLoadingStream(false); // Clear loading state when video has dimensions
+          // setIsLoadingStream(false); // Clear loading state when video has dimensions
         }, 200); // Delay to ensure video is ready
       }
     }
@@ -2986,11 +2986,12 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           setIsLoadingStream(true);
           try {
             await authFetch(`${API_BASE}/api/streams/${stream.id}/reconnect`, { method: 'POST' });
+            setTimeout(loadStream, 5000); // Reload video element
           } catch (err: any) {
             console.error('Failed to reconnect stream:', err);
             alert(`Failed to reconnect stream: ${err.message || 'Network error'}`);
           } finally {
-            setIsLoadingStream(false);
+            setTimeout(() => setIsLoadingStream(false), 5000);
           }
         }}
       />
