@@ -2456,6 +2456,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
                 ref={videoRef}
                 autoPlay
                 muted
+                controls={false}
                 style={
                   isLoadingStream
                     ? {
