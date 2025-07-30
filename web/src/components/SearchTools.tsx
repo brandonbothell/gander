@@ -1,4 +1,4 @@
-import { forwardRef, useRef, useState, useEffect } from "react";
+import React, { forwardRef, useRef, useState, useEffect } from "react";
 import { FiRefreshCw } from "react-icons/fi";
 import { isIOS } from "../StreamPage";
 
@@ -23,6 +23,8 @@ interface SearchToolsProps {
   onUserTyping?: (typing: boolean) => void;
   onSearchInputActiveChange?: (active: boolean) => void;
   onFilterUpdateBlocked?: (blocked: boolean) => void;
+  onFocusSearchTools?: () => void;
+  onBlurSearchTools?: () => void;
   isSearching?: boolean; // Add this prop
 }
 
@@ -40,6 +42,8 @@ export const SearchTools = forwardRef<HTMLDivElement, SearchToolsProps>(({
   openAndScrollToRecordingsList,
   onBlurSearchInput,
   onUserTyping,
+  onFocusSearchTools,
+  onBlurSearchTools,
   onSearchInputActiveChange,
   onFilterUpdateBlocked,
   isSearching = false, // Add this prop with default value
@@ -48,6 +52,7 @@ export const SearchTools = forwardRef<HTMLDivElement, SearchToolsProps>(({
   const inputRef = useRef<HTMLInputElement>(null);
   const blurTimeoutRef = useRef<number | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Add state to track date input timeouts (keep this simple)
   const [dateInputTimeouts, setDateInputTimeouts] = useState<{ [key: string]: number }>({});
@@ -202,9 +207,37 @@ export const SearchTools = forwardRef<HTMLDivElement, SearchToolsProps>(({
     setDateInputTimeouts(prev => ({ ...prev, [field]: timeoutId }));
   };
 
+  // Use this effect to handle focus within the whole container
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    function handleFocusIn() {
+      onFocusSearchTools?.();
+    }
+    function handleFocusOut(e: FocusEvent) {
+      // Only call onBlur if focus is leaving the container entirely
+      if (!node?.contains(e.relatedTarget as Node)) {
+        onBlurSearchTools?.();
+      }
+    }
+    node.addEventListener('focusin', handleFocusIn);
+    node.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      node.removeEventListener('focusin', handleFocusIn);
+      node.removeEventListener('focusout', handleFocusOut);
+    };
+  }, [onFocusSearchTools, onBlurSearchTools]);
+
   return (
     <div
-      ref={ref}
+      ref={node => {
+        // Support both forwarded ref and local ref
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+        containerRef.current = node;
+      }}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -277,8 +310,13 @@ export const SearchTools = forwardRef<HTMLDivElement, SearchToolsProps>(({
             placeholder="Search recordings..."
             value={search}
             onChange={handleInputChange}
-            onBlur={handleInputBlur}
-            onFocus={handleInputFocus}
+            onFocus={() => {
+              onFocusSearchTools?.()
+              handleInputFocus();
+            }}
+            onBlur={e => {
+              handleInputBlur(e);
+            }}
             onKeyDown={handleInputKeyDown}
             className="recording-nickname"
             disabled={isSearching}
@@ -403,6 +441,7 @@ export const SearchTools = forwardRef<HTMLDivElement, SearchToolsProps>(({
             type="checkbox"
             checked={isNicknamedOnly}
             disabled={isSearching}
+            onFocus={() => onFocusSearchTools?.()}
             onChange={e => {
               if (!isSearching) {
                 setIsNicknamedOnly(e.target.checked);
@@ -465,6 +504,7 @@ export const SearchTools = forwardRef<HTMLDivElement, SearchToolsProps>(({
                     if (!isSearching) {
                       handleDateInputFocus('from');
                     }
+                    onFocusSearchTools?.()
                   }}
                   onChange={e => {
                     // COMPLETELY block onChange during auto-population detection OR while searching
@@ -493,6 +533,7 @@ export const SearchTools = forwardRef<HTMLDivElement, SearchToolsProps>(({
                     if (!isSearching) {
                       handleDateInputFocus('to');
                     }
+                    onFocusSearchTools?.()
                   }}
                   onChange={e => {
                     // COMPLETELY block onChange during auto-population detection OR while searching

@@ -174,6 +174,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [userTyping, setUserTyping] = useState(false);
   const [searchInputActive, setSearchInputActive] = useState(false);
   const [filterUpdatesBlocked, setFilterUpdatesBlocked] = useState(false);
+  const [searchToolsInteracting, setSearchToolsInteracting] = useState(false);
 
   const handleLogout = async () => {
     if (confirm('Are you sure you want to log out?')) {
@@ -246,7 +247,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     // If user is actively typing and we have frozen results, return those to prevent DOM changes
     if (userTyping && frozenFilteredRecordings.length > 0) {
-      return frozenFilteredRecordings;
+      // <-- PAGINATE frozen results
+      return frozenFilteredRecordings.slice(0, filteredRecordingsPage * PAGE_SIZE);
     }
 
     // If no search filters are active, return paginated results immediately
@@ -258,7 +260,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     // For searches, return cached results if available, otherwise perform immediate sync search
     if (filteredRecordingsCache.length > 0 || isSearching) {
-      return filteredRecordingsCache;
+      // <-- PAGINATE search results
+      return filteredRecordingsCache.slice(0, filteredRecordingsPage * PAGE_SIZE);
     }
 
     // Fallback: perform immediate synchronous search if cache is empty
@@ -308,8 +311,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       return true;
     });
 
-    // Sort and return immediate results
-    return immediateResults.sort((a, b) => b.filename.localeCompare(a.filename));
+    // Sort and return immediate results, paginated
+    return immediateResults
+      .sort((a, b) => b.filename.localeCompare(a.filename))
+      .slice(0, filteredRecordingsPage * PAGE_SIZE);
   }, [
     cachedRecordings, nicknames, search,
     isNicknamedOnly, dateRange, filteredRecordingsPage,
@@ -1045,6 +1050,52 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     return () => list.removeEventListener('scroll', onScroll);
   }, [filteredRecordingsPage, cachedRecordings, activeStream, viewingRecordingsFrom, currentPage, totalRecordings, isLoadingMore]);
 
+  useEffect(() => {
+    const list = recordingsListRef.current;
+    if (
+      !list ||
+      isLoadingMore ||
+      !recordingsListOpen
+    ) return;
+
+    const recordingsStream = viewingRecordingsFrom ?? activeStream;
+    if (!recordingsStream) return;
+
+    // Check if more can be loaded
+    const totalAvailable = totalRecordings[recordingsStream.id] || 0;
+    const cachedLen = cachedRecordings[recordingsStream.id]?.length || 0;
+
+    // If all loaded, do nothing
+    if (cachedLen >= totalAvailable) return;
+
+    // If the list is not scrollable (all content fits), or user is at bottom, load more
+    const isScrollable = list.scrollHeight > list.clientHeight;
+    const isAtBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 10;
+
+    if (!isScrollable || isAtBottom) {
+      // Load next page
+      setIsLoadingMore(true);
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      setFilteredRecordingsPage(page => page + 1);
+      loadPage(recordingsStream, nextPage, true).finally(() => {
+        setIsLoadingMore(false);
+      });
+    }
+  }, [
+    filteredRecordings, // triggers when list changes
+    isLoadingMore,
+    recordingsListOpen,
+    currentPage,
+    totalRecordings,
+    cachedRecordings,
+    activeStream,
+    viewingRecordingsFrom,
+    loadPage,
+    setCurrentPage,
+    setFilteredRecordingsPage,
+  ]);
+
   // Open the recordings list when swiping up at the bottom of the page
   useEffect(() => {
     function onTouchStart(e: TouchEvent) {
@@ -1205,14 +1256,25 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
     function handleScroll() {
       const currentScrollY = window.scrollY;
-      if (keyboardTransitioningRef.current || isKeyboardOpen || forceSticky || Date.now() < autoScrollUntilRef.current) {
+
+      // 1. Suppress closing for 1s after opening the list
+      if (
+        Date.now() - lastRecordingsListCloseTime.current < 1000 ||
+        keyboardTransitioningRef.current ||
+        isKeyboardOpen ||
+        forceSticky ||
+        Date.now() < autoScrollUntilRef.current ||
+        searchToolsInteracting
+      ) {
         lastScrollY = currentScrollY;
-        return; // Ignore scroll events while keyboard is transitioning or auto-scrolling
+        return;
       }
-      // Only close if scrolling up
+
+      // 2. Only close if scrolling up by at least 20px
+      const scrollDelta = lastScrollY - currentScrollY;
       if (
         recordingsListRef.current?.scrollTop === 0 &&
-        currentScrollY < lastScrollY &&
+        scrollDelta > 20 &&
         window.innerHeight + currentScrollY < document.body.offsetHeight - window.innerHeight * 0.1 &&
         recordingsListOpen
       ) {
@@ -1226,19 +1288,13 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       lastScrollY = currentScrollY;
     }
 
-    // Debounce scroll event to avoid animation issues
-    let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
     if (recordingsListOpen) {
-      scrollTimeout = setTimeout(() => {
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        scrollTimeout = null;
-      }, 1500);
+      window.addEventListener('scroll', handleScroll, { passive: true });
     }
     return () => {
-      if (scrollTimeout) clearTimeout(scrollTimeout);
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [recordingsListOpen]);
+  }, [recordingsListOpen, searchToolsInteracting, isKeyboardOpen, forceSticky]);
 
   // For scrolling behavior, we need to set the sticky state based on scroll position
   useEffect(() => {
@@ -2683,6 +2739,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
               onFilterUpdateBlocked={setFilterUpdatesBlocked}
               onFocusSearchInput={isMobileWidth ? () => setForceSticky(true) : undefined}
               onBlurSearchInput={isMobileWidth ? () => setForceSticky(false) : undefined}
+              onFocusSearchTools={() => setSearchToolsInteracting(true)}
+              onBlurSearchTools={() => setSearchToolsInteracting(false)}
               onRefresh={isMobileWidth ? undefined : async () => {
                 setIsDesktopRefreshing(true);
                 const recordingsStream = viewingRecordingsFrom ?? activeStream;
