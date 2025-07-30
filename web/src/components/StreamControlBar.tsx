@@ -312,7 +312,7 @@ export function StreamControlBar({
       <div
         style={{
           position: 'absolute',
-          bottom: `calc(${videoRect.top}px + 2rem + 8px)`,
+          bottom: `calc(${videoRect.top}px + 2rem)`,
           left: `${videoRect.left}px`,
           width: `${videoRect.width}px`,
           height: `${sizes.barHeight}px`, // Responsive height
