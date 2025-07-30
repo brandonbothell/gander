@@ -426,8 +426,15 @@ async function cleanupExpiredTokensAndDevices() {
 
 // --- CORS ---
 app.use(cors({
-  origin: (process.env.API_ENV === 'production' ? [] : ['http://localhost:3000'])
-    .concat(process.env.VITE_BASE_URL ? [process.env.VITE_BASE_URL] : []),
+  origin: (origin, callback) => {
+    const allowedOrigins = (process.env.API_ENV === 'production' ? [] : ['http://localhost:3000'])
+      .concat(process.env.VITE_BASE_URL ? [process.env.VITE_BASE_URL] : []);
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`[CORS] Denied request from origin: ${origin}`));
+    }
+  },
   credentials: true
 }));
 
