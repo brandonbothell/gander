@@ -57,29 +57,46 @@ export default function initializeMotionRoutes(
     }) || { nickname: dynamicStreams[streamId].config.ffmpegInput };
 
     if (state.motionPaused) {
-      // Cancel any ongoing save operation
-      if (state.savingInProgress && state.currentSaveProcess) {
-        logMotion(`[${streamId}] Pausing motion - canceling ongoing save operation`);
-        state.currentSaveProcess.kill('SIGTERM');
-        state.savingInProgress = false;
-        state.currentSaveProcess = null;
-        state.saveRetryCount = 0;
-      }
-
       if (state.motionRecordingActive) {
-        if (state.motionTimeout) clearTimeout(state.motionTimeout);
-        // Save any pending segments before pausing
-        if (state.motionSegments.length > 0 || state.flushingSegments.length > 0) {
-          saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId).then(() => {
-            state.notificationSent = false;
-            state.motionRecordingActive = false;
-            state.motionRecordingTimeoutAt = 0;
-            if (state.flushTimer) {
-              clearInterval(state.flushTimer);
-              state.flushTimer = undefined;
-            }
-          });
+        if (state.motionTimeout) {
+          clearTimeout(state.motionTimeout);
+          state.motionTimeout = undefined;
         }
+        if (state.flushTimer) {
+          clearInterval(state.flushTimer);
+          state.flushTimer = undefined;
+        }
+
+        if (state.flushingSegments.length > 0) {
+          // Wait for flush to complete before pausing
+          state.cancelFlush = true;
+          const waitForFlush = new Promise<void>(resolveFlush => {
+            const checkFlush = setInterval(() => {
+              if (state.flushingSegments.length === 0 && !state.savingInProgress) {
+                clearInterval(checkFlush);
+                resolveFlush();
+              }
+            }, 1000);
+          });
+          await waitForFlush;
+        }
+
+        if (!state.savingInProgress && !state.currentSaveProcess) {
+          // Save any pending segments before pausing
+          if (state.motionSegments.length > 0 || state.flushRecordings.length > 0) {
+            saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId).then(() => {
+              state.notificationSent = false;
+              state.motionRecordingActive = false;
+              state.motionRecordingTimeoutAt = 0;
+            });
+          }
+        } else {
+          // If saving is in progress, just pause the recording
+          state.notificationSent = false;
+          state.motionRecordingActive = false;
+          state.motionRecordingTimeoutAt = 0;
+        }
+
       }
 
       await notify(dynamicStreams, streamId, {
@@ -175,10 +192,16 @@ async function flushMotionSegments(
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
 
+  if (state.cancelFlush) {
+    logMotion(`[${streamId}] Flush operation was canceled`);
+    state.cancelFlush = false;
+    state.flushingSegments = [];
+    return;
+  }
+
   if (state.savingInProgress) {
     state.flushingSegments = ['dummy']; // Prevent further saves while flushing
     setTimeout(() => {
-      state.flushingSegments = [];
       flushMotionSegments(streamStates, dynamicStreams, streamId);
     }, 1000);
     return;
@@ -209,6 +232,14 @@ async function flushMotionSegments(
 
   const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${flushOutFile}"`;
 
+  if (state.cancelFlush) {
+    logMotion(`[${streamId}] Flush operation was canceled`);
+    state.cancelFlush = false;
+    state.motionSegments = state.flushingSegments; // Restore segments
+    state.flushingSegments = [];
+    return;
+  }
+
   logMotion(`[${streamId}] Flushing ${existingSegments.length} segments to ${path.basename(flushOutFile)}`);
 
   await new Promise<void>((resolve, reject) => {
@@ -218,6 +249,7 @@ async function flushMotionSegments(
         logMotion(`[${streamId}] FFmpeg flush failed: ${err}`, 'error');
         state.motionSegments = state.flushingSegments; // Restore segments on error
         state.flushingSegments = [];
+        state.cancelFlush = false;
         reject(err);
         return;
       }
@@ -230,6 +262,7 @@ async function flushMotionSegments(
       });
       await Promise.all(promises);
       state.flushingSegments = [];
+      state.cancelFlush = false;
       state.flushRecordings.push(flushOutFile);
       resolve();
     });
@@ -244,6 +277,15 @@ async function saveMotionSegments(
 ): Promise<void> {
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
+
+  const flushingOrSaving = state.flushingSegments.length > 0 && state.savingInProgress;
+
+  if (flushingOrSaving) {
+    console.warn(`[${streamId}] Flush and save operations called simultaneously, cancelling flush and continuing save`);
+    state.cancelFlush = true;
+  }
+
+  state.savingInProgress = flushingOrSaving;
 
   if (state.flushingSegments.length > 0) {
     setTimeout(() => saveMotionSegments(streamStates, dynamicStreams, streamId), 1000);

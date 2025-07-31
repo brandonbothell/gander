@@ -118,7 +118,7 @@ export interface RequestWithUser extends express.Request {
 export interface StreamMotionState {
   notificationSent: boolean;
   motionRecordingActive: boolean;
-  motionTimeout: NodeJS.Timeout | null;
+  motionTimeout?: NodeJS.Timeout;
   motionRecordingTimeoutAt: number;
   motionSegments: string[];
   flushingSegments: string[]; // Segments currently being flushed
@@ -136,6 +136,7 @@ export interface StreamMotionState {
   nextFlushNumber: number; // Next flush number to use for segment naming
   recordingTitle: string; // Title for the current recording
   cleaningUp: boolean; // Whether HLS/flush directory cleanup is in progress
+  cancelFlush: boolean; // Whether to cancel the current flush operation
 }
 
 const streamStates: Record<string, StreamMotionState> = {};
@@ -188,21 +189,24 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
               // Clear the motion timeout since we're continuing to record
               if (state.motionTimeout) {
                 clearTimeout(state.motionTimeout);
-                state.motionTimeout = null;
+                state.motionTimeout = undefined;
               }
+            } else if (!state.motionRecordingActive) {
+              // This code runs when motion is detected and we're not currently recording/saving
+              state.nextFlushNumber = 1;
+              state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
+              state.startedRecordingAt = Date.now();
+              state.notificationSent = false;
             }
 
             if (!state.motionRecordingActive) {
               state.motionRecordingActive = true;
-              state.startedRecordingAt = Date.now();
-              state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
-              state.notificationSent = false;
-              state.nextFlushNumber = 1;
               if (state.motionTimeout) clearTimeout(state.motionTimeout);
               state.recentSegments.forEach(recentPath => {
                 if (!state.motionSegments.includes(recentPath)) state.motionSegments.push(recentPath);
               });
 
+              if (state.flushTimer) clearInterval(state.flushTimer);
               // Start periodic flush
               state.flushTimer = setInterval(() => {
                 flushMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId);
@@ -978,7 +982,6 @@ export async function createStreamManager(stream: any) {
   streamStates[stream.id] = {
     notificationSent: false,
     motionRecordingActive: false,
-    motionTimeout: null,
     motionRecordingTimeoutAt: 0,
     motionSegments: [],
     flushingSegments: [],
@@ -995,6 +998,7 @@ export async function createStreamManager(stream: any) {
     flushRecordings: [],
     nextFlushNumber: 1,
     cleaningUp: false,
+    cancelFlush: false,
   }
 
   return new StreamManager({
