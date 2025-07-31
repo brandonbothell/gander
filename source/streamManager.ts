@@ -210,6 +210,9 @@ export class StreamManager {
     } catch (e) {
       logMotion(`[${this.config.id}] Error cleaning HLS and flush directories: ${e}`, 'error');
     }
+
+    this.state.cleaningUp = false;
+
     const elapsed = Date.now() - start;
     if (elapsed > 500) {
       console.warn(`[${this.config.id}] HLS & flush directory cleanup took ${elapsed}ms`);
