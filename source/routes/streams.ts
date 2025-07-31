@@ -30,7 +30,7 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
     console.log(`[POST] Creating new stream with nickname: ${nickname}, ffmpegInput: ${ffmpegInput}, rtspUser: ${rtspUser}, rtspPass: ${rtspPass}`);
     try {
       const stream = await prisma.stream.create({ data: { nickname, ffmpegInput, rtspUser, rtspPass } });
-      dynamicStreams[stream.id] = createStreamManager(stream);
+      dynamicStreams[stream.id] = await createStreamManager(stream);
       dynamicStreams[stream.id].startFFmpeg();
       res.status(201).json(stream);
     } catch (e) {
@@ -69,7 +69,7 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
 
       if (dynamicStreams[id] && shouldRestart) {
         dynamicStreams[id].ffmpeg?.kill('SIGINT');
-        dynamicStreams[id] = createStreamManager(updated);
+        dynamicStreams[id] = await createStreamManager(updated);
         dynamicStreams[id].startFFmpeg();
       }
       res.json(updated);

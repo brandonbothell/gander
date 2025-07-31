@@ -135,6 +135,7 @@ export interface StreamMotionState {
   flushRecordings: string[]; // Filenames of that have been flushed
   nextFlushNumber: number; // Next flush number to use for segment naming
   recordingTitle: string; // Title for the current recording
+  cleaningUp: boolean; // Whether HLS/flush directory cleanup is in progress
 }
 
 const streamStates: Record<string, StreamMotionState> = {};
@@ -142,30 +143,7 @@ const streamStates: Record<string, StreamMotionState> = {};
 const watchers = new Map<string, chokidar.FSWatcher>();
 
 export async function setupStreamMotionMonitoring(streamId?: string) {
-  const persistedStates = await loadPersistedStreamStates();
-
   const setupMotionMonitoring = async (streamId: string) => {
-    streamStates[streamId] = {
-      notificationSent: false,
-      motionRecordingActive: false,
-      motionTimeout: null,
-      motionRecordingTimeoutAt: 0,
-      motionSegments: [],
-      flushingSegments: [],
-      recentSegments: [],
-      flushedSegments: [],
-      motionPaused: persistedStates[streamId]?.motionPaused ?? false,
-      startupTime: Date.now(),
-      savingInProgress: false,
-      currentSaveProcess: null,
-      saveRetryCount: 0,
-      startedRecordingAt: 0,
-      lastSegmentProcessAt: 0,
-      recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
-      flushRecordings: [],
-      nextFlushNumber: 1,
-    };
-
     logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
 
     // --- Motion Detection Watcher ---
@@ -197,7 +175,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         setTimeout(async () => {
           if (state.motionPaused) return;
           if ((Date.now() - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD) return;
-          const motionStatus = await detectMotion(streamId, segmentPath);
+          const motionStatus = await detectMotion(streamStates, streamId, segmentPath);
           if (motionStatus.motion) {
             // If we're currently saving and detect new motion, cancel the save and continue recording
             if (state.savingInProgress && state.currentSaveProcess) {
@@ -313,7 +291,7 @@ async function loadStreamsFromDb() {
   const dbStreams = await prisma.stream.findMany();
   for (const s of dbStreams) {
     if (!dynamicStreams[s.id]) {
-      dynamicStreams[s.id] = createStreamManager(s);
+      dynamicStreams[s.id] = await createStreamManager(s);
       dynamicStreams[s.id].startFFmpeg();
     }
   }
@@ -989,12 +967,36 @@ export async function safeUnlinkWithRetry(filePath: string, retries = 3) {
 }
 
 // Helper: Create StreamManager instance for a stream
-export function createStreamManager(stream: any) {
+export async function createStreamManager(stream: any) {
   // Use unique folders for each stream
   const hlsDir = path.join(__dirname, '..', `hls_${stream.id}`);
   const recordDir = path.join(config.recordingsDirectory, stream.id);
   const flushDir = path.join(recordDir, 'flush');
   const thumbDir = path.join(recordDir, 'thumbnails');
+  const persistedStates = await loadPersistedStreamStates();
+
+  streamStates[stream.id] = {
+    notificationSent: false,
+    motionRecordingActive: false,
+    motionTimeout: null,
+    motionRecordingTimeoutAt: 0,
+    motionSegments: [],
+    flushingSegments: [],
+    recentSegments: [],
+    flushedSegments: [],
+    motionPaused: persistedStates[stream.id]?.motionPaused ?? false,
+    startupTime: Date.now(),
+    savingInProgress: false,
+    currentSaveProcess: null,
+    saveRetryCount: 0,
+    startedRecordingAt: 0,
+    lastSegmentProcessAt: 0,
+    recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
+    flushRecordings: [],
+    nextFlushNumber: 1,
+    cleaningUp: false,
+  }
+
   return new StreamManager({
     id: stream.id,
     hlsDir,
@@ -1004,7 +1006,7 @@ export function createStreamManager(stream: any) {
     ffmpegInput: stream.ffmpegInput,
     rtspUser: stream.rtspUser ?? undefined,
     rtspPass: stream.rtspPass ?? undefined
-  });
+  }, streamStates[stream.id]);
 }
 
 async function loadPersistedStreamStates() {

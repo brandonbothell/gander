@@ -246,13 +246,20 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
   }));
 }
 
-export async function detectMotion(
+export async function detectMotion(streamStates: Record<string, StreamMotionState>,
   streamId: string,
   segmentPath: string,
   diffThreshold = streamMotionThresholds.min ?? 0.002,
   cameraMovementThreshold = streamMotionThresholds.max ?? 0.4,
 ): Promise<{ motion: boolean; aboveCameraMovementThreshold: boolean }> {
   debugLog(`[${streamId}] [Motion] Starting detection for ${segmentPath}`);
+
+  const state = streamStates[streamId];
+
+  if (state.cleaningUp) {
+    logMotion(`[${streamId}] Skipping flush/frame extraction during cleanup`, 'warn');
+    return { motion: false, aboveCameraMovementThreshold: false };
+  }
 
   try {
     // Quick file existence check
@@ -435,9 +442,7 @@ export function cleanFrameCache(dynamicStreams: Record<string, StreamManager>, s
 export async function safeUnlink(...filePaths: string[]) {
   try {
     for (const filePath of filePaths) {
-      if (await fs.promises.stat(filePath).then(() => true).catch(() => false)) {
-        await fs.promises.rm(filePath, { force: true, recursive: true });
-      }
+      await fs.promises.rm(filePath, { force: true, recursive: true }).catch(() => false);
     }
   } catch (error) {
     // Ignore errors silently for performance
