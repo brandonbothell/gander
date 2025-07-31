@@ -143,9 +143,34 @@ const streamStates: Record<string, StreamMotionState> = {};
 
 const watchers = new Map<string, chokidar.FSWatcher>();
 
-export async function setupStreamMotionMonitoring(streamId?: string) {
+export function setupStreamMotionMonitoring(streamId?: string) {
   const setupMotionMonitoring = async (streamId: string) => {
     logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
+
+    if (!streamStates[streamId]) {
+      const persistedStates = await loadPersistedStreamStates();
+      streamStates[streamId] = {
+        notificationSent: false,
+        motionRecordingActive: false,
+        motionRecordingTimeoutAt: 0,
+        motionSegments: [],
+        flushingSegments: [],
+        recentSegments: [],
+        flushedSegments: [],
+        motionPaused: persistedStates[streamId]?.motionPaused ?? false,
+        startupTime: Date.now(),
+        savingInProgress: false,
+        currentSaveProcess: null,
+        saveRetryCount: 0,
+        startedRecordingAt: 0,
+        lastSegmentProcessAt: 0,
+        recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
+        flushRecordings: [],
+        nextFlushNumber: 1,
+        cleaningUp: false,
+        cancelFlush: false,
+      }
+    }
 
     // --- Motion Detection Watcher ---
     watchers.set(streamId,
