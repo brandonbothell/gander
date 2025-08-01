@@ -1626,10 +1626,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   // --- Poll motion status every second ---
   // Update the motion status polling effect to include sound playing logic
   useEffect(() => {
-    if (!activeStream) return;
-
     const pollMotionStatus = () => {
-      if (!activeStream) return;
       authFetch(`${API_BASE}/api/motion-status`)
         .then(res => res.json())
         .then((status: { [streamId: string]: { recording: boolean, secondsLeft: number, saving: boolean, startedRecordingAt: number } }) => {
@@ -1653,7 +1650,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     pollMotionStatus();
     const interval = setInterval(pollMotionStatus, 1000);
     return () => clearInterval(interval);
-  }, [activeStream]);
+  }, []);
 
 
 
