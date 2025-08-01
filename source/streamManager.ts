@@ -263,6 +263,10 @@ export class StreamManager {
       const output = data.toString();
       // --- Segment creation tracking ---
       if (output.includes("Opening") && output.includes("segment_")) {
+        const match = output.match(/segment_(\d+)\.ts/);
+        const segNum = match ? match[1] : '?';
+        logMotion(`[${this.config.id}] [SEGMENT] Created segment ${segNum} at ${new Date().toISOString()}`);
+
         this.segmentCount++;
         const now = Date.now();
         const timeSinceLastSegment = now - this.lastSegmentTimestamp;
@@ -320,7 +324,7 @@ export class StreamManager {
     ffmpegProcess.on('exit', (code, signal) => {
       if (this.ffmpeg !== ffmpegProcess) return;
       this.ffmpeg = null;
-      console.warn(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${this.segmentCount} segments created)`);
+      logMotion(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${this.segmentCount} segments created)`, 'warn');
       if (this.segmentMonitorTimer) {
         clearInterval(this.segmentMonitorTimer);
         this.segmentMonitorTimer = null;

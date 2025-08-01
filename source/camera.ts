@@ -296,6 +296,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
 
 export function stopStreamMotionMonitoring(streamId?: string) {
   const stopMotionMonitoring = (streamId: string) => {
+    logMotion(`[${streamId}] Stopping motion monitoring at ${new Date().toLocaleString()}`);
     if (watchers.has(streamId)) {
       watchers.get(streamId)?.close();
       watchers.delete(streamId);
