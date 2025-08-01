@@ -143,7 +143,7 @@ const streamStates: Record<string, StreamMotionState> = {};
 
 const watchers = new Map<string, chokidar.FSWatcher>();
 
-export function setupStreamMotionMonitoring(streamId?: string) {
+export async function setupStreamMotionMonitoring(streamId?: string) {
   const setupMotionMonitoring = async (streamId: string) => {
     logMotion(`[${streamId}] Monitoring started at ${new Date().toLocaleString()}`);
 
@@ -282,11 +282,13 @@ export function setupStreamMotionMonitoring(streamId?: string) {
   }
 
   if (streamId) {
-    setupMotionMonitoring(streamId)
+    await setupMotionMonitoring(streamId)
   } else {
+    const promises = [];
     for (const streamId in dynamicStreams) {
-      setupMotionMonitoring(streamId)
+      promises.push(setupMotionMonitoring(streamId));
     }
+    await Promise.all(promises);
   }
 
   setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000);
@@ -1153,7 +1155,8 @@ async function cleanExit() {
 
   // Then stop FFmpeg processes and clean up directories
   for (const streamId of Object.keys(dynamicStreams)) {
-    dynamicStreams[streamId].ffmpeg?.kill('SIGINT');
+    dynamicStreams[streamId].destroy();
+    console.log(`[Cleanup] Stopped FFmpeg for stream ${streamId}`);
     await new Promise(res => setTimeout(res, 1000));
 
     try {

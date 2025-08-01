@@ -30,10 +30,17 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
     console.log(`[POST] Creating new stream with nickname: ${nickname}, ffmpegInput: ${ffmpegInput}, rtspUser: ${rtspUser}, rtspPass: ${rtspPass}`);
     try {
       const stream = await prisma.stream.create({ data: { nickname, ffmpegInput, rtspUser, rtspPass } });
-      dynamicStreams[stream.id] = await createStreamManager(stream);
-      dynamicStreams[stream.id].startFFmpeg();
+      try {
+        dynamicStreams[stream.id] = await createStreamManager(stream);
+        await dynamicStreams[stream.id].startFFmpeg();
+      } catch (err) {
+        console.error(`[StreamManager] Failed to start FFmpeg for stream ${stream.id}:`, err);
+        res.status(500).json({ error: 'Failed to start FFmpeg for new stream.' });
+        return;
+      }
       res.status(201).json(stream);
     } catch (e) {
+      console.error(`[StreamManager] Failed to create stream:`, e);
       res.status(500).json({ error: 'Failed to create stream.' });
     }
   });
@@ -68,12 +75,19 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
         (rtspPass !== undefined && rtspPass !== stream.rtspPass);
 
       if (dynamicStreams[id] && shouldRestart) {
-        dynamicStreams[id].ffmpeg?.kill('SIGINT');
-        dynamicStreams[id] = await createStreamManager(updated);
-        dynamicStreams[id].startFFmpeg();
+        try {
+          dynamicStreams[id].destroy();
+          dynamicStreams[id] = await createStreamManager(updated);
+          await dynamicStreams[id].startFFmpeg();
+        } catch (err) {
+          console.error(`[StreamManager] Failed to restart FFmpeg for stream ${id}:`, err);
+          res.status(500).json({ error: 'Failed to restart FFmpeg for updated stream.' });
+          return;
+        }
       }
       res.json(updated);
     } catch (e) {
+      console.error(`[StreamManager] Failed to update stream:`, e);
       res.status(500).json({ error: 'Failed to update stream.' });
     }
   });
@@ -105,11 +119,18 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
     try {
       await prisma.stream.delete({ where: { id } });
       if (dynamicStreams[id]) {
-        dynamicStreams[id].ffmpeg?.kill('SIGINT');
+        try {
+          dynamicStreams[id].destroy();
+        } catch (err) {
+          console.error(`[StreamManager] Failed to destroy stream ${id}:`, err);
+          res.status(500).json({ error: 'Failed to destroy stream.' });
+          return;
+        }
         delete dynamicStreams[id];
       }
       res.json({ success: true });
     } catch (e) {
+      console.error(`[StreamManager] Failed to delete stream:`, e);
       res.status(500).json({ error: 'Failed to delete stream.' });
     }
   });

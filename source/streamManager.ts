@@ -1,8 +1,8 @@
 import path from 'path';
 import fs from 'fs';
 import { exec, spawn } from 'child_process';
-import { logMotion } from './logMotion';
 import { setupStreamMotionMonitoring, stopStreamMotionMonitoring, StreamMotionState } from './camera';
+import { logMotion } from './logMotion';
 
 export interface StreamConfig {
   id: string;
@@ -17,19 +17,20 @@ export interface StreamConfig {
 
 export class StreamManager {
   config: StreamConfig;
-  ffmpeg: ReturnType<typeof spawn> | null = null;
-  webrtcProcess: ReturnType<typeof spawn> | null = null;
-  private webrtcClients = new Set<string>();
-  private ffmpegRestartTimestamps: number[] = [];
-  private static readonly MAX_RESTARTS = 5;
-  private static readonly RESTART_WINDOW_MS = 60 * 1000; // 1 minute
-  private static readonly COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
-  private ffmpegCooldownUntil: number = 0;
+  private webrtcClients: Set<string> = new Set();
+  private webrtcProcess: ReturnType<typeof spawn> | null = null;
+  private ffmpeg: ReturnType<typeof spawn> | null = null;
   private segmentMonitorTimer: NodeJS.Timeout | null = null;
   private lastSegmentTimestamp: number = Date.now();
   private segmentCount: number = 0;
   private restartInProgress = false;
-  private state: StreamMotionState
+  private state: StreamMotionState;
+  private lastRestartTimestamp = 0;
+  private ffmpegCooldownUntil: number = 0;
+  private ffmpegRestartTimestamps: number[] = [];
+  private static readonly MAX_RESTARTS = 5;
+  private static readonly RESTART_WINDOW_MS = 60 * 1000;
+  private static readonly COOLDOWN_MS = 5 * 60 * 1000;
 
   constructor(config: StreamConfig, state: StreamMotionState) {
     this.config = config;
@@ -175,19 +176,16 @@ export class StreamManager {
 
   // Main HLS stream - balanced for stability and performance
   async startFFmpeg() {
-    // --- Add cooldown check ---
+    // --- Cooldown and cleaning guards ---
     if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
       logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Next restart allowed at ${new Date(this.ffmpegCooldownUntil).toLocaleTimeString()}`, 'warn');
       return;
     }
-
     if (this.state.cleaningUp) {
       logMotion(`[${this.config.id}] FFmpeg is cleaning up, waiting to start`, 'warn');
       setTimeout(() => this.startFFmpeg(), 5000);
       return;
     }
-
-    // --- Restart rate limiting logic ---
     const now = Date.now();
     this.segmentCount = 0;
     this.lastSegmentTimestamp = now;
@@ -198,19 +196,22 @@ export class StreamManager {
       logMotion(`[${this.config.id}] Too many FFmpeg restarts (${this.ffmpegRestartTimestamps.length} in ${StreamManager.RESTART_WINDOW_MS / 1000}s). Entering cooldown for ${StreamManager.COOLDOWN_MS / 60000} minutes.`, 'error');
       return;
     }
+    if (now - this.lastRestartTimestamp < 10000) {
+      logMotion(`[${this.config.id}] Restart requested too soon after previous (${now - this.lastRestartTimestamp}ms), skipping.`, 'warn');
+      return;
+    }
+    this.lastRestartTimestamp = now;
 
     const start = Date.now();
     this.state.cleaningUp = true;
-
     try {
       await Promise.all([
-        fs.promises.rm(this.config.hlsDir, { recursive: true }),
-        fs.promises.rm(this.config.flushDir, { recursive: true })
+        fs.promises.rm(this.config.hlsDir, { recursive: true, force: true }),
+        fs.promises.rm(this.config.flushDir, { recursive: true, force: true })
       ]);
     } catch (e) {
       logMotion(`[${this.config.id}] Error cleaning HLS and flush directories: ${e}`, 'error');
     }
-
     this.state.cleaningUp = false;
 
     const elapsed = Date.now() - start;
@@ -223,123 +224,61 @@ export class StreamManager {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     });
 
+    // --- FFmpeg args and spawn ---
     const inputIsRtsp = this.config.ffmpegInput.startsWith('rtsp://');
     const inputUrl = inputIsRtsp ? this.getRtspUrlWithAuth() : this.config.ffmpegInput;
-
     let ffmpegArgs: string[];
-
     if (inputIsRtsp) {
-      // RTSP input - try stream copy first, fallback to reencoding
       ffmpegArgs = [
-        '-y',
-        '-fflags', '+genpts+discardcorrupt',
-        '-rtsp_transport', 'udp',
-        '-analyzeduration', '2000000',
-        '-probesize', '2000000',
-        '-i', inputUrl,
-
-        // Try stream copy first for maximum performance
-        '-c:v', 'copy',
-
-        // Handle audio
-        '-map', '0:v:0',
-        '-map', '0:a:0?',
-        '-c:a', 'aac',
-        '-ar', '44100',
-        '-ac', '2',
-        '-b:a', '128k',
-
-        // Better timestamp handling for stability
-        '-avoid_negative_ts', 'make_zero',
-        '-copyts',
-        '-start_at_zero',
-        '-muxdelay', '0',
-
-        // HLS settings optimized for smooth playback
-        '-f', 'hls',
-        '-hls_time', '0.5', // Shorter segments for better responsiveness
-        '-hls_list_size', '6',
-        '-hls_flags', 'independent_segments',
+        '-y', '-fflags', '+genpts+discardcorrupt', '-rtsp_transport', 'udp',
+        '-analyzeduration', '2000000', '-probesize', '2000000', '-i', inputUrl,
+        '-c:v', 'copy', '-map', '0:v:0', '-map', '0:a:0?', '-c:a', 'aac',
+        '-ar', '44100', '-ac', '2', '-b:a', '128k', '-avoid_negative_ts', 'make_zero',
+        '-copyts', '-start_at_zero', '-muxdelay', '0', '-f', 'hls', '-hls_time', '0.5',
+        '-hls_list_size', '6', '-hls_flags', 'independent_segments',
         '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
         path.join(this.config.hlsDir, 'stream.m3u8')
       ];
     } else {
-      // Local camera input (USB/V4L2)
       ffmpegArgs = [
-        '-y',
-        '-f', 'v4l2',
-        '-input_format', 'mjpeg',
-        '-video_size', '1280x720',
-        '-framerate', '15', // Slightly higher for smoother motion
-        '-i', inputUrl,
-
-        // Balanced encoding
-        '-c:v', 'libx264',
-        '-preset', 'faster', // Better balance than veryfast
-        '-tune', 'zerolatency',
-        '-profile:v', 'main',
-        '-level', '3.1',
-        '-pix_fmt', 'yuv420p',
-        '-b:v', '1000k',
-        '-maxrate', '1200k',
-        '-bufsize', '2400k',
-        '-g', '30', // Longer GOP for stability
-        '-x264opts', 'keyint=30:min-keyint=30:no-scenecut:threads=3',
-
-        // No audio for most local cameras
-        '-an',
-
-        // HLS settings
-        '-f', 'hls',
-        '-hls_time', '0.5', // Shorter segments for better responsiveness
-        '-hls_list_size', '6',
-        '-hls_flags', 'independent_segments',
+        '-y', '-f', 'v4l2', '-input_format', 'mjpeg', '-video_size', '1280x720',
+        '-framerate', '15', '-i', inputUrl, '-c:v', 'libx264', '-preset', 'faster',
+        '-tune', 'zerolatency', '-profile:v', 'main', '-level', '3.1', '-pix_fmt', 'yuv420p',
+        '-b:v', '1000k', '-maxrate', '1200k', '-bufsize', '2400k', '-g', '30',
+        '-x264opts', 'keyint=30:min-keyint=30:no-scenecut:threads=3', '-an', '-f', 'hls',
+        '-hls_time', '0.5', '-hls_list_size', '6', '-hls_flags', 'independent_segments',
         '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
         path.join(this.config.hlsDir, 'stream.m3u8')
       ];
     }
-
     console.info(`[${this.config.id}] Starting FFmpeg with args:`, ffmpegArgs.join(' '));
-
     const ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
       stdio: ['ignore', 'ignore', 'pipe'],
       shell: false
     });
-
-    this.ffmpeg = ffmpegProcess; // Track the current process
-
+    this.ffmpeg = ffmpegProcess;
     let hasErrored = false;
-    let segmentCount = 0;
-    let lastSegmentTime = Date.now();
 
     ffmpegProcess.stderr?.on('data', data => {
       const output = data.toString();
-
-      // Count successful segment creation and track timing
+      // --- Segment creation tracking ---
       if (output.includes("Opening") && output.includes("segment_")) {
-        this.segmentCount++; // <-- Increment here
+        this.segmentCount++;
         const now = Date.now();
-        const timeSinceLastSegment = now - lastSegmentTime;
-        lastSegmentTime = now;
+        const timeSinceLastSegment = now - this.lastSegmentTimestamp;
         this.lastSegmentTimestamp = now;
-
-        // Log if segments are taking too long (indicates stuttering)
-        if (this.segmentCount > 1 && timeSinceLastSegment > 10000) { // 10 seconds
-          logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment
-            }ms, total segments: ${this.segmentCount} (restarting FFmpeg)`, 'warn');
-          // --- Add cooldown check before restart ---
+        if (this.segmentCount > 1 && timeSinceLastSegment > 10000) {
+          logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms, total segments: ${this.segmentCount} (restarting FFmpeg)`, 'warn');
           if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
             logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
             return;
           }
-
           this.reconnect();
         } else if (this.segmentCount > 1 && timeSinceLastSegment > 3000) {
           logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`);
         }
       }
-
-      // Only check for real errors that require reencoding
+      // --- Error handling ---
       if (inputIsRtsp && !hasErrored && this.segmentCount < 3) {
         const hasRealError = (
           output.includes('Connection refused') ||
@@ -352,7 +291,6 @@ export class StreamManager {
           output.includes('codec not currently supported in container') ||
           (output.includes('Packet corrupt') && !output.includes('DTS'))
         );
-
         if (hasRealError) {
           console.warn(`[${this.config.id}] Stream copy failed, reconnecting...`);
           hasErrored = true;
@@ -360,48 +298,38 @@ export class StreamManager {
           return;
         }
       }
-
       if (output.includes('Error') && !output.includes('Non-monotonous DTS')) {
         console.error(`[${this.config.id}] FFmpeg: ${output.trim()}`);
       }
     });
 
-    // --- Add segment monitor timer ---
+    // --- Robust segment monitor ---
     if (this.segmentMonitorTimer) clearInterval(this.segmentMonitorTimer);
-    setTimeout(() => this.segmentMonitorTimer = setInterval(() => {
+    this.segmentMonitorTimer = setInterval(() => {
       const now = Date.now();
-      // Only check if at least one segment has been created
+      if (this.restartInProgress || this.state.cleaningUp) return;
       if (this.segmentCount > 0 && now - this.lastSegmentTimestamp > 15000) {
-        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)
-          }s (total segments: ${this.segmentCount}), restarting FFmpeg (auto health check)`, 'warn');
+        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: ${this.segmentCount}), restarting FFmpeg (auto health check)`, 'warn');
         this.reconnect();
       } else if (this.segmentCount === 0 && now - this.lastSegmentTimestamp > 30000) {
-        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)
-          }s (total segments: 0), restarting FFmpeg (auto health check)`, 'warn');
+        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: 0), restarting FFmpeg (auto health check)`, 'warn');
         this.reconnect();
       }
-    }, 5000), 5000); // Start after 5 seconds to avoid false positives on startup
+    }, 5000);
 
-    // Robust exit handler
     ffmpegProcess.on('exit', (code, signal) => {
-      // Only handle exit for the current process
       if (this.ffmpeg !== ffmpegProcess) return;
       this.ffmpeg = null;
-      console.warn(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${segmentCount} segments created)`);
-      // --- Clear segment monitor timer on exit ---
+      console.warn(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${this.segmentCount} segments created)`);
       if (this.segmentMonitorTimer) {
         clearInterval(this.segmentMonitorTimer);
         this.segmentMonitorTimer = null;
       }
-      // --- Add cooldown check before restart ---
       if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
         logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
         return;
       }
-      // Only try restarting if it failed unexpectedly
-      if (code !== 0 && code !== 255 &&
-        (signal !== 'SIGTERM' && signal !== 'SIGKILL' && signal !== 'SIGINT')) {
-        // FFmpeg crashed or exited unexpectedly, restart
+      if (code !== 0 && code !== 255 && (signal !== 'SIGTERM' && signal !== 'SIGKILL' && signal !== 'SIGINT')) {
         logMotion(`[${this.config.id}] FFmpeg crashed or exited unexpectedly (code ${code}, signal ${signal}), restarting...`, 'warn');
         this.reconnect();
       }
@@ -418,27 +346,25 @@ export class StreamManager {
    */
   async reconnect(): Promise<void> {
     const streamId = this.config.id;
-
     if (this.restartInProgress) {
       logMotion(`[${streamId}] Reconnect already in progress, skipping...`, 'warn');
       return;
     }
     this.restartInProgress = true;
-
     if (this.segmentMonitorTimer) {
       clearInterval(this.segmentMonitorTimer);
       this.segmentMonitorTimer = null;
     }
-
-    // 1. Stop motion monitoring and clear state
     try {
-      await stopStreamMotionMonitoring(streamId);
+      stopStreamMotionMonitoring(streamId);
       logMotion(`[${streamId}] Stopped stream motion monitoring`);
     } catch (e) {
       logMotion(`[${streamId}] Error stopping stream motion monitoring: ${e}`, 'warn');
     }
-
-    // 2. Kill all ffmpeg processes for this stream (by matching hlsDir in command line)
+    // Kill managed ffmpeg process
+    this.ffmpeg?.kill('SIGKILL');
+    this.ffmpeg = null;
+    // Kill any stray ffmpeg processes (platform-specific)
     const killFFmpegPromise = new Promise<void>((resolve) => {
       // Also kill the managed ffmpeg process if still running
       this.ffmpeg?.kill('SIGKILL');
@@ -496,7 +422,6 @@ export class StreamManager {
     } catch (e) {
       logMotion(`[${streamId}] Error restarting FFmpeg: ${e}`, 'error');
     }
-
     // 4. Restart motion monitoring for this stream
     try {
       await setupStreamMotionMonitoring(streamId);
@@ -504,81 +429,9 @@ export class StreamManager {
     } catch (e) {
       logMotion(`[${streamId}] Error re-initializing motion monitoring: ${e}`, 'error');
     }
-
     this.restartInProgress = false;
     logMotion(`[${streamId}] Reconnect completed`);
   }
-
-  /* // Fallback reencoding with balanced settings
-  private startFFmpegWithReencoding() {
-    console.info(`[${this.config.id}] Starting FFmpeg with reencoding...`);
-
-    const inputUrl = this.getRtspUrlWithAuth();
-
-    const ffmpegArgs = [
-      '-y',
-      '-fflags', '+genpts',
-      '-rtsp_transport', 'udp',
-      '-analyzeduration', '3000000',
-      '-probesize', '3000000',
-      '-i', inputUrl,
-
-      // Balanced reencoding settings
-      '-c:v', 'libx264',
-      '-preset', 'faster', // Better balance than veryfast
-      '-tune', 'zerolatency',
-      '-profile:v', 'main',
-      '-level', '3.1',
-      '-pix_fmt', 'yuv420p',
-      '-b:v', '800k',
-      '-maxrate', '1000k',
-      '-bufsize', '2000k',
-      '-g', '30', // Longer GOP for stability
-      '-x264opts', 'keyint=30:min-keyint=30:no-scenecut:threads=3',
-      '-vf', 'scale=1280:720',
-
-      // Audio handling
-      '-map', '0:v:0',
-      '-map', '0:a:0?',
-      '-c:a', 'aac',
-      '-ar', '44100',
-      '-ac', '2',
-      '-b:a', '128k',
-
-      // Timestamp handling
-      '-avoid_negative_ts', 'make_zero',
-      '-vsync', 'cfr',
-
-      // HLS settings
-      '-f', 'hls',
-      '-hls_time', '0.5', // Shorter segments for better responsiveness
-      '-hls_list_size', '6',
-      '-hls_flags', 'independent_segments',
-      '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
-      path.join(this.config.hlsDir, 'stream.m3u8')
-    ];
-
-    console.info(`[${this.config.id}] Reencoding FFmpeg args:`, ffmpegArgs.join(' '));
-
-    this.ffmpeg = spawn('ffmpeg', ffmpegArgs, {
-      stdio: ['ignore', 'ignore', 'pipe'],
-      shell: false
-    });
-
-    this.ffmpeg.stderr?.on('data', data => {
-      const output = data.toString();
-      if (!output.includes('frame=') &&
-        !output.includes('bitrate=') &&
-        !output.includes('speed=')) {
-        console.info(`[${this.config.id}] FFmpeg (reencoded): ${output.trim()}`);
-      }
-    });
-
-    this.ffmpeg.on('exit', (code, signal) => {
-      this.ffmpeg = null; // Always clear reference on exit
-      console.info(`[${this.config.id}] FFmpeg (reencoded) exited with code ${code} and signal ${signal}`);
-    });
-  } */
 
   getPlaylistPath() {
     return path.join(this.config.hlsDir, 'stream.m3u8');

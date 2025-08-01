@@ -256,7 +256,7 @@ export async function detectMotion(streamStates: Record<string, StreamMotionStat
 
   const state = streamStates[streamId];
 
-  if (state.cleaningUp) {
+  if (!state || state.cleaningUp) {
     logMotion(`[${streamId}] Skipping flush/frame extraction during cleanup`, 'warn');
     return { motion: false, aboveCameraMovementThreshold: false };
   }
