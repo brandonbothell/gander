@@ -10,6 +10,7 @@ export interface RecordingThumbItemProps {
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onTouchStart: () => void;
+  onTouchMove: (e: React.TouchEvent) => void;
   onTouchEnd: () => void;
   onTouchCancel: () => void;
   onClick: () => void;
@@ -39,6 +40,7 @@ export function RecordingThumbItem({
   onMouseEnter,
   onMouseLeave,
   onTouchStart,
+  onTouchMove,
   onTouchEnd,
   onTouchCancel,
   onClick,
@@ -55,6 +57,7 @@ export function RecordingThumbItem({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onTouchCancel={onTouchCancel}
     >

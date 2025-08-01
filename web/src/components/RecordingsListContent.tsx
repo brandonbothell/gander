@@ -42,6 +42,7 @@ interface RecordingsListContentProps {
   setHovered: (filename: string | null) => void;
   recordingsListRef: React.RefObject<HTMLDivElement | null>;
   handleTouchStart: (filename: string, checked: boolean) => void;
+  handleTouchMove: (e: React.TouchEvent) => void;
   handleTouchEnd: () => void;
   handleView: (filename: string) => void;
   handleCheckboxChange: (filename: string, checked: boolean) => void;
@@ -78,6 +79,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }: any) => {
     setHovered,
     recordingsListRef,
     handleTouchStart,
+    handleTouchMove,
     handleTouchEnd,
     handleView,
     handleCheckboxChange,
@@ -115,6 +117,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }: any) => {
           onMouseEnter={() => setHovered(rec.filename)}
           onMouseLeave={() => setHovered(null)}
           onTouchStart={() => handleTouchStart(rec.filename, checked)}
+          onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
           onClick={() => handleView(rec.filename)}
@@ -133,25 +136,35 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
   const [containerWidth, setContainerWidth] = useState(360);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Minimum thumbnail width
+  const MIN_THUMB_WIDTH = props.isMobile ? 180 : 200;
+  const MAX_THUMB_WIDTH = props.isMobile ? 240 : 215;
+  const GRID_GAP = props.isMobile ? 12 : 16;
+
+  // Dynamically calculate columns
+  const getNumColumns = (width: number) => {
+    const columns = Math.max(1, Math.floor((width + GRID_GAP) / (MIN_THUMB_WIDTH + GRID_GAP)));
+    return columns; // Limit to max 4 columns
+  };
+
+  const [numColumns, setNumColumns] = useState(getNumColumns(containerWidth));
+
   useEffect(() => {
     function updateWidth() {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      } else {
-        setContainerWidth(window.innerWidth);
-      }
+      let width = window.innerWidth;
+      setContainerWidth(width);
+      setNumColumns(getNumColumns(width));
     }
     updateWidth();
     window.addEventListener("resize", updateWidth);
     return () => window.removeEventListener("resize", updateWidth);
+    // eslint-disable-next-line
   }, []);
 
-  // Mobile: 2 columns, fill width; Desktop: 4 columns
-  const isMobile = props.isMobile;
-  const numColumns = isMobile ? 2 : 4;
-  const THUMB_WIDTH = isMobile ? containerWidth / 2 - 12 : 240; // 16px margin
-  const THUMB_HEIGHT = isMobile ? 180 : 150;
-  const GRID_GAP = isMobile ? 12 : 16;
+  // Calculate thumbnail width based on columns
+  let THUMB_WIDTH = Math.max(MIN_THUMB_WIDTH, (containerWidth - GRID_GAP * numColumns) / numColumns);
+  if (THUMB_WIDTH > MAX_THUMB_WIDTH) THUMB_WIDTH = MAX_THUMB_WIDTH;
+  const THUMB_HEIGHT = props.isMobile ? 180 : 150;
 
   // Calculate row count
   const rowCount = Math.ceil(props.filteredRecordings.length / numColumns);
@@ -203,6 +216,13 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
     }
   }, [rowHeights]);
 
+  // Add this effect to reset columns when numColumns, THUMB_WIDTH, or GRID_GAP change
+  useEffect(() => {
+    if (gridRef.current) {
+      gridRef.current.resetAfterColumnIndex(0, true);
+    }
+  }, [numColumns, THUMB_WIDTH, GRID_GAP]);
+
   // --- Touch handling for pull-to-refresh ---
   const handleTouchStart = (e: React.TouchEvent) => {
     const gridAtTop = props.gridOuterRef.current?.scrollTop !== undefined ? props.gridOuterRef.current.scrollTop <= 50 : false;
@@ -213,16 +233,13 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    const gridAtTop = props.gridOuterRef.current?.scrollTop !== undefined ? props.gridOuterRef.current.scrollTop <= 50 : false;
     if (
       props.pullStartY.current !== null &&
-      !props.transferScrollToPage &&
-      gridAtTop
+      !props.transferScrollToPage
     ) {
       const delta = e.touches[0].clientY - props.pullStartY.current;
-      if (delta > 0) {
-        props.setPullDistance(delta);
-      }
+      // Always set pullDistance to the current delta, even if user moves back up
+      props.setPullDistance(Math.max(0, delta));
     } else if (props.transferScrollToPage) {
       const deltaY = e.touches[0].clientY - (props.pullStartY.current ?? e.touches[0].clientY);
       window.scrollBy({ top: -deltaY, behavior: 'instant' });
@@ -257,14 +274,14 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
             position: 'relative',
             opacity: props.isSearching ? 0.3 : 1,
             pointerEvents: props.isSearching ? 'none' : 'auto',
-            width: isMobile ? "100%" : gridWidth,
+            width: props.isMobile ? "100%" : gridWidth,
             margin: '0 auto',
           }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {isMobile && (
+          {props.isMobile && (
             <div
               style={{
                 position: "absolute",
@@ -335,7 +352,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
             height={Math.min(6, rowCount) * (THUMB_HEIGHT + GRID_GAP) + 40}
             rowCount={rowCount}
             rowHeight={rowHeight}
-            width={isMobile ? containerWidth : gridWidth}
+            width={props.isMobile ? containerWidth : gridWidth}
             itemData={itemData}
             estimatedRowHeight={THUMB_HEIGHT + 32 + GRID_GAP}
             estimatedColumnWidth={THUMB_WIDTH + GRID_GAP}
@@ -365,7 +382,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
             cursor: 'pointer',
             background: 'none',
             border: '0 2px 8px #1a298044',
-            transform: props.mobileSearchSticky && isMobile
+            transform: props.mobileSearchSticky && props.isMobile
               ? `translateY(${isIOS() ? 0 : window.innerHeight * .02}px)`
               : 'translateY(0px)',
             transition: 'transform 0.5s cubic-bezier(.4,2,.6,1)',

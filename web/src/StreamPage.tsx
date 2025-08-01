@@ -1241,7 +1241,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [recordingsListOpen]);
+  }, [recordingsListOpen, isKeyboardOpen, forceSticky]);
   useEffect(() => {
     let lastScrollY = window.scrollY;
 
@@ -1873,6 +1873,13 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         handleCheckboxChange(filename, true);
       }
     }, 500); // 500ms for long press
+  }
+
+  function handleTouchMove() {
+    if (longPressTimeout.current) {
+      clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
   }
 
   function handleTouchEnd() {
@@ -2811,6 +2818,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           setHovered={setHovered}
           recordingsListRef={recordingsListRef}
           handleTouchStart={handleTouchStart}
+          handleTouchMove={handleTouchMove}
           handleTouchEnd={handleTouchEnd}
           handleView={handleView}
           handleCheckboxChange={handleCheckboxChange}

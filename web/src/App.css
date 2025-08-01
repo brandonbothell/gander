@@ -391,7 +391,6 @@ video:focus, video:hover {
   }
 }
 
-@media (max-width: 1280px) {
   .recordings-list {
     width: 100vw;
     max-width: 100vw;
@@ -400,7 +399,6 @@ video:focus, video:hover {
     padding-left: 0.5em;
     padding-right: 0.5em;
   }
-}
 
 @media (max-width: 1280px) {
   /* Hide fixed toggles on mobile */
