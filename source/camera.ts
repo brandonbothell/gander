@@ -382,7 +382,6 @@ loadStreamsFromDb().then(cleanupExpiredTokensAndDevices).then(() => setupStreamM
  * - Runs every hour.
  * - Removes expired JWTs and refresh tokens from users.
  * - Removes trusted devices not seen in 7+ days.
- * - Deletes users with no trusted devices left.
  */
 async function cleanupExpiredTokensAndDevices() {
   const now = Date.now();
@@ -436,10 +435,10 @@ async function cleanupExpiredTokensAndDevices() {
       console.log(`[Cleanup] Updated user ${user.username} - removed ${(jwts.length - validJwts.length) + (refreshTokens.length - validRefreshTokens.length)
         } expired tokens and ${(trustedDevices.length - filteredDevices.length)} old devices.`);
     }
-
-    // Run every hour
-    setTimeout(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
   }
+
+  // Run every hour
+  setTimeout(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
 };
 
 // --- CORS ---
