@@ -206,8 +206,8 @@ export class StreamManager {
     this.state.cleaningUp = true;
     try {
       await Promise.all([
-        fs.promises.rm(this.config.hlsDir, { recursive: true, force: true }),
-        fs.promises.rm(this.config.flushDir, { recursive: true, force: true })
+        fastCleanDir(this.config.hlsDir),
+        fastCleanDir(this.config.flushDir)
       ]);
     } catch (e) {
       logMotion(`[${this.config.id}] Error cleaning HLS and flush directories: ${e}`, 'error');
@@ -259,6 +259,51 @@ export class StreamManager {
     this.ffmpeg = ffmpegProcess;
     let hasErrored = false;
 
+    // --- Wait for first segment creation ---
+    let firstSegmentCreated = false;
+    let firstSegmentPromiseResolve: (() => void) | null = null;
+    let firstSegmentPromiseReject: ((err: Error) => void) | null = null;
+    const firstSegmentPromise = new Promise<void>((resolve, reject) => {
+      firstSegmentPromiseResolve = resolve;
+      firstSegmentPromiseReject = reject;
+    });
+
+    // --- Robust segment monitor ---
+    if (this.segmentMonitorTimer) clearInterval(this.segmentMonitorTimer);
+    this.segmentMonitorTimer = setInterval(() => {
+      const now = Date.now();
+      if (this.restartInProgress || this.state.cleaningUp) return;
+      if (this.segmentCount > 0 && now - this.lastSegmentTimestamp > 15000) {
+        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: ${this.segmentCount}), restarting FFmpeg (auto health check)`, 'warn');
+        this.reconnect();
+      } else if (this.segmentCount === 0 && now - this.lastSegmentTimestamp > 30000) {
+        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: 0), restarting FFmpeg (auto health check)`, 'warn');
+        this.reconnect();
+      }
+    }, 5000);
+
+    ffmpegProcess.on('exit', (code, signal) => {
+      if (this.ffmpeg !== ffmpegProcess) return;
+      this.ffmpeg = null;
+      logMotion(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${this.segmentCount} segments created)`, 'warn');
+      if (this.segmentMonitorTimer) {
+        clearInterval(this.segmentMonitorTimer);
+        this.segmentMonitorTimer = null;
+      }
+      // Reject the promise if FFmpeg exits before first segment
+      if (!firstSegmentCreated && firstSegmentPromiseReject) {
+        firstSegmentPromiseReject(new Error('FFmpeg exited before first segment was created'));
+      }
+      if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
+        logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
+        return;
+      }
+      if (code !== 0 && code !== 255 && (signal !== 'SIGTERM' && signal !== 'SIGKILL' && signal !== 'SIGINT')) {
+        logMotion(`[${this.config.id}] FFmpeg crashed or exited unexpectedly (code ${code}, signal ${signal}), restarting...`, 'warn');
+        this.reconnect();
+      }
+    });
+
     ffmpegProcess.stderr?.on('data', data => {
       const output = data.toString();
       // --- Segment creation tracking ---
@@ -271,6 +316,10 @@ export class StreamManager {
         const now = Date.now();
         const timeSinceLastSegment = now - this.lastSegmentTimestamp;
         this.lastSegmentTimestamp = now;
+        if (!firstSegmentCreated && firstSegmentPromiseResolve) {
+          firstSegmentCreated = true;
+          firstSegmentPromiseResolve();
+        }
         if (this.segmentCount > 1 && timeSinceLastSegment > 10000) {
           logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms, total segments: ${this.segmentCount} (restarting FFmpeg)`, 'warn');
           if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
@@ -307,37 +356,8 @@ export class StreamManager {
       }
     });
 
-    // --- Robust segment monitor ---
-    if (this.segmentMonitorTimer) clearInterval(this.segmentMonitorTimer);
-    this.segmentMonitorTimer = setInterval(() => {
-      const now = Date.now();
-      if (this.restartInProgress || this.state.cleaningUp) return;
-      if (this.segmentCount > 0 && now - this.lastSegmentTimestamp > 15000) {
-        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: ${this.segmentCount}), restarting FFmpeg (auto health check)`, 'warn');
-        this.reconnect();
-      } else if (this.segmentCount === 0 && now - this.lastSegmentTimestamp > 30000) {
-        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: 0), restarting FFmpeg (auto health check)`, 'warn');
-        this.reconnect();
-      }
-    }, 5000);
-
-    ffmpegProcess.on('exit', (code, signal) => {
-      if (this.ffmpeg !== ffmpegProcess) return;
-      this.ffmpeg = null;
-      logMotion(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${this.segmentCount} segments created)`, 'warn');
-      if (this.segmentMonitorTimer) {
-        clearInterval(this.segmentMonitorTimer);
-        this.segmentMonitorTimer = null;
-      }
-      if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
-        logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
-        return;
-      }
-      if (code !== 0 && code !== 255 && (signal !== 'SIGTERM' && signal !== 'SIGKILL' && signal !== 'SIGINT')) {
-        logMotion(`[${this.config.id}] FFmpeg crashed or exited unexpectedly (code ${code}, signal ${signal}), restarting...`, 'warn');
-        this.reconnect();
-      }
-    });
+    // --- Wait for first segment or error ---
+    return firstSegmentPromise;
   }
 
   /**
@@ -421,7 +441,7 @@ export class StreamManager {
 
     // 3. Restart FFmpeg
     try {
-      this.startFFmpeg();
+      await this.startFFmpeg();
       logMotion(`[${streamId}] FFmpeg restarted via reconnect`);
     } catch (e) {
       logMotion(`[${streamId}] Error restarting FFmpeg: ${e}`, 'error');
@@ -458,6 +478,21 @@ export class StreamManager {
     if (this.segmentMonitorTimer) {
       clearInterval(this.segmentMonitorTimer);
       this.segmentMonitorTimer = null;
+    }
+  }
+}
+
+async function fastCleanDir(dir: string) {
+  if (process.platform !== 'win32') {
+    // Use rm -rf for speed on Linux
+    await new Promise((resolve) => {
+      exec(`rm -rf "${dir}"/*`, () => resolve(undefined));
+    });
+  } else {
+    // Fallback to Node.js for Windows
+    if (fs.existsSync(dir)) {
+      const files = await fs.promises.readdir(dir);
+      await Promise.all(files.map(f => fs.promises.rm(path.join(dir, f), { force: true, recursive: true })));
     }
   }
 }

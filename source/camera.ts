@@ -279,6 +279,8 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
           }
         }, 300);
       }));
+
+    console.log(`[${streamId}] Watcher set up for ${dynamicStreams[streamId].config.hlsDir}`);
   }
 
   if (streamId) {
@@ -305,7 +307,9 @@ export function stopStreamMotionMonitoring(streamId?: string) {
       const state = streamStates[streamId];
       if (state.flushTimer) clearInterval(state.flushTimer);
       if (state.motionTimeout) clearTimeout(state.motionTimeout);
-      delete streamStates[streamId];
+      persistStreamState(streamId).finally(() => {
+        delete streamStates[streamId];
+      });
     }
   }
 
@@ -321,12 +325,15 @@ export function stopStreamMotionMonitoring(streamId?: string) {
 // Load streams from DB on startup
 async function loadStreamsFromDb() {
   const dbStreams = await prisma.stream.findMany();
+  const promises = [];
   for (const s of dbStreams) {
     if (!dynamicStreams[s.id]) {
       dynamicStreams[s.id] = await createStreamManager(s);
-      dynamicStreams[s.id].startFFmpeg();
+      promises.push(dynamicStreams[s.id].startFFmpeg());
     }
   }
+
+  await Promise.all(promises);
 
   // --- Monitor for FFmpeg cooldowns and alert ---
   setInterval(() => {
