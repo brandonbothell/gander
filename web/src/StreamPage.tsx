@@ -1468,7 +1468,6 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     (async () => {
       // Poll latest recordings every 5 seconds
       const pollLatest = async () => {
-        console.log('Polling latest recordings...');
         if (!activeStream || cancelled) return;
 
         const today = getLocalDateString(new Date());
