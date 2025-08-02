@@ -203,30 +203,25 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
           if ((Date.now() - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD) return;
           const motionStatus = await detectMotion(streamStates, streamId, segmentPath);
           if (motionStatus.motion) {
-            // If we're currently saving and detect new motion, cancel the save and continue recording
-            if (state.savingInProgress && state.currentSaveProcess) {
-              logMotion(`[${streamId}] New motion detected while saving, canceling save operation`);
-              state.currentSaveProcess.kill('SIGTERM');
-              state.savingInProgress = false;
-              state.currentSaveProcess = null;
-              state.saveRetryCount = 0;
-
-              // Clear the motion timeout since we're continuing to record
-              if (state.motionTimeout) {
-                clearTimeout(state.motionTimeout);
-                state.motionTimeout = undefined;
-              }
-            } else if (!state.motionRecordingActive) {
-              // This code runs when motion is detected and we're not currently recording/saving
-              state.nextFlushNumber = 1;
-              state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
-              state.startedRecordingAt = Date.now();
-              state.notificationSent = false;
-            }
-
+            // --- If motion is detected and we're not currently recording ---
             if (!state.motionRecordingActive) {
+              // If we're currently saving, cancel the save and continue recording
+              if (state.savingInProgress && state.currentSaveProcess) {
+                logMotion(`[${streamId}] New motion detected while saving, canceling save operation`);
+                state.currentSaveProcess.kill('SIGTERM');
+                state.savingInProgress = false;
+                state.currentSaveProcess = null;
+                state.saveRetryCount = 0;
+              } else {
+                // Motion was detected and we're not currently recording/saving
+                // Start a new recording
+                state.nextFlushNumber = 1;
+                state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
+                state.startedRecordingAt = Date.now();
+                state.notificationSent = false;
+              }
+
               state.motionRecordingActive = true;
-              if (state.motionTimeout) clearTimeout(state.motionTimeout);
               state.recentSegments.forEach(recentPath => {
                 if (!state.motionSegments.includes(recentPath)) state.motionSegments.push(recentPath);
               });
@@ -235,10 +230,10 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
               // Start periodic flush
               state.flushTimer = setInterval(() => {
                 flushMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId);
-                // After saving, clear motionSegments so new ones accumulate
-                // state.motionSegments = [];
               }, 10000); // flush every 10 seconds
             }
+
+            // --- If motion is detected, add the segment to motion segments ---
             if (!state.motionSegments.includes(segmentPath)) state.motionSegments.push(segmentPath);
 
             // Log motion event
@@ -261,17 +256,15 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
 
             if (state.motionTimeout) clearTimeout(state.motionTimeout);
             state.motionTimeout = setTimeout(() => {
-              saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId).then(() => {
-                state.notificationSent = false;
-              });
+              // --- Save motion segments and reset state (segment and save state is reset in saveMotionSegments) ---
+              saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId);
               state.motionRecordingActive = false;
-              state.startedRecordingAt = 0; // Reset when recording stops
               state.motionRecordingTimeoutAt = 0;
-              state.nextFlushNumber = 1;
               if (state.flushTimer) {
                 clearInterval(state.flushTimer);
                 state.flushTimer = undefined;
               }
+              state.motionTimeout = undefined;
             }, motionRecordingTimeoutMs);
             state.motionRecordingTimeoutAt = Date.now() + motionRecordingTimeoutMs;
           } else if (state.motionRecordingActive) {

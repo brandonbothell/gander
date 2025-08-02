@@ -84,19 +84,13 @@ export default function initializeMotionRoutes(
         if (!state.savingInProgress && !state.currentSaveProcess) {
           // Save any pending segments before pausing
           if (state.motionSegments.length > 0 || state.flushRecordings.length > 0) {
-            saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId).then(() => {
-              state.notificationSent = false;
-              state.motionRecordingActive = false;
-              state.motionRecordingTimeoutAt = 0;
-            });
+            saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId)
           }
-        } else {
-          // If saving is in progress, just pause the recording
-          state.notificationSent = false;
-          state.motionRecordingActive = false;
-          state.motionRecordingTimeoutAt = 0;
         }
 
+        // Pause motion recording
+        state.motionRecordingActive = false;
+        state.motionRecordingTimeoutAt = 0;
       }
 
       await notify(dynamicStreams, streamId, {
@@ -256,7 +250,7 @@ async function flushMotionSegments(
       // Remove flushed segments except recent ones
       const promises = state.flushingSegments.map(segment => {
         state.flushedSegments.push(segment);
-        if (!state.recentSegments.includes(segment)) {
+        if (!state.recentSegments.includes(segment) && !state.motionSegments.includes(segment)) {
           return safeUnlinkWithRetry(segment);
         }
       });
@@ -278,16 +272,15 @@ async function saveMotionSegments(
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
 
-  const flushingOrSaving = state.flushingSegments.length > 0 && state.savingInProgress;
-
-  if (flushingOrSaving) {
-    console.warn(`[${streamId}] Flush and save operations called simultaneously, cancelling flush and continuing save`);
-    state.cancelFlush = true;
+  if (state.savingInProgress) {
+    logMotion(`[${streamId}] Save operation already in progress, rescheduling`, 'warn');
+    setTimeout(() => saveMotionSegments(streamStates, dynamicStreams, streamId), 1000);
+    return;
   }
 
-  state.savingInProgress = flushingOrSaving;
-
   if (state.flushingSegments.length > 0) {
+    console.warn(`[${streamId}] Flush and save operations called simultaneously, cancelling flush and rescheduling save`);
+    state.cancelFlush = true;
     setTimeout(() => saveMotionSegments(streamStates, dynamicStreams, streamId), 1000);
     return;
   }
@@ -340,90 +333,109 @@ async function saveMotionSegments(
   logMotion(`[${streamId}] Saving ${concatList.length} items (${existingFlushedFiles.length
     } flushed + ${existingSegments.length} segments) to ${path.basename(outFile)}`);
 
-  const ffmpegProcess = exec(ffmpegConcatCmd, async (err) => {
-    if (ffmpegProcess.killed) {
-      logMotion(`[${streamId}] Save operation was canceled`);
-      state.savingInProgress = false;
-      state.currentSaveProcess = null;
-      await safeUnlinkWithRetry(listFile);
-      return;
-    }
-
-    if (err) {
-      logMotion(`[${streamId}] FFmpeg concat failed: ${err}`);
-      state.savingInProgress = false;
-      state.currentSaveProcess = null;
-      state.motionSegments = [];
-      state.flushedSegments = [];
-      state.flushRecordings = [];
-      await safeUnlinkWithRetry(listFile);
-      return;
-    }
-
-    // Generate thumbnail
-    let seek = 7;
-    const thumbProcess = exec(`ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 -update 1 "${thumbFile}"`, async () => {
-      // Clean up segments and flushed files
-      const promises = [
-        state.flushedSegments.concat(existingSegments).map(segment => {
-          if (!state.recentSegments.includes(segment)) {
-            return safeUnlinkWithRetry(segment);
-          }
-        }),
-        ...existingFlushedFiles.map(f => safeUnlinkWithRetry(f)),
-        safeUnlinkWithRetry(listFile)
-      ];
-      await Promise.all(promises);
-
-      logMotion(`[${streamId}] Cleared flushDir and saved segments`);
-      state.motionSegments = [];
-      state.flushRecordings = [];
-      state.flushedSegments = [];
-      state.savingInProgress = false;
-      state.currentSaveProcess = null;
-
-      // Save to DB as before...
-      try {
-        const duration = await getVideoDuration(outFile);
-        const filename = path.basename(outFile);
-        const recordedAt = filename.match(/(\d{4}-\d{2}-\d{2})T/)?.[1] || new Date().toISOString().slice(0, 10);
-
-        await prisma.motionRecording.upsert({
-          where: { streamId_filename: { streamId, filename } },
-          update: { duration, updatedAt: new Date() },
-          create: {
-            streamId,
-            filename,
-            duration,
-            recordedAt,
-            updatedAt: new Date(),
-          }
-        });
-
-        logMotion(`[${streamId}] Successfully saved ${filename} (${duration}s, ${concatList.length} items)`);
-      } catch (e) {
-        logMotion(`[${streamId}] Failed to upsert MotionRecording: ${e}`);
+  return new Promise<void>((resolve) => {
+    const ffmpegProcess = exec(ffmpegConcatCmd, async (err) => {
+      if (ffmpegProcess.killed) {
+        logMotion(`[${streamId}] Save operation was canceled`);
+        state.savingInProgress = false;
+        state.currentSaveProcess = null;
+        await safeUnlinkWithRetry(listFile);
+        resolve();
+        return;
       }
+
+      if (err) {
+        logMotion(`[${streamId}] FFmpeg concat failed: ${err}`, 'error');
+        state.savingInProgress = false;
+        state.currentSaveProcess = null;
+        state.motionSegments = [];
+        state.flushedSegments = [];
+        state.flushRecordings = [];
+        state.nextFlushNumber = 1;
+        state.notificationSent = false;
+        state.startedRecordingAt = 0;
+        await safeUnlinkWithRetry(listFile);
+        resolve();
+        return;
+      }
+
+      // Generate thumbnail
+      let seek = 7;
+      const thumbProcess = exec(`ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 -update 1 "${thumbFile}"`, async () => {
+        // Clean up segments and flushed files
+        const promises = [
+          state.flushedSegments.concat(existingSegments).map(segment => {
+            if (!state.recentSegments.includes(segment)) {
+              return safeUnlinkWithRetry(segment);
+            }
+          }),
+          ...existingFlushedFiles.map(f => safeUnlinkWithRetry(f)),
+          safeUnlinkWithRetry(listFile)
+        ];
+        await Promise.all(promises);
+
+        logMotion(`[${streamId}] Cleared flushDir and saved segments`);
+        state.motionSegments = [];
+        state.flushRecordings = [];
+        state.flushedSegments = [];
+        state.nextFlushNumber = 1;
+        state.notificationSent = false;
+        state.startedRecordingAt = 0;
+        state.savingInProgress = false;
+        state.currentSaveProcess = null;
+
+        // Save to DB as before...
+        try {
+          const duration = await getVideoDuration(outFile);
+          const filename = path.basename(outFile);
+          const recordedAt = filename.match(/(\d{4}-\d{2}-\d{2})T/)?.[1] || new Date().toISOString().slice(0, 10);
+
+          await prisma.motionRecording.upsert({
+            where: { streamId_filename: { streamId, filename } },
+            update: { duration, updatedAt: new Date() },
+            create: {
+              streamId,
+              filename,
+              duration,
+              recordedAt,
+              updatedAt: new Date(),
+            }
+          });
+
+          logMotion(`[${streamId}] Successfully saved ${filename} (${duration}s, ${concatList.length} items)`);
+        } catch (e) {
+          logMotion(`[${streamId}] Failed to upsert MotionRecording: ${e}`, 'error');
+        }
+        resolve();
+      });
+
+      thumbProcess.on('exit', () => {
+        state.currentSaveProcess = null;
+      });
+
+      state.currentSaveProcess = thumbProcess;
     });
 
-    state.currentSaveProcess = thumbProcess;
-  });
+    state.currentSaveProcess = ffmpegProcess;
 
-  state.currentSaveProcess = ffmpegProcess;
+    const saveTimeout = setTimeout(() => {
+      if (state.currentSaveProcess && !state.currentSaveProcess.killed) {
+        logMotion(`[${streamId}] Save operation timed out, killing process`);
+        state.currentSaveProcess.kill('SIGTERM');
+        state.motionSegments = [];
+        state.flushRecordings = [];
+        state.nextFlushNumber = 1;
+        state.notificationSent = false;
+        state.startedRecordingAt = 0;
+        state.savingInProgress = false;
+        state.currentSaveProcess = null;
+        resolve();
+      }
+    }, 60000);
 
-  const saveTimeout = setTimeout(() => {
-    if (state.currentSaveProcess && !state.currentSaveProcess.killed) {
-      logMotion(`[${streamId}] Save operation timed out, killing process`);
-      state.currentSaveProcess.kill('SIGTERM');
-      state.motionSegments = [];
-      state.flushRecordings = [];
-      state.savingInProgress = false;
-      state.currentSaveProcess = null;
-    }
-  }, 60000);
-
-  ffmpegProcess.on('exit', () => {
-    clearTimeout(saveTimeout);
+    ffmpegProcess.on('exit', () => {
+      clearTimeout(saveTimeout);
+    });
   });
 }
 
