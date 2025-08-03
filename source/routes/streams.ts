@@ -32,7 +32,9 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
       const stream = await prisma.stream.create({ data: { nickname, ffmpegInput, rtspUser, rtspPass } });
       try {
         dynamicStreams[stream.id] = await createStreamManager(stream);
-        await dynamicStreams[stream.id].startFFmpeg();
+        await dynamicStreams[stream.id].startFFmpeg().catch((err: any) => {
+          console.warn(`[${stream.id}] FFmpeg failed to start:`, err?.message || err);
+        });
       } catch (err) {
         console.error(`[StreamManager] Failed to start FFmpeg for stream ${stream.id}:`, err);
         res.status(500).json({ error: 'Failed to start FFmpeg for new stream.' });
@@ -78,7 +80,9 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
         try {
           dynamicStreams[id].destroy();
           dynamicStreams[id] = await createStreamManager(updated);
-          await dynamicStreams[id].startFFmpeg();
+          await dynamicStreams[id].startFFmpeg().catch((err: any) => {
+            console.warn(`[${dynamicStreams[id].config.id}] FFmpeg failed to start:`, err?.message || err);
+          });
         } catch (err) {
           console.error(`[StreamManager] Failed to restart FFmpeg for stream ${id}:`, err);
           res.status(500).json({ error: 'Failed to restart FFmpeg for updated stream.' });

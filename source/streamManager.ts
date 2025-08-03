@@ -183,7 +183,9 @@ export class StreamManager {
     }
     if (this.state.cleaningUp) {
       logMotion(`[${this.config.id}] FFmpeg is cleaning up, waiting to start`, 'warn');
-      setTimeout(() => this.startFFmpeg(), 5000);
+      setTimeout(() => this.startFFmpeg().catch((err: any) => {
+        console.warn(`[${this.config.id}] FFmpeg failed to start:`, err?.message || err);
+      }), 5000);
       return;
     }
     const now = Date.now();
@@ -357,6 +359,16 @@ export class StreamManager {
     });
 
     // --- Wait for first segment or error ---
+    // Add a timeout so this promise never hangs forever
+    const timeoutMs = 15000; // 15 seconds
+    const timeout = setTimeout(() => {
+      if (!firstSegmentCreated && firstSegmentPromiseResolve) {
+        console.error('FFmpeg did not create a segment in time');
+        firstSegmentPromiseResolve();
+      }
+    }, timeoutMs);
+
+    firstSegmentPromise.finally(() => clearTimeout(timeout));
     return firstSegmentPromise;
   }
 
@@ -441,7 +453,9 @@ export class StreamManager {
 
     // 3. Restart FFmpeg
     try {
-      await this.startFFmpeg();
+      await this.startFFmpeg().catch((err: any) => {
+        console.warn(`[${this.config.id}] FFmpeg failed to start:`, err?.message || err);
+      });
       logMotion(`[${streamId}] FFmpeg restarted via reconnect`);
     } catch (e) {
       logMotion(`[${streamId}] Error restarting FFmpeg: ${e}`, 'error');

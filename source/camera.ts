@@ -318,15 +318,18 @@ export function stopStreamMotionMonitoring(streamId?: string) {
 // Load streams from DB on startup
 async function loadStreamsFromDb() {
   const dbStreams = await prisma.stream.findMany();
-  const promises = [];
   for (const s of dbStreams) {
     if (!dynamicStreams[s.id]) {
       dynamicStreams[s.id] = await createStreamManager(s);
-      promises.push(dynamicStreams[s.id].startFFmpeg());
+      try {
+        dynamicStreams[s.id].startFFmpeg().catch((err: any) => {
+          console.warn(`[${s.id}] FFmpeg failed to start:`, err?.message || err);
+        });
+      } catch (err) {
+        console.error(`[${s.id}] Error starting FFmpeg:`, err);
+      }
     }
   }
-
-  await Promise.all(promises);
 
   // --- Monitor for FFmpeg cooldowns and alert ---
   setInterval(() => {
