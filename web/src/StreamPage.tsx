@@ -2382,12 +2382,26 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     setEditingStream(stream);
     setShowSettingsModal(true);
   };
-  const handleSaveSettings = async (stream: Stream, newNickname: string) => {
+  const handleSaveSettings = async (stream: Stream, newNickname: string, newFfmpegInput?: string, newRtspUser?: string, newRtspPass?: string) => {
+    // Build PATCH body with all fields, only if changed
+    const patch: any = {};
     if (newNickname.trim() && newNickname !== stream.nickname) {
+      patch.nickname = newNickname.trim();
+    }
+    if (typeof newFfmpegInput === 'string' && newFfmpegInput.trim() && newFfmpegInput !== stream.ffmpegInput) {
+      patch.ffmpegInput = newFfmpegInput.trim();
+    }
+    if (typeof newRtspUser === 'string' && (newRtspUser.trim() !== (stream.rtspUser || ''))) {
+      patch.rtspUser = newRtspUser.trim() || undefined;
+    }
+    if (typeof newRtspPass === 'string' && (newRtspPass.trim() !== (stream.rtspPass || ''))) {
+      patch.rtspPass = newRtspPass.trim() || undefined;
+    }
+    if (Object.keys(patch).length > 0) {
       await authFetch(`${API_BASE}/api/streams/${stream.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname: newNickname.trim() })
+        body: JSON.stringify(patch)
       });
       // Refresh streams
       const res = await authFetch(`${API_BASE}/api/streams`);
@@ -3034,8 +3048,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
           setShowSettingsModal(false);
           setEditingStream(null);
         }}
-        onSave={async (stream, newNickname) => {
-          await handleSaveSettings(stream, newNickname);
+        onSave={async (stream, newNickname, newFfmpegInput, newRtspUser, newRtspPass) => {
+          await handleSaveSettings(stream, newNickname, newFfmpegInput, newRtspUser, newRtspPass);
         }}
         onReconnect={async (stream) => {
           if (!stream) return;

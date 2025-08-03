@@ -264,10 +264,8 @@ export class StreamManager {
     // --- Wait for first segment creation ---
     let firstSegmentCreated = false;
     let firstSegmentPromiseResolve: (() => void) | null = null;
-    let firstSegmentPromiseReject: ((err: Error) => void) | null = null;
-    const firstSegmentPromise = new Promise<void>((resolve, reject) => {
+    const firstSegmentPromise = new Promise<void>((resolve) => {
       firstSegmentPromiseResolve = resolve;
-      firstSegmentPromiseReject = reject;
     });
 
     // --- Robust segment monitor ---
@@ -293,8 +291,9 @@ export class StreamManager {
         this.segmentMonitorTimer = null;
       }
       // Reject the promise if FFmpeg exits before first segment
-      if (!firstSegmentCreated && firstSegmentPromiseReject) {
-        firstSegmentPromiseReject(new Error('FFmpeg exited before first segment was created'));
+      if (!firstSegmentCreated && firstSegmentPromiseResolve) {
+        console.error('FFmpeg exited before first segment was created');
+        firstSegmentPromiseResolve();
       }
       if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
         logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');

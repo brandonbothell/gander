@@ -5,7 +5,7 @@ interface StreamSettingsModalProps {
   showModal: boolean;
   stream: Stream | null;
   onClose: () => void;
-  onSave: (stream: Stream, newNickname: string) => Promise<void>;
+  onSave: (stream: Stream, newNickname: string, newFfmpegInput: string, newRtspUser: string, newRtspPass: string) => Promise<void>;
   onReconnect: (stream: Stream) => Promise<void>; // <-- Add this prop
 }
 
@@ -17,27 +17,63 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
   onReconnect,
 }) => {
   const [nicknameDraft, setNicknameDraft] = useState('');
+  const [ffmpegInputDraft, setFfmpegInputDraft] = useState('');
+  const [rtspUserDraft, setRtspUserDraft] = useState('');
+  const [rtspPassDraft, setRtspPassDraft] = useState('');
   const [reconnecting, setReconnecting] = useState(false);
   const [showReconnectedMessage, setShowReconnectedMessage] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const lastReconnectingRef = React.useRef<boolean>(reconnecting);
 
-  // Update draft when stream changes
+  // Update drafts when stream changes
   useEffect(() => {
     if (stream) {
       setNicknameDraft(stream.nickname || '');
+      setFfmpegInputDraft(stream.ffmpegInput || '');
+      setRtspUserDraft(stream.rtspUser || '');
+      setRtspPassDraft(stream.rtspPass || '');
     }
   }, [stream]);
 
   const handleClose = () => {
     onClose();
     setNicknameDraft('');
+    setFfmpegInputDraft('');
+    setRtspUserDraft('');
+    setRtspPassDraft('');
+    setSaveError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
+
+    // Basic client validation
+    if (!nicknameDraft.trim() || !ffmpegInputDraft.trim()) {
+      setSaveError('Nickname and Stream URL are required.');
+      return;
+    }
+    if (
+      !/^rtsp:\/\//i.test(ffmpegInputDraft.trim()) &&
+      !/^video=.+:audio=.+/i.test(ffmpegInputDraft.trim())
+    ) {
+      setSaveError('Stream URL must be an RTSP URL or a video=...:audio=... string.');
+      return;
+    }
+
     if (stream) {
-      await onSave(stream, nicknameDraft);
-      handleClose();
+      try {
+        await onSave(
+          stream,
+          nicknameDraft.trim(),
+          ffmpegInputDraft.trim(),
+          rtspUserDraft.trim(),
+          rtspPassDraft.trim()
+        );
+        handleClose();
+      } catch (err: any) {
+        setSaveError(err.message || 'Failed to save stream.');
+      }
     }
   };
 
@@ -54,7 +90,7 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
   useEffect(() => {
     if (lastReconnectingRef.current !== reconnecting && !reconnecting) {
       setShowReconnectedMessage(true);
-      setTimeout(() => setShowReconnectedMessage(false), 3000); // Show message for 3 seconds
+      setTimeout(() => setShowReconnectedMessage(false), 3000);
     }
     lastReconnectingRef.current = reconnecting;
   }, [reconnecting]);
@@ -92,23 +128,79 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
       >
         <h2 style={{ marginTop: 0 }}>Stream Settings</h2>
         <form onSubmit={handleSubmit}>
-          <label style={{ fontWeight: 500, marginBottom: 6, display: 'block' }}>
-            Edit Nickname
-          </label>
-          <input
-            type="text"
-            value={nicknameDraft}
-            onChange={e => setNicknameDraft(e.target.value)}
-            style={{
-              width: '100%',
-              padding: 8,
-              borderRadius: 4,
-              border: '1px solid #1976d2',
-              marginTop: 4,
-              marginBottom: 16,
-            }}
-            autoFocus
-          />
+          <div style={{ marginBottom: 16 }}>
+            <label>Nickname</label>
+            <input
+              type="text"
+              value={nicknameDraft}
+              onChange={e => setNicknameDraft(e.target.value)}
+              style={{
+                width: '100%',
+                padding: 8,
+                borderRadius: 4,
+                border: '1px solid #1976d2',
+                marginTop: 4,
+                marginBottom: 8,
+              }}
+              autoFocus
+            />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label>Stream URL (RTSP or video=...:audio=...)</label>
+            <input
+              type="text"
+              value={ffmpegInputDraft}
+              onChange={e => setFfmpegInputDraft(e.target.value)}
+              style={{
+                width: '100%',
+                padding: 8,
+                borderRadius: 4,
+                border: '1px solid #1976d2',
+                marginTop: 4,
+                marginBottom: 8,
+              }}
+              required
+            />
+          </div>
+          {/^rtsp:\/\//i.test(ffmpegInputDraft.trim()) && (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                <label>RTSP Username (optional)</label>
+                <input
+                  type="text"
+                  value={rtspUserDraft}
+                  onChange={e => setRtspUserDraft(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: 8,
+                    borderRadius: 4,
+                    border: '1px solid #1976d2',
+                    marginTop: 4,
+                    marginBottom: 8,
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label>RTSP Password (optional)</label>
+                <input
+                  type="password"
+                  value={rtspPassDraft}
+                  onChange={e => setRtspPassDraft(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: 8,
+                    borderRadius: 4,
+                    border: '1px solid #1976d2',
+                    marginTop: 4,
+                    marginBottom: 8,
+                  }}
+                />
+              </div>
+            </>
+          )}
+          {saveError && (
+            <div style={{ color: '#ff6b6b', marginBottom: 12 }}>{saveError}</div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
             <button
               type="button"
