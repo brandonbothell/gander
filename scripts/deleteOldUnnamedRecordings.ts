@@ -57,7 +57,7 @@ async function main() {
           filename: rec.filename,
           // deletedAt will default to now()
         }
-      });
+      }).catch();
 
       // Delete from DB
       await prisma.motionRecording.delete({
