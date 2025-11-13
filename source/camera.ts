@@ -5,6 +5,8 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import http from 'http'
+import childProcess from 'child_process';
 import open from 'open'
 import * as admin from 'firebase-admin';
 import webpush from 'web-push';
@@ -16,7 +18,7 @@ import { TrustedDevice } from './types/deviceInfo';
 import Greenlock from 'greenlock-express';
 import config from '../config.json'
 import { jwtAuth } from './middleware/jwtAuth';
-import initializeMotionRoutes, { flushMotionSegmentsWithRetry, saveMotionSegmentsWithRetry } from './routes/motion';
+import initializeMotionRoutes, { checkDiskSpaceAndPurge, flushMotionSegmentsWithRetry, saveMotionSegmentsWithRetry } from './routes/motion';
 import initializeAuthRoutes from './routes/auth';
 import initializeNotificationRoutes, { notify } from './routes/notifications';
 import initializeRecordingRoutes from './routes/recordings';
@@ -137,6 +139,7 @@ export interface StreamMotionState {
   recordingTitle: string; // Title for the current recording
   cleaningUp: boolean; // Whether HLS/flush directory cleanup is in progress
   cancelFlush: boolean; // Whether to cancel the current flush operation
+  lowSpaceNotified: boolean; // new flag to avoid spamming notifications
 }
 
 const streamStates: Record<string, StreamMotionState> = {};
@@ -169,6 +172,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         nextFlushNumber: 1,
         cleaningUp: false,
         cancelFlush: false,
+        lowSpaceNotified: false
       }
     }
 
@@ -346,6 +350,22 @@ async function loadStreamsFromDb() {
       }
     }
   }, 60000); // Check every minute
+
+  // Periodic disk-space check: run every 60 seconds
+  const diskSpaceCheck = () => {
+    for (const sId in dynamicStreams) {
+      if (!dynamicStreams[sId]) continue;
+      checkDiskSpaceAndPurge(streamStates, dynamicStreams, sId).catch(err => {
+        console.error(`[DiskCheck] Error checking disk for ${sId}:`, err);
+      });
+    }
+  }
+  diskSpaceCheck(); // Initial check on startup
+  setInterval(() => {
+    diskSpaceCheck();
+  }, 60 * 1000);
+
+  setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000);
 }
 
 loadStreamsFromDb().then(cleanupExpiredTokensAndDevices).then(() => setupStreamMotionMonitoring()).then(() => {
@@ -364,7 +384,7 @@ loadStreamsFromDb().then(cleanupExpiredTokensAndDevices).then(() => setupStreamM
     // Use HTTP for development
     // Always use Greenlock for HTTPS, but also start HTTP server in development for convenience
     const port = process.env.PORT ?? 3000;
-    require('http').createServer(app).listen(port, () => {
+    http.createServer(app).listen(port, () => {
       console.debug(`Development HTTP server running on http://localhost:${port}`);
       setTimeout(() => {
         open(`http://localhost:${port}`);
@@ -459,7 +479,7 @@ app.get('/hls/:streamId/stream.m3u8', jwtAuth, (req, res) => {
   if (!stream) {
     res.status(404).send('Stream not found');
     return
-  } 4
+  }
   fs.readFile(stream.getPlaylistPath(), 'utf8', (err, data) => {
     if (err) {
       res.status(404).send('Not found');
@@ -506,7 +526,7 @@ app.get(/^\/(?!hls|api|recordings|signed|sounds).*/, (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'));
 });
 
-app.get(/^\/recordings(\/[^\/]+)(\/[^\/]+)?$/, (req, res) => {
+app.get(/^\/recordings(\/[^/]+)(\/[^/]+)?$/, (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'));
 });
 
@@ -681,7 +701,7 @@ app.get('/signed/recordings/:streamId/thumbnails/latest.jpg', async (req, res) =
       if (regenerate) {
         const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=160:90" -vframes 1 -update 1 "${thumbPath}"`;
         streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>((resolve) => {
-          require('child_process').exec(ffmpegCmd, (err: any) => {
+          childProcess.exec(ffmpegCmd, (err: any) => {
             if (err) {
               console.error(`[${streamId}] Failed to generate thumbnail from ${latestTs}:`, err);
               resolve({ success: false });
@@ -788,7 +808,7 @@ app.get('/recordings/:streamId/thumbnails/latest.jpg', jwtAuth, async (req, res)
       if (regenerate) {
         const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 "${thumbPath}"`;
         streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>((resolve) => {
-          require('child_process').exec(ffmpegCmd, { windowsHide: true }, (err: any) => {
+          childProcess.exec(ffmpegCmd, { windowsHide: true }, (err: any) => {
             if (err) {
               console.error(`[${streamId}] Failed to generate thumbnail from ${latestTs}:`, err);
               resolve({ success: false });
@@ -1029,6 +1049,7 @@ export async function createStreamManager(stream: any) {
     nextFlushNumber: 1,
     cleaningUp: false,
     cancelFlush: false,
+    lowSpaceNotified: false,
   }
 
   return new StreamManager({
@@ -1049,7 +1070,9 @@ async function loadPersistedStreamStates() {
   for (const row of all) {
     try {
       persisted[row.streamId] = JSON.parse(row.state);
-    } catch { }
+    } catch {
+      console.error(`[loadPersistedStreamStates] Failed to parse persisted state for stream ${row.streamId}`);
+    }
   }
   return persisted;
 }

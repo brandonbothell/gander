@@ -22,9 +22,9 @@ export function debugLog(message: string) {
   }
 }
 
-let lastFrame: { [streamId: string]: Awaited<ReturnType<typeof Jimp.read>> } = {};
-let streamMotionHistory: { [streamId: string]: boolean[] } = {};
-let streamMovementHistory: { [streamId: string]: boolean[] } = {};
+const lastFrame: { [streamId: string]: Awaited<ReturnType<typeof Jimp.read>> } = {};
+const streamMotionHistory: { [streamId: string]: boolean[] } = {};
+const streamMovementHistory: { [streamId: string]: boolean[] } = {};
 
 const streamMotionThresholds = {
   min: 0.002, max: 0.4, // Slightly higher due to lower resolution
@@ -34,28 +34,7 @@ const streamMotionThresholds = {
 const GLOBAL_HISTORY_LENGTH = 4;  // Keep same for now
 const CAMERA_MOVEMENT_HISTORY_LENGTH = 6; // Keep same for now
 
-// Cache frame counts to avoid repeated ffprobe calls
-const frameCountCache: { [segmentPath: string]: { count: number, timestamp: number } } = {};
-const FRAME_COUNT_CACHE_TTL = 5000;
-
-function getFrameCount(segmentPath: string): Promise<number> {
-  return new Promise((resolve) => {
-    // Check cache first
-    const cached = frameCountCache[segmentPath];
-    const now = Date.now();
-    if (cached && (now - cached.timestamp) < FRAME_COUNT_CACHE_TTL) {
-      resolve(cached.count);
-      return;
-    }
-
-    // Quick estimation based on segment duration (0.5 seconds at ~20fps = ~10 frames)
-    const estimatedFrames = 10; // Reasonable estimate for 0.5-second segments
-    frameCountCache[segmentPath] = { count: estimatedFrames, timestamp: now };
-    resolve(estimatedFrames);
-  });
-}
-
-let firstFrameSaved: { [streamId: string]: boolean } = {};
+const firstFrameSaved: { [streamId: string]: boolean } = {};
 
 const maskCache: { [streamId: string]: { masks: Array<{ x: number, y: number, w: number, h: number }>, ts: number } } = {};
 const MASK_CACHE_TTL = 10000; // Longer cache
@@ -191,7 +170,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
                         await fs.promises.rename(pngPath, outputPath);
                         debugLog(`[Motion] PNG extraction successful, renamed to JPG`);
                         resolve();
-                      } catch (e) {
+                      } catch (_) {
                         logMotion(`[Motion] PNG extraction successful but rename failed`, 'error');
                         reject(new Error('Rename failed'));
                       }
@@ -269,7 +248,7 @@ export async function detectMotion(streamStates: Record<string, StreamMotionStat
         logMotion(`[${streamId}] [Motion] Segment file too small: ${segmentPath}`, 'warn');
         return { motion: false, aboveCameraMovementThreshold: false };
       }
-    } catch (err) {
+    } catch (_) {
       logMotion(`[${streamId}] [Motion] Segment file missing: ${segmentPath}`, 'error');
       return { motion: false, aboveCameraMovementThreshold: false };
     }
@@ -444,7 +423,7 @@ export async function safeUnlink(...filePaths: string[]) {
     for (const filePath of filePaths) {
       await fs.promises.rm(filePath, { force: true, recursive: true }).catch(() => false);
     }
-  } catch (error) {
+  } catch (_) {
     // Ignore errors silently for performance
   }
 }

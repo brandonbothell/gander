@@ -99,7 +99,7 @@ class SecureStorageService {
       // Fallback to base64 decoding for legacy tokens
       try {
         return atob(encryptedText);
-      } catch (fallbackError) {
+      } catch (_) {
         console.error('Failed to decrypt token:', error);
         throw new Error('Failed to decrypt token');
       }

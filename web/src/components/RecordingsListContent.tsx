@@ -151,14 +151,13 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
 
   useEffect(() => {
     function updateWidth() {
-      let width = window.innerWidth;
+      const width = window.innerWidth;
       setContainerWidth(width);
       setNumColumns(getNumColumns(width));
     }
     updateWidth();
     window.addEventListener("resize", updateWidth);
     return () => window.removeEventListener("resize", updateWidth);
-    // eslint-disable-next-line
   }, []);
 
   // Calculate thumbnail width based on columns
@@ -191,7 +190,6 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
       heights[row] = maxHeight + GRID_GAP;
     }
     setRowHeights(heights);
-    // eslint-disable-next-line
   }, [props.filteredRecordings, props.nicknames, THUMB_WIDTH, rowCount, numColumns, THUMB_HEIGHT, GRID_GAP]);
 
   // VariableSizeGrid rowHeight/columnWidth

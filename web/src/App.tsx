@@ -156,7 +156,7 @@ export default function App() {
         try {
           const errorText = await res.text();
           debugLog(`Error response body: ${errorText}`, 'error');
-        } catch (e) {
+        } catch (_) {
           debugLog('Could not read error response body', 'warn');
         }
       }

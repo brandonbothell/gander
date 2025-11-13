@@ -5,6 +5,21 @@ import { isIOS } from '../StreamPage';
 import { Capacitor } from '@capacitor/core';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
+/**
+ * Typed extension for WebKit fullscreen methods present on some mobile Safari video elements.
+ * This avoids using `any` while still allowing guarded access to vendor-prefixed methods.
+ */
+interface WebkitVideoElement extends HTMLVideoElement {
+  webkitEnterFullscreen?: () => void;
+  webkitRequestFullscreen?: () => void | Promise<void>;
+}
+
+interface WebkitDocument extends Document {
+  webkitFullscreenElement?: Element | null;
+  mozFullScreenElement?: Element | null;
+  msFullscreenElement?: Element | null;
+}
+
 interface StreamControlBarProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   activeStream: Stream | null;
@@ -212,26 +227,33 @@ export function StreamControlBar({
   const handleFullscreen = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (isIOS() && typeof (video as any).webkitEnterFullscreen === 'function') {
+
+    // Cast to a typed extension that may include WebKit fullscreen helpers
+    const webkitVideo = video as WebkitVideoElement;
+
+    if (isIOS() && typeof webkitVideo.webkitEnterFullscreen === 'function') {
       // iOS Safari/PWA: use webkitEnterFullscreen
-      (video as any).webkitEnterFullscreen();
+      webkitVideo.webkitEnterFullscreen();
     } else if (video.requestFullscreen) {
       video.requestFullscreen();
-    } else if ((video as any).webkitRequestFullscreen) {
-      (video as any).webkitRequestFullscreen();
+    } else if (typeof webkitVideo.webkitRequestFullscreen === 'function') {
+      webkitVideo.webkitRequestFullscreen();
     }
 
     // Only lock orientation if supported
     if (Capacitor.isNativePlatform()) {
       ScreenOrientation.lock({ orientation: 'landscape' })
-    } else if (
-      'orientation' in screen &&
-      typeof (screen.orientation as any).lock === 'function'
-    ) {
-      try {
-        (screen.orientation as any).lock('landscape').catch(() => { });
-      } catch (error) {
-        // Ignore errors
+    } else {
+      const orientation = (screen as unknown as { orientation?: { lock?: (orientation: string) => Promise<void> } }).orientation;
+      if (orientation && typeof orientation.lock === 'function') {
+        try {
+          const lockResult = orientation.lock('landscape');
+          if (lockResult && typeof (lockResult as Promise<void>).catch === 'function') {
+            (lockResult as Promise<void>).catch(() => { });
+          }
+        } catch (_) {
+          // Ignore errors
+        }
       }
     }
     handleShowControls();
@@ -240,12 +262,11 @@ export function StreamControlBar({
   const handleExitFullscreen = () => {
     if (Capacitor.isNativePlatform()) {
       ScreenOrientation.unlock()
-    } else if (
-      screen.orientation &&
-      typeof (screen.orientation as any).unlock === 'function'
-    ) {
+    } else {
+      const orientation = (screen as unknown as { orientation?: { unlock?: () => Promise<void> } }).orientation;
+      if (!orientation || typeof orientation.unlock !== 'function') return;
       try {
-        const result = (screen.orientation as any).unlock();
+        const result = orientation.unlock();
         if (result && typeof result.catch === 'function') {
           result.catch(() => { });
         }
@@ -265,9 +286,9 @@ export function StreamControlBar({
       // Check if fullscreen is exited
       if (
         !document.fullscreenElement &&
-        !((document as any).webkitFullscreenElement) &&
-        !((document as any).mozFullScreenElement) &&
-        !((document as any).msFullscreenElement)
+        !((document as WebkitDocument).webkitFullscreenElement) &&
+        !((document as WebkitDocument).mozFullScreenElement) &&
+        !((document as WebkitDocument).msFullscreenElement)
       ) {
         handleExitFullscreen();
       }

@@ -1,3 +1,5 @@
+import type { CustomWindow } from "../main";
+
 const DEBUG_LOGS_KEY = 'debug_logs';
 const MAX_DEBUG_LOGS = 100;
 
@@ -25,7 +27,7 @@ export const debugLog = (message: string, level: 'info' | 'error' | 'warn' = 'in
     }
 
     localStorage.setItem(DEBUG_LOGS_KEY, JSON.stringify(existingLogs));
-  } catch (e) {
+  } catch (_) {
     // Ignore localStorage errors
   }
 };
@@ -35,11 +37,11 @@ export const getDebugLogs = () => {
   try {
     const logs = JSON.parse(localStorage.getItem(DEBUG_LOGS_KEY) || '[]');
     return logs.join('\n');
-  } catch (e) {
+  } catch (_) {
     return 'No debug logs available';
   }
 };
 
 // Make it globally available for debugging
-(window as any).getDebugLogs = getDebugLogs;
-(window as any).clearDebugLogs = () => localStorage.removeItem(DEBUG_LOGS_KEY);
+(window as unknown as CustomWindow).getDebugLogs = getDebugLogs;
+(window as unknown as CustomWindow).clearDebugLogs = () => localStorage.removeItem(DEBUG_LOGS_KEY);

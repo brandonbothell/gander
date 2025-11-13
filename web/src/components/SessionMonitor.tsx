@@ -36,7 +36,7 @@ interface SessionMonitorProps {
 
 declare global {
   interface Window {
-    google: any;
+    initGoogleMaps?: () => void;
   }
 }
 
@@ -100,18 +100,18 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
     script.defer = true;
 
     // Add a global callback function
-    (window as any).initGoogleMaps = () => {
+    window.initGoogleMaps = () => {
       console.log('Google Maps API loaded successfully');
       setMapsLoaded(true);
       // Clean up the global callback
-      delete (window as any).initGoogleMaps;
+      delete window.initGoogleMaps;
     };
 
     script.onerror = () => {
       console.error('Failed to load Google Maps API');
       setError('Failed to load maps. Please check your internet connection.');
       // Clean up the global callback
-      delete (window as any).initGoogleMaps;
+      delete window.initGoogleMaps;
     };
 
     document.head.appendChild(script);
@@ -121,8 +121,8 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
         script.parentNode.removeChild(script);
       }
       // Clean up the global callback if component unmounts
-      if ((window as any).initGoogleMaps) {
-        delete (window as any).initGoogleMaps;
+      if (window.initGoogleMaps) {
+        delete window.initGoogleMaps;
       }
     };
   }, []);

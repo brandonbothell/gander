@@ -1,6 +1,6 @@
 import React from 'react';
 import { FiBell, FiBellOff, FiUsers, FiLogOut } from 'react-icons/fi';
-import { type Stream } from '../../../source/types/shared';
+import { type Stream, type StreamMask } from '../../../source/types/shared';
 
 interface StreamControlsProps {
   shouldNotifyOnMotion: boolean;
@@ -14,8 +14,8 @@ interface StreamControlsProps {
   isMobile: boolean;
   handleLogout: () => void;
   activeStream: Stream | null;
-  setMasks: React.Dispatch<React.SetStateAction<any[]>>;
-  authFetch: (url: string, options?: any) => Promise<any>;
+  setMasks: React.Dispatch<React.SetStateAction<StreamMask[]>>;
+  authFetch: (url: string, options?: object) => Promise<Response>;
   API_BASE: string;
   pauseMaskPollingUntil: React.RefObject<number>;
 }

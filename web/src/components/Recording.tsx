@@ -116,7 +116,7 @@ export function Recording({
     ) {
       try {
         (screen.orientation as any).lock('landscape').catch();
-      } catch (error) {
+      } catch (_) {
         // Ignore errors
       }
     }

@@ -156,8 +156,13 @@ export function StreamTilesGrid({
     element.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
     element.style.zIndex = '10';
 
-    // Force reflow
-    element.offsetHeight;
+    // Force layout then apply transition on next frame to ensure the browser sees the start state
+    // (avoids relying on the magic of reading offsetHeight)
+    void element.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      element.style.transition = 'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+      element.style.transform = 'translate(0, 0)';
+    });
 
     // Animate to final position
     element.style.transition = 'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';

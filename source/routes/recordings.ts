@@ -4,6 +4,7 @@ import { prisma } from '../camera';
 import { StreamManager } from '../streamManager';
 import path from 'path';
 import fs from 'fs/promises';
+import { MotionRecording, Prisma } from '../generated/prisma';
 
 export default function initializeRecordingRoutes(app: express.Application, dynamicStreams: Record<string, StreamManager>) {
   // --- Get all recordings for a stream ---
@@ -13,11 +14,15 @@ export default function initializeRecordingRoutes(app: express.Application, dyna
     const { from, to } = req.query;
 
     // Query from MotionRecording table
-    let where: any = { streamId };
+    const where: Prisma.MotionRecordingWhereInput = { streamId };
     if (from || to) {
       where.filename = {};
-      if (from) where.recordedAt.gte = from;
-      if (to) where.recordedAt.lte = to;
+      if (from || to) where.recordedAt = {};
+      if (from) { where.recordedAt = {}; where.recordedAt.gte = String(from); }
+      if (to) {
+        if (!where.recordedAt) where.recordedAt = {};
+        (where.recordedAt as unknown as Prisma.StringFilter<MotionRecording>).lte = String(to);
+      }
     }
     const recordings = await prisma.motionRecording.findMany({
       where,
@@ -169,7 +174,7 @@ export default function initializeRecordingRoutes(app: express.Application, dyna
   // --- Serve a recording file for a stream ---
   app.get('/recordings/:streamId/file/:filename', jwtAuth, (req, res) => {
     const { streamId, filename } = req.params;
-    if (!/^[\w\-\.]+\.mp4$/.test(filename)) { res.status(400).json({ error: 'Invalid filename' }); return; }
+    if (!/^[\w\-.]+\.mp4$/.test(filename)) { res.status(400).json({ error: 'Invalid filename' }); return; }
     const stream = dynamicStreams[streamId];
     if (!stream) { res.status(404).json({ error: 'Stream not found' }); return; }
     const filePath = path.join(stream.config.recordDir, filename);
@@ -210,7 +215,7 @@ export default function initializeRecordingRoutes(app: express.Application, dyna
   // --- Delete a recording file for a stream ---
   app.delete('/api/recordings/:streamId/:filename', jwtAuth, async (req, res) => {
     const { streamId, filename } = req.params;
-    if (!/^[\w\-\.]+\.mp4$/.test(filename)) { res.status(400).json({ error: 'Invalid filename' }); return; }
+    if (!/^[\w\-.]+\.mp4$/.test(filename)) { res.status(400).json({ error: 'Invalid filename' }); return; }
     const stream = dynamicStreams[streamId];
     if (!stream) { res.status(404).json({ error: 'Stream not found' }); return; }
     const filePath = path.join(stream.config.recordDir, filename);
@@ -220,7 +225,7 @@ export default function initializeRecordingRoutes(app: express.Application, dyna
         fs.rm(filePath, { force: true, recursive: true }),
         fs.rm(thumbPath, { force: true, recursive: true })
       ]);
-    } catch (e) {
+    } catch (_) {
       res.status(500).json({ error: 'Failed to delete file' });
     }
 
@@ -244,7 +249,7 @@ export default function initializeRecordingRoutes(app: express.Application, dyna
   app.post('/api/recordings/:streamId/bulk-delete', jwtAuth, express.json(), async (req, res) => {
     const { streamId } = req.params;
     const { filenames } = req.body;
-    if (!Array.isArray(filenames) || filenames.some(f => !/^[\w\-\.]+\.mp4$/.test(f))) { res.status(400).json({ error: 'Invalid filenames' }); return; }
+    if (!Array.isArray(filenames) || filenames.some(f => !/^[\w\-.]+\.mp4$/.test(f))) { res.status(400).json({ error: 'Invalid filenames' }); return; }
     const stream = dynamicStreams[streamId];
     if (!stream) { res.status(404).json({ error: 'Stream not found' }); return; }
     const results: { [filename: string]: boolean } = {};
@@ -256,7 +261,7 @@ export default function initializeRecordingRoutes(app: express.Application, dyna
           fs.rm(filePath, { force: true, recursive: true }),
           fs.rm(thumbPath, { force: true, recursive: true })
         ]);
-      } catch (e) {
+      } catch (_) {
         results[filename] = false;
       }
 

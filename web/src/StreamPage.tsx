@@ -80,7 +80,8 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const location = useLocation();
   const [cachedRecordings, setCachedRecordings] = useLocalStorageState<{ [streamId: string]: Recording[] }>('cachedRecordings', {});
   const [viewed, setViewed] = useLocalStorageState<{ filename: string; streamId: string }[]>('viewedRecordings', []);
-  const [motionStatus, setMotionStatus] = useState<{ [streamId: string]: { recording: boolean; secondsLeft: number; saving: boolean; startedRecordingAt: number } }>({});
+  const [motionStatus, setMotionStatus] = useState<{ [streamId: string]:
+    { recording: boolean; secondsLeft: number; saving: boolean; startedRecordingAt: number, lowDiskSpace: boolean } }>({});
   const [isMotionRecordingPaused, setMotionRecordingPaused] = useState<{ [streamId: string]: boolean }>({});
   const [nicknames, setNicknames] = useState<{ [filename: string]: string }>({});
   const [shouldNotifyOnMotion, setShouldNotifyOnMotion] = useLocalStorageState<boolean>('motionNotify', false);
@@ -148,6 +149,20 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
   const [isAtBottomOfPage, setIsAtBottomOfPage] = useState(false);
   const [errorModalOpen, setErrorModalOpen] = useState(false);
   const [errorModalMsg, setErrorModalMsg] = useState('');
+
+  const [lowDiskModalOpen, setLowDiskModalOpen] = useState(false);
+  const [lowDiskModalStreamId, setLowDiskModalStreamId] = useState<string | null>(null);
+  const [lowDiskLastDismissed, setLowDiskLastDismissed] = useLocalStorageState<Record<string, number>>('lowDiskLastDismissed', {});
+  const LOW_DISK_COOLDOWN = 10 * 60 * 1000; // 10 minutes
+
+  // Handle low disk modal dismissal
+  function handleLowDiskModalClose() {
+    if (lowDiskModalStreamId) {
+      setLowDiskLastDismissed(prev => ({ ...(prev || {}), [lowDiskModalStreamId]: Date.now() }));
+    }
+    setLowDiskModalOpen(false);
+    setLowDiskModalStreamId(null);
+  }
 
   // Handler for copyright long-press (touch devices)
   function handleCopyrightTouchStart() {
@@ -299,7 +314,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
             if (dateRange.from && /^\d{4}-\d{2}-\d{2}$/.test(dateRange.from) && fileDateLocal < dateRange.from) return false;
             if (dateRange.to && /^\d{4}-\d{2}-\d{2}$/.test(dateRange.to) && fileDateLocal > dateRange.to) return false;
-          } catch (dateError) {
+          } catch (_dateError) {
             // If date parsing fails, exclude the recording
             return false;
           }
@@ -501,7 +516,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
 
             if (dateRange.from && /^\d{4}-\d{2}-\d{2}$/.test(dateRange.from) && fileDateLocal < dateRange.from) continue;
             if (dateRange.to && /^\d{4}-\d{2}-\d{2}$/.test(dateRange.to) && fileDateLocal > dateRange.to) continue;
-          } catch (dateError) {
+          } catch (_dateError) {
             // If date parsing fails, exclude the recording
             continue;
           }
@@ -1553,7 +1568,7 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     setTotalRecordings(prev => ({ ...prev, [stream.id]: data.total || 0 }));
 
     let foundLastSeen = false;
-    let recsToAdd = newRecs;
+    const recsToAdd = newRecs;
     if (lastSeenRecording[stream.id]) {
       const idx = newRecs.findIndex(r => r.filename === lastSeenRecording[stream.id]!);
       if (idx !== -1) {
@@ -1628,7 +1643,9 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     const pollMotionStatus = () => {
       authFetch(`${API_BASE}/api/motion-status`)
         .then(res => res.json())
-        .then((status: { [streamId: string]: { recording: boolean, secondsLeft: number, saving: boolean, startedRecordingAt: number } }) => {
+        .then((status: { [streamId: string]:
+          { recording: boolean, secondsLeft: number, saving: boolean, startedRecordingAt: number, lowDiskSpace: boolean } }) => {
+          // Update motion status state
           setMotionStatus(status);
 
           // Check for any stream that just started recording (motion detection)
@@ -1658,7 +1675,18 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     if (!activeStream?.id) return;
 
     // Check if we just switched to a stream that recently started recording
-    const streamStatus = motionStatus[activeStream.id];
+    const streamStatus = motionStatus[activeStream.id]
+
+    // If activeStream has lowDiskSpace flag, show modal if allowed by cooldown
+          try {
+            if (streamStatus.lowDiskSpace) {
+              const last = lowDiskLastDismissed[activeStream.id] ?? 0;
+              if (Date.now() - last > LOW_DISK_COOLDOWN && !lowDiskModalOpen) {
+                setLowDiskModalStreamId(activeStream.id);
+                setLowDiskModalOpen(true);
+              }
+            }
+          } catch (_) { /* ignore */ }
 
     if (streamStatus?.recording && streamStatus.startedRecordingAt > 0) {
       const timeSinceStart = Date.now() - streamStatus.startedRecordingAt;
@@ -1754,6 +1782,20 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!lowDiskModalStreamId) return;
+    const sId = lowDiskModalStreamId;
+    if (!activeStream || activeStream.id !== sId) {
+      // close if user navigated away
+      setLowDiskModalOpen(false);
+      setLowDiskModalStreamId(null);
+    } else if (!motionStatus[sId]?.lowDiskSpace) {
+      // close if flag cleared
+      setLowDiskModalOpen(false);
+      setLowDiskModalStreamId(null);
+    }
+  }, [activeStream, motionStatus, lowDiskModalStreamId]);
 
   // --- Poll pause state every 3 seconds ---
   useEffect(() => {
@@ -2067,14 +2109,13 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     async function fetchDeleted() {
       if (!activeStream) return;
       const recordingsStream = viewingRecordingsFrom ?? activeStream;
-      try {
-        const res = await authFetch(`${API_BASE}/api/deleted-recordings/${recordingsStream.id}`);
-        if (!res.ok) return;
-        const list: string[] = await res.json();
-        if (!cancelled && (!deletedRecordings[recordingsStream.id] || !list.every(r => deletedRecordings[recordingsStream.id].includes(r)))) {
-          setDeletedRecordings(prev => ({ ...prev, [recordingsStream.id]: list }));
-        }
-      } catch { }
+      const res = await authFetch(`${API_BASE}/api/deleted-recordings/${recordingsStream.id}`)
+        .catch(() => ({ ok: false } as { ok: false }));
+      if (!res.ok) return;
+      const list: string[] = await res.json();
+      if (!cancelled && (!deletedRecordings[recordingsStream.id] || !list.every(r => deletedRecordings[recordingsStream.id].includes(r)))) {
+        setDeletedRecordings(prev => ({ ...prev, [recordingsStream.id]: list }));
+      }
     }
     fetchDeleted();
     const interval = setInterval(fetchDeleted, 30000);
@@ -2151,12 +2192,10 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
     // Skip fetching if paused
     if (Date.now() < pauseMaskPollingUntil.current || !activeStream) return;
     if (isDraggingMask) return;
-    try {
-      const res = await authFetch(`${API_BASE}/api/masks/${activeStream.id}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setMasks(prev => mergeMasks(data, prev));
-    } catch { }
+    const res = await authFetch(`${API_BASE}/api/masks/${activeStream.id}`).catch(() => ({ ok: false } as { ok: false }));
+    if (!res.ok) return;
+    const data = await res.json();
+    setMasks(prev => mergeMasks(data, prev));
   }
 
   // Fetch masks when mask editor is shown, and poll every 5 seconds while open
@@ -2419,6 +2458,15 @@ export default function StreamPage({ streamId, onShowSessionMonitor, onSessionMo
         open={errorModalOpen}
         message={errorModalMsg}
         onClose={() => setErrorModalOpen(false)}
+      />
+      {/* Low disk space modal */}
+      <ErrorModal
+        open={lowDiskModalOpen}
+        message={
+          `Host is low on disk space. Motion recording saving is paused and new segments will be deleted for this stream. ` +
+          `Free space on the host to resume saving.`
+        }
+        onClose={handleLowDiskModalClose}
       />
       <div style={{ userSelect: 'none' }}>
         {/* Main video and mask editor remain unchanged, but use activeStream */}
@@ -3192,7 +3240,7 @@ function playNotificationTone() {
     setTimeout(() => {
       try {
         audioContext.close();
-      } catch (e) {
+      } catch (_) {
         // Ignore cleanup errors
       }
     }, 200);

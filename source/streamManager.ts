@@ -418,7 +418,9 @@ export class StreamManager {
                 if (match) {
                   const pid = match[1];
                   logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
-                  try { process.kill(Number(pid), 'SIGKILL'); } catch { }
+                  try { process.kill(Number(pid), 'SIGKILL'); } catch {
+                    // Ignore failure to kill ffmpeg process
+                  }
                 }
               }
             }
@@ -434,7 +436,9 @@ export class StreamManager {
               const pids = stdout.split('\n').map(line => line.trim()).filter(Boolean);
               for (const pid of pids) {
                 logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
-                try { process.kill(Number(pid), 'SIGKILL'); } catch { }
+                try { process.kill(Number(pid), 'SIGKILL'); } catch {
+                  // Ignore failure to kill ffmpeg process
+                }
               }
             }
             resolve();

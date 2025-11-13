@@ -17,7 +17,6 @@ export function RouterLoadingHandler() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-    // eslint-disable-next-line
   }, [location.key]); // triggers on every navigation
 
   return null;

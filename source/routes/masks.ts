@@ -67,7 +67,7 @@ export default function initializeMaskRoutes(app: express.Application) {
         }
       });
       res.json({ success: true, mask: updated });
-    } catch (e) {
+    } catch (_) {
       res.status(500).json({ success: false, error: 'Failed to update mask' });
     }
   });

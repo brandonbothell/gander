@@ -27,7 +27,9 @@ function loadCache(): SignedUrlCache {
       memoryCache = cached;
       return memoryCache || { urls: {} };
     }
-  } catch { }
+  } catch {
+    // Ignore parse errors
+  }
   memoryCache = { urls: {} };
   return memoryCache;
 }

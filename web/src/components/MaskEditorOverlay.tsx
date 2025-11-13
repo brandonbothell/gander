@@ -615,11 +615,11 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                   masksRef.current = (() => {
                     const newMasks = masksRef.current.filter(m => m.id !== maskObj.id);
                     // Find the mask under the deleted one with the largest overlap area
-                    let maskA = typeof deletedMask.mask === 'string' ? JSON.parse(deletedMask.mask) : deletedMask.mask;
+                    const maskA = typeof deletedMask.mask === 'string' ? JSON.parse(deletedMask.mask) : deletedMask.mask;
                     let maxOverlap = 0;
                     let mostOverlapping: typeof maskObj | undefined;
                     for (const m of newMasks) {
-                      let maskB = typeof m.mask === 'string' ? JSON.parse(m.mask) : m.mask;
+                      const maskB = typeof m.mask === 'string' ? JSON.parse(m.mask) : m.mask;
                       const x_overlap = Math.max(0, Math.min(maskA.x + maskA.w, maskB.x + maskB.w) - Math.max(maskA.x, maskB.x));
                       const y_overlap = Math.max(0, Math.min(maskA.y + maskA.h, maskB.y + maskB.h) - Math.max(maskA.y, maskB.y));
                       const overlapArea = x_overlap * y_overlap;

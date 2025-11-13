@@ -71,8 +71,12 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
           rtspPassDraft.trim()
         );
         handleClose();
-      } catch (err: any) {
-        setSaveError(err.message || 'Failed to save stream.');
+      } catch (err) {
+        if (err instanceof Error) {
+          setSaveError(err.message || 'Failed to save stream.');
+        } else {
+          setSaveError(String(err) || 'Failed to save stream.');
+        }
       }
     }
   };

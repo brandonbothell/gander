@@ -1,7 +1,6 @@
 import { prisma } from "../camera";
 import express from "express";
 import { jwtAuth } from "../middleware/jwtAuth";
-import config from '../../config.json';
 import { StreamManager } from "../streamManager";
 import * as admin from 'firebase-admin';
 import webpush from 'web-push';

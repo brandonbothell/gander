@@ -177,7 +177,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
     let tokens: string[] = [];
     try {
       tokens = JSON.parse(user.refreshTokens ?? '[]');
-    } catch (err) {
+    } catch (_) {
       logAuth(`Failed to parse refresh tokens for user: ${user.username}`, 'error');
       res.status(500).json({ error: 'Failed to parse refresh tokens' });
       return;
@@ -199,7 +199,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
         tokens = tokens.filter((t: string) => t !== refreshToken);
         tokens.push(newRefreshToken);
         return newRefreshToken;
-      } catch (err) {
+      } catch (_) {
         logAuth(`Failed to verify refresh token for user: ${user.username}`, 'error');
         res.status(401).json({ error: 'Invalid refresh token' });
         return null;

@@ -107,7 +107,7 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
     try {
       await stream.reconnect();
       res.json({ success: true });
-    } catch (e) {
+    } catch (_) {
       res.status(500).json({ error: 'Failed to reconnect stream.' });
     }
   });
