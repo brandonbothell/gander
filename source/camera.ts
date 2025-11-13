@@ -365,6 +365,67 @@ async function loadStreamsFromDb() {
     diskSpaceCheck();
   }, 60 * 1000);
 
+  // Periodically remove old HLS segments (runs independent of motion monitoring)
+  const SEGMENT_RETENTION_SECONDS = 300; // 5 minutes
+  async function cleanupOldStreamSegments() {
+    const retentionMs = SEGMENT_RETENTION_SECONDS * 1000;
+    const now = Date.now();
+
+    for (const streamId of Object.keys(dynamicStreams)) {
+      const stream = dynamicStreams[streamId];
+      if (!stream) continue;
+      const dir = stream.config.hlsDir;
+      let files: string[] = [];
+      try {
+        files = await fs.promises.readdir(dir);
+      } catch {
+        continue;
+      }
+
+      const segmentFiles = files.filter(f => /^segment_\d+\.ts$/.test(f));
+      for (const fname of segmentFiles) {
+        const fullPath = path.join(dir, fname);
+
+        try {
+          const stat = await fs.promises.stat(fullPath);
+          const age = now - stat.mtimeMs;
+
+          // Skip files that are still recent enough
+          if (age <= retentionMs) continue;
+
+          // Avoid deleting files that are currently referenced by motion state
+          const state = streamStates[streamId];
+          const isReferenced = state && (
+            (state.recentSegments || []).includes(fullPath) ||
+            (state.motionSegments || []).includes(fullPath) ||
+            (state.flushingSegments || []).includes(fullPath)
+          );
+          if (isReferenced) continue;
+
+          // Delete the segment and its associated motion thumbnail if present
+          await safeUnlinkWithRetry(fullPath);
+
+          const motionJpg = fullPath.replace(/\.ts$/, '_motion.jpg');
+          try {
+            await fs.promises.access(motionJpg);
+            const mjStat = await fs.promises.stat(motionJpg);
+            if (now - mjStat.mtimeMs > retentionMs) {
+              await safeUnlinkWithRetry(motionJpg);
+            }
+          } catch {
+            // not present — ignore
+          }
+        } catch {
+          // ignore individual file errors and continue
+        }
+      }
+    }
+  }
+
+  // Run immediately and then every minute
+  cleanupOldStreamSegments().catch(() => { /* ignore */ });
+  setInterval(() => cleanupOldStreamSegments().catch(() => { /* ignore */ }), 60 * 1000);
+
   setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000);
 }
 
