@@ -1,9 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
-
-const LoadingContext = createContext<{
-  loading: boolean;
-  setLoading: (v: boolean) => void;
-}>({ loading: false, setLoading: () => { } });
+import React, { useState } from 'react';
+import { LoadingContext } from './hooks/useLoading';
 
 export function LoadingProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
@@ -12,8 +8,4 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
       {children}
     </LoadingContext.Provider>
   );
-}
-
-export function useLoading() {
-  return useContext(LoadingContext);
 }

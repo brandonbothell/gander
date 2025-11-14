@@ -23,7 +23,9 @@
     "db:migrate-reset": "yarn pnpify prisma migrate reset",
     "db:migrate-dev": "yarn pnpify prisma migrate dev",
     "db:migrate-resolve": "yarn pnpify prisma migrate resolve",
-    "lint": "yarn eslint ."
+    "lint": "yarn lint:server && yarn lint:client",
+    "lint:server": "yarn eslint .",
+    "lint:client": "yarn workspace web eslint ."
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -36,10 +38,15 @@
     "@types/jsonwebtoken": "^9",
     "@types/session-file-store": "^1",
     "@types/web-push": "^3",
+    "@typescript-eslint/parser": "^8.46.4",
     "concurrently": "^9.1.2",
     "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "nodemon": "^3.1.10",
     "pm2": "^6.0.6",
+    "prettier": "^3.6.2",
     "prisma": "^6.9.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",

@@ -4,9 +4,12 @@ import eslint from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
-export default defineConfig(
+import prettierRecommended from 'eslint-config-prettier/flat';
+
+export default defineConfig([
   eslint.configs.recommended,
   tseslint.configs.recommended,
+  prettierRecommended,
   {
     ignores: [
       '**/dist/**',
@@ -17,20 +20,21 @@ export default defineConfig(
       '**/android/**',
       '**/public/**',
       '**/.yarn/**',
+      '**/web/**',
       '**/hls_*/**',
-      '.pnp.cjs'
+      '.pnp.cjs',
     ],
   },
   {
     rules: {
       '@typescript-eslint/no-unused-vars': [
-        "warn",
+        'warn',
         {
           caughtErrorsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
-          argsIgnorePattern: '^_'
-        }
-      ]
-    }
-  }
-);
+          argsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+]);

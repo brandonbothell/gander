@@ -1,4 +1,4 @@
-import { useLoading } from '../LoadingProvider';
+import { useLoading } from '../hooks/useLoading';
 
 export function LoadingBar() {
   const { loading } = useLoading();
