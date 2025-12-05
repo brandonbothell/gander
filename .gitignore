@@ -40,7 +40,8 @@ security-cam.sqlite
 *.crt
 *.p12
 *.pfx
-greenlock.d/
+greenlock.d/*
+!greenlock.d/config.example.json
 .greenlockrc
 
 # Android signing and builds

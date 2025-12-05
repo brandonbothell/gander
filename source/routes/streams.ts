@@ -1,9 +1,12 @@
-import { createStreamManager, prisma } from "../camera";
-import { jwtAuth } from "../middleware/jwtAuth";
-import { StreamManager } from "../streamManager";
-import express from "express";
+import { createStreamManager, prisma } from '../camera';
+import { jwtAuth } from '../middleware/jwtAuth';
+import { StreamManager } from '../streamManager';
+import express from 'express';
 
-export default function initializeStreamRoutes(app: express.Application, dynamicStreams: Record<string, StreamManager>) {
+export default function initializeStreamRoutes(
+  app: express.Application,
+  dynamicStreams: Record<string, StreamManager>,
+) {
   // List all streams
   app.get('/api/streams', jwtAuth, async (req, res) => {
     const streams = await prisma.stream.findMany();
@@ -27,17 +30,29 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
       res.status(400).json({ error: validation.error });
       return;
     }
-    console.log(`[POST] Creating new stream with nickname: ${nickname}, ffmpegInput: ${ffmpegInput}, rtspUser: ${rtspUser}, rtspPass: ${rtspPass}`);
+    console.log(
+      `[POST] Creating new stream with nickname: ${nickname}, ffmpegInput: ${ffmpegInput}, rtspUser: ${rtspUser}, rtspPass: ${rtspPass}`,
+    );
     try {
-      const stream = await prisma.stream.create({ data: { nickname, ffmpegInput, rtspUser, rtspPass } });
+      const stream = await prisma.stream.create({
+        data: { nickname, ffmpegInput, rtspUser, rtspPass },
+      });
       try {
         dynamicStreams[stream.id] = await createStreamManager(stream);
-        await dynamicStreams[stream.id].startFFmpeg().catch((err: any) => {
-          console.warn(`[${stream.id}] FFmpeg failed to start:`, err?.message || err);
+        await dynamicStreams[stream.id].startFFmpeg().catch((err) => {
+          console.warn(
+            `[${stream.id}] FFmpeg failed to start:`,
+            err?.message || err,
+          );
         });
       } catch (err) {
-        console.error(`[StreamManager] Failed to start FFmpeg for stream ${stream.id}:`, err);
-        res.status(500).json({ error: 'Failed to start FFmpeg for new stream.' });
+        console.error(
+          `[StreamManager] Failed to start FFmpeg for stream ${stream.id}:`,
+          err,
+        );
+        res
+          .status(500)
+          .json({ error: 'Failed to start FFmpeg for new stream.' });
         return;
       }
       res.status(201).json(stream);
@@ -56,18 +71,26 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
       res.status(404).json({ error: 'Stream not found.' });
       return;
     }
-    const validation = validateStreamInput({ ffmpegInput: ffmpegInput ?? stream.ffmpegInput, rtspUser: rtspUser ?? stream.rtspUser, rtspPass: rtspPass ?? stream.rtspPass });
+    const validation = validateStreamInput({
+      ffmpegInput: ffmpegInput ?? stream.ffmpegInput,
+      rtspUser: rtspUser ?? stream.rtspUser,
+      rtspPass: rtspPass ?? stream.rtspPass,
+    });
     if (!validation.valid) {
       res.status(400).json({ error: validation.error });
       return;
     }
-    console.log(`[PATCH] Updating stream ${id} with nickname: ${nickname}, ffmpegInput: ${ffmpegInput}, rtspUser: ${rtspUser}, rtspPass: ${rtspPass}`);
+    console.log(
+      `[PATCH] Updating stream ${id} with nickname: ${nickname}, ffmpegInput: ${ffmpegInput}, rtspUser: ${rtspUser}, rtspPass: ${rtspPass}`,
+    );
     try {
       const updated = await prisma.stream.update({
         where: { id },
         data: Object.fromEntries(
-          Object.entries({ nickname, ffmpegInput, rtspUser, rtspPass }).filter(([_, v]) => v !== undefined)
-        )
+          Object.entries({ nickname, ffmpegInput, rtspUser, rtspPass }).filter(
+            ([_, v]) => v !== undefined,
+          ),
+        ),
       });
 
       // Only restart ffmpeg if ffmpegInput, rtspUser, or rtspPass changed
@@ -80,12 +103,20 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
         try {
           dynamicStreams[id].destroy();
           dynamicStreams[id] = await createStreamManager(updated);
-          await dynamicStreams[id].startFFmpeg().catch((err: any) => {
-            console.warn(`[${dynamicStreams[id].config.id}] FFmpeg failed to start:`, err?.message || err);
+          await dynamicStreams[id].startFFmpeg().catch((err) => {
+            console.warn(
+              `[${dynamicStreams[id].config.id}] FFmpeg failed to start:`,
+              err?.message || err,
+            );
           });
         } catch (err) {
-          console.error(`[StreamManager] Failed to restart FFmpeg for stream ${id}:`, err);
-          res.status(500).json({ error: 'Failed to restart FFmpeg for updated stream.' });
+          console.error(
+            `[StreamManager] Failed to restart FFmpeg for stream ${id}:`,
+            err,
+          );
+          res
+            .status(500)
+            .json({ error: 'Failed to restart FFmpeg for updated stream.' });
           return;
         }
       }
@@ -141,15 +172,30 @@ export default function initializeStreamRoutes(app: express.Application, dynamic
 }
 
 // Helper: Validate ffmpegInput and credentials
-function validateStreamInput({ ffmpegInput, rtspUser, rtspPass }: { ffmpegInput: string, rtspUser?: string, rtspPass?: string }) {
+function validateStreamInput({
+  ffmpegInput,
+  rtspUser,
+  rtspPass,
+}: {
+  ffmpegInput: string;
+  rtspUser?: string;
+  rtspPass?: string;
+}) {
   // Only allow RTSP URLs or DirectShow device strings
   const isRtsp = /^rtsp:\/\//i.test(ffmpegInput);
   const isDirectShow = /^video=.+:audio=.+/i.test(ffmpegInput);
   if (!isRtsp && !isDirectShow) {
-    return { valid: false, error: 'ffmpegInput must be an RTSP URL or DirectShow device string (video=...:audio=...)' };
+    return {
+      valid: false,
+      error:
+        'ffmpegInput must be an RTSP URL or DirectShow device string (video=...:audio=...)',
+    };
   }
   if (isRtsp && ((rtspUser && !rtspPass) || (!rtspUser && rtspPass))) {
-    return { valid: false, error: 'Both rtspUser and rtspPass must be provided for RTSP streams.' };
+    return {
+      valid: false,
+      error: 'Both rtspUser and rtspPass must be provided for RTSP streams.',
+    };
   }
   return { valid: true };
 }

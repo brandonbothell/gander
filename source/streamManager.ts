@@ -1,7 +1,11 @@
 import path from 'path';
 import fs from 'fs';
 import { exec, spawn } from 'child_process';
-import { setupStreamMotionMonitoring, stopStreamMotionMonitoring, StreamMotionState } from './camera';
+import {
+  setupStreamMotionMonitoring,
+  stopStreamMotionMonitoring,
+  StreamMotionState,
+} from './camera';
 import { logMotion } from './logMotion';
 
 export interface StreamConfig {
@@ -36,9 +40,11 @@ export class StreamManager {
     this.config = config;
     this.state = state;
     this.deleteHlsDir();
-    [config.hlsDir, config.recordDir, config.thumbDir, config.flushDir].forEach(dir => {
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    });
+    [config.hlsDir, config.recordDir, config.thumbDir, config.flushDir].forEach(
+      (dir) => {
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      },
+    );
   }
 
   private getRtspUrlWithAuth(): string {
@@ -56,7 +62,7 @@ export class StreamManager {
 
       return url.replace(
         /^rtsp:\/\//,
-        `rtsp://${encodeURIComponent(this.config.rtspUser)}:${encodeURIComponent(this.config.rtspPass)}@`
+        `rtsp://${encodeURIComponent(this.config.rtspUser)}:${encodeURIComponent(this.config.rtspPass)}@`,
       );
     }
     return this.config.ffmpegInput;
@@ -68,14 +74,18 @@ export class StreamManager {
       this.startWebRTCStream();
     }
     this.webrtcClients.add(clientId);
-    console.info(`[${this.config.id}] WebRTC client ${clientId} added. Total clients: ${this.webrtcClients.size}`);
+    console.info(
+      `[${this.config.id}] WebRTC client ${clientId} added. Total clients: ${this.webrtcClients.size}`,
+    );
     return true;
   }
 
   // Remove client from WebRTC stream
   removeWebRTCClient(clientId: string): void {
     this.webrtcClients.delete(clientId);
-    console.info(`[${this.config.id}] WebRTC client ${clientId} removed. Total clients: ${this.webrtcClients.size}`);
+    console.info(
+      `[${this.config.id}] WebRTC client ${clientId} removed. Total clients: ${this.webrtcClients.size}`,
+    );
 
     if (this.webrtcClients.size === 0) {
       this.stopWebRTCStream();
@@ -90,53 +100,88 @@ export class StreamManager {
     }
 
     const inputIsRtsp = this.config.ffmpegInput.startsWith('rtsp://');
-    const inputUrl = inputIsRtsp ? this.getRtspUrlWithAuth() : this.config.ffmpegInput;
+    const inputUrl = inputIsRtsp
+      ? this.getRtspUrlWithAuth()
+      : this.config.ffmpegInput;
 
     const webrtcArgs = [
       '-y',
-      '-fflags', '+genpts',
-      '-analyzeduration', '1000000',
-      '-probesize', '1000000',
+      '-fflags',
+      '+genpts',
+      '-analyzeduration',
+      '1000000',
+      '-probesize',
+      '1000000',
       ...(inputIsRtsp
         ? ['-rtsp_transport', 'udp', '-i', inputUrl]
-        : ['-f', 'v4l2', '-input_format', 'mjpeg', '-video_size', '640x360', '-framerate', '10', '-i', inputUrl]
-      ),
+        : [
+            '-f',
+            'v4l2',
+            '-input_format',
+            'mjpeg',
+            '-video_size',
+            '640x360',
+            '-framerate',
+            '10',
+            '-i',
+            inputUrl,
+          ]),
 
       // Balanced encoding for WebRTC
-      '-c:v', 'libx264',
-      '-preset', 'faster',  // Less aggressive than ultrafast
-      '-tune', 'zerolatency',
-      '-profile:v', 'baseline',
-      '-level', '3.0',
-      '-pix_fmt', 'yuv420p',
-      '-b:v', '400k',
-      '-maxrate', '500k',
-      '-bufsize', '1000k',
-      '-g', '25',
-      '-keyint_min', '25',
-      '-x264opts', 'keyint=25:min-keyint=25:no-scenecut:threads=3', // More threads
-      '-vf', 'scale=640:360',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'faster', // Less aggressive than ultrafast
+      '-tune',
+      'zerolatency',
+      '-profile:v',
+      'baseline',
+      '-level',
+      '3.0',
+      '-pix_fmt',
+      'yuv420p',
+      '-b:v',
+      '400k',
+      '-maxrate',
+      '500k',
+      '-bufsize',
+      '1000k',
+      '-g',
+      '25',
+      '-keyint_min',
+      '25',
+      '-x264opts',
+      'keyint=25:min-keyint=25:no-scenecut:threads=3', // More threads
+      '-vf',
+      'scale=640:360',
 
       // Audio
-      '-c:a', 'libopus',
-      '-ar', '24000',
-      '-ac', '1',
-      '-b:a', '48k',
+      '-c:a',
+      'libopus',
+      '-ar',
+      '24000',
+      '-ac',
+      '1',
+      '-b:a',
+      '48k',
 
       // WebM output
-      '-f', 'webm',
-      '-deadline', 'realtime',
-      '-cpu-used', '6', // Less aggressive than 8
-      '-'
+      '-f',
+      'webm',
+      '-deadline',
+      'realtime',
+      '-cpu-used',
+      '6', // Less aggressive than 8
+      '-',
     ];
 
     console.info(`[${this.config.id}] Starting WebRTC stream...`);
     this.webrtcProcess = spawn('ffmpeg', webrtcArgs, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false
+      shell: false,
     });
 
-    this.webrtcProcess.stderr?.on('data', data => {
+    this.webrtcProcess.stderr?.on('data', (data) => {
       const output = data.toString();
       if (output.includes('Error') || output.includes('Invalid')) {
         console.error(`[${this.config.id}] WebRTC FFmpeg Error: ${output}`);
@@ -144,7 +189,9 @@ export class StreamManager {
     });
 
     this.webrtcProcess.on('exit', (code, signal) => {
-      console.info(`[${this.config.id}] WebRTC FFmpeg exited with code ${code} and signal ${signal}`);
+      console.info(
+        `[${this.config.id}] WebRTC FFmpeg exited with code ${code} and signal ${signal}`,
+      );
       this.webrtcProcess = null;
 
       if (this.webrtcClients.size > 0 && code !== 0 && signal !== 'SIGTERM') {
@@ -174,32 +221,57 @@ export class StreamManager {
     return this.webrtcClients.size;
   }
 
+  getFFmpegCooldownUntil(): number {
+    return this.ffmpegCooldownUntil;
+  }
+
   // Main HLS stream - balanced for stability and performance
   async startFFmpeg() {
     // --- Cooldown and cleaning guards ---
     if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
-      logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Next restart allowed at ${new Date(this.ffmpegCooldownUntil).toLocaleTimeString()}`, 'warn');
+      logMotion(
+        `[${this.config.id}] FFmpeg restart cooldown active. Next restart allowed at ${new Date(this.ffmpegCooldownUntil).toLocaleTimeString()}`,
+        'warn',
+      );
       return;
     }
     if (this.state.cleaningUp) {
-      logMotion(`[${this.config.id}] FFmpeg is cleaning up, waiting to start`, 'warn');
-      setTimeout(() => this.startFFmpeg().catch((err: any) => {
-        console.warn(`[${this.config.id}] FFmpeg failed to start:`, err?.message || err);
-      }), 5000);
+      logMotion(
+        `[${this.config.id}] FFmpeg is cleaning up, waiting to start`,
+        'warn',
+      );
+      setTimeout(
+        () =>
+          this.startFFmpeg().catch((err) => {
+            console.warn(
+              `[${this.config.id}] FFmpeg failed to start:`,
+              err?.message || err,
+            );
+          }),
+        5000,
+      );
       return;
     }
     const now = Date.now();
     this.segmentCount = 0;
     this.lastSegmentTimestamp = now;
-    this.ffmpegRestartTimestamps = this.ffmpegRestartTimestamps.filter(ts => now - ts < StreamManager.RESTART_WINDOW_MS);
+    this.ffmpegRestartTimestamps = this.ffmpegRestartTimestamps.filter(
+      (ts) => now - ts < StreamManager.RESTART_WINDOW_MS,
+    );
     this.ffmpegRestartTimestamps.push(now);
     if (this.ffmpegRestartTimestamps.length > StreamManager.MAX_RESTARTS) {
       this.ffmpegCooldownUntil = now + StreamManager.COOLDOWN_MS;
-      logMotion(`[${this.config.id}] Too many FFmpeg restarts (${this.ffmpegRestartTimestamps.length} in ${StreamManager.RESTART_WINDOW_MS / 1000}s). Entering cooldown for ${StreamManager.COOLDOWN_MS / 60000} minutes.`, 'error');
+      logMotion(
+        `[${this.config.id}] Too many FFmpeg restarts (${this.ffmpegRestartTimestamps.length} in ${StreamManager.RESTART_WINDOW_MS / 1000}s). Entering cooldown for ${StreamManager.COOLDOWN_MS / 60000} minutes.`,
+        'error',
+      );
       return;
     }
     if (now - this.lastRestartTimestamp < 10000) {
-      logMotion(`[${this.config.id}] Restart requested too soon after previous (${now - this.lastRestartTimestamp}ms), skipping.`, 'warn');
+      logMotion(
+        `[${this.config.id}] Restart requested too soon after previous (${now - this.lastRestartTimestamp}ms), skipping.`,
+        'warn',
+      );
       return;
     }
     this.lastRestartTimestamp = now;
@@ -209,54 +281,142 @@ export class StreamManager {
     try {
       await Promise.all([
         fastCleanDir(this.config.hlsDir),
-        fastCleanDir(this.config.flushDir)
+        fastCleanDir(this.config.flushDir),
       ]);
     } catch (e) {
-      logMotion(`[${this.config.id}] Error cleaning HLS and flush directories: ${e}`, 'error');
+      logMotion(
+        `[${this.config.id}] Error cleaning HLS and flush directories: ${e}`,
+        'error',
+      );
     }
     this.state.cleaningUp = false;
 
     const elapsed = Date.now() - start;
     if (elapsed > 500) {
-      console.warn(`[${this.config.id}] HLS & flush directory cleanup took ${elapsed}ms`);
+      console.warn(
+        `[${this.config.id}] HLS & flush directory cleanup took ${elapsed}ms`,
+      );
     }
-    console.debug(`[${this.config.id}] Cleaned HLS & flush directories: ${this.config.hlsDir}, ${this.config.flushDir}`);
+    console.debug(
+      `[${this.config.id}] Cleaned HLS & flush directories: ${this.config.hlsDir}, ${this.config.flushDir}`,
+    );
 
-    [this.config.hlsDir, this.config.recordDir, this.config.thumbDir, this.config.flushDir].forEach(dir => {
+    [
+      this.config.hlsDir,
+      this.config.recordDir,
+      this.config.thumbDir,
+      this.config.flushDir,
+    ].forEach((dir) => {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     });
 
     // --- FFmpeg args and spawn ---
     const inputIsRtsp = this.config.ffmpegInput.startsWith('rtsp://');
-    const inputUrl = inputIsRtsp ? this.getRtspUrlWithAuth() : this.config.ffmpegInput;
+    const inputUrl = inputIsRtsp
+      ? this.getRtspUrlWithAuth()
+      : this.config.ffmpegInput;
     let ffmpegArgs: string[];
     if (inputIsRtsp) {
       ffmpegArgs = [
-        '-y', '-fflags', '+genpts+discardcorrupt', '-rtsp_transport', 'udp',
-        '-analyzeduration', '2000000', '-probesize', '2000000', '-i', inputUrl,
-        '-c:v', 'copy', '-map', '0:v:0', '-map', '0:a:0?', '-c:a', 'aac',
-        '-ar', '44100', '-ac', '2', '-b:a', '128k', '-avoid_negative_ts', 'make_zero',
-        '-copyts', '-start_at_zero', '-muxdelay', '0', '-f', 'hls', '-hls_time', '0.5',
-        '-hls_list_size', '6', '-hls_flags', 'independent_segments',
-        '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
-        path.join(this.config.hlsDir, 'stream.m3u8')
+        '-y',
+        '-fflags',
+        '+genpts+discardcorrupt',
+        '-rtsp_transport',
+        'udp',
+        '-analyzeduration',
+        '2000000',
+        '-probesize',
+        '2000000',
+        '-i',
+        inputUrl,
+        '-c:v',
+        'copy',
+        '-map',
+        '0:v:0',
+        '-map',
+        '0:a:0?',
+        '-c:a',
+        'aac',
+        '-ar',
+        '44100',
+        '-ac',
+        '2',
+        '-b:a',
+        '128k',
+        '-avoid_negative_ts',
+        'make_zero',
+        '-copyts',
+        '-start_at_zero',
+        '-muxdelay',
+        '0',
+        '-f',
+        'hls',
+        '-hls_time',
+        '0.5',
+        '-hls_list_size',
+        '6',
+        '-hls_flags',
+        'independent_segments',
+        '-hls_segment_filename',
+        path.join(this.config.hlsDir, 'segment_%03d.ts'),
+        path.join(this.config.hlsDir, 'stream.m3u8'),
       ];
     } else {
       ffmpegArgs = [
-        '-y', '-f', 'v4l2', '-input_format', 'mjpeg', '-video_size', '1280x720',
-        '-framerate', '15', '-i', inputUrl, '-c:v', 'libx264', '-preset', 'faster',
-        '-tune', 'zerolatency', '-profile:v', 'main', '-level', '3.1', '-pix_fmt', 'yuv420p',
-        '-b:v', '1000k', '-maxrate', '1200k', '-bufsize', '2400k', '-g', '30',
-        '-x264opts', 'keyint=30:min-keyint=30:no-scenecut:threads=3', '-an', '-f', 'hls',
-        '-hls_time', '0.5', '-hls_list_size', '6', '-hls_flags', 'independent_segments',
-        '-hls_segment_filename', path.join(this.config.hlsDir, 'segment_%03d.ts'),
-        path.join(this.config.hlsDir, 'stream.m3u8')
+        '-y',
+        '-f',
+        'v4l2',
+        '-input_format',
+        'mjpeg',
+        '-video_size',
+        '1280x720',
+        '-framerate',
+        '15',
+        '-i',
+        inputUrl,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'faster',
+        '-tune',
+        'zerolatency',
+        '-profile:v',
+        'main',
+        '-level',
+        '3.1',
+        '-pix_fmt',
+        'yuv420p',
+        '-b:v',
+        '1000k',
+        '-maxrate',
+        '1200k',
+        '-bufsize',
+        '2400k',
+        '-g',
+        '30',
+        '-x264opts',
+        'keyint=30:min-keyint=30:no-scenecut:threads=3',
+        '-an',
+        '-f',
+        'hls',
+        '-hls_time',
+        '0.5',
+        '-hls_list_size',
+        '6',
+        '-hls_flags',
+        'independent_segments',
+        '-hls_segment_filename',
+        path.join(this.config.hlsDir, 'segment_%03d.ts'),
+        path.join(this.config.hlsDir, 'stream.m3u8'),
       ];
     }
-    console.info(`[${this.config.id}] Starting FFmpeg with args:`, ffmpegArgs.join(' '));
+    console.info(
+      `[${this.config.id}] Starting FFmpeg with args:`,
+      ffmpegArgs.join(' '),
+    );
     const ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
       stdio: ['ignore', 'ignore', 'pipe'],
-      shell: false
+      shell: false,
     });
     this.ffmpeg = ffmpegProcess;
     let hasErrored = false;
@@ -274,10 +434,19 @@ export class StreamManager {
       const now = Date.now();
       if (this.restartInProgress || this.state.cleaningUp) return;
       if (this.segmentCount > 0 && now - this.lastSegmentTimestamp > 15000) {
-        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: ${this.segmentCount}), restarting FFmpeg (auto health check)`, 'warn');
+        logMotion(
+          `[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: ${this.segmentCount}), restarting FFmpeg (auto health check)`,
+          'warn',
+        );
         this.reconnect();
-      } else if (this.segmentCount === 0 && now - this.lastSegmentTimestamp > 30000) {
-        logMotion(`[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: 0), restarting FFmpeg (auto health check)`, 'warn');
+      } else if (
+        this.segmentCount === 0 &&
+        now - this.lastSegmentTimestamp > 30000
+      ) {
+        logMotion(
+          `[${this.config.id}] No HLS segments created for ${Math.floor((now - this.lastSegmentTimestamp) / 1000)}s (total segments: 0), restarting FFmpeg (auto health check)`,
+          'warn',
+        );
         this.reconnect();
       }
     }, 5000);
@@ -285,7 +454,10 @@ export class StreamManager {
     ffmpegProcess.on('exit', (code, signal) => {
       if (this.ffmpeg !== ffmpegProcess) return;
       this.ffmpeg = null;
-      logMotion(`[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${this.segmentCount} segments created)`, 'warn');
+      logMotion(
+        `[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${this.segmentCount} segments created)`,
+        'warn',
+      );
       if (this.segmentMonitorTimer) {
         clearInterval(this.segmentMonitorTimer);
         this.segmentMonitorTimer = null;
@@ -296,22 +468,36 @@ export class StreamManager {
         firstSegmentPromiseResolve();
       }
       if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
-        logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
+        logMotion(
+          `[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`,
+          'warn',
+        );
         return;
       }
-      if (code !== 0 && code !== 255 && (signal !== 'SIGTERM' && signal !== 'SIGKILL' && signal !== 'SIGINT')) {
-        logMotion(`[${this.config.id}] FFmpeg crashed or exited unexpectedly (code ${code}, signal ${signal}), restarting...`, 'warn');
+      if (
+        code !== 0 &&
+        code !== 255 &&
+        signal !== 'SIGTERM' &&
+        signal !== 'SIGKILL' &&
+        signal !== 'SIGINT'
+      ) {
+        logMotion(
+          `[${this.config.id}] FFmpeg crashed or exited unexpectedly (code ${code}, signal ${signal}), restarting...`,
+          'warn',
+        );
         this.reconnect();
       }
     });
 
-    ffmpegProcess.stderr?.on('data', data => {
+    ffmpegProcess.stderr?.on('data', (data) => {
       const output = data.toString();
       // --- Segment creation tracking ---
-      if (output.includes("Opening") && output.includes("segment_")) {
+      if (output.includes('Opening') && output.includes('segment_')) {
         const match = output.match(/segment_(\d+)\.ts/);
         const segNum = match ? match[1] : '?';
-        logMotion(`[${this.config.id}] [SEGMENT] Created segment ${segNum} at ${new Date().toISOString()}`);
+        logMotion(
+          `[${this.config.id}] [SEGMENT] Created segment ${segNum} at ${new Date().toISOString()}`,
+        );
 
         this.segmentCount++;
         const now = Date.now();
@@ -322,19 +508,30 @@ export class StreamManager {
           firstSegmentPromiseResolve();
         }
         if (this.segmentCount > 1 && timeSinceLastSegment > 10000) {
-          logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms, total segments: ${this.segmentCount} (restarting FFmpeg)`, 'warn');
-          if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
-            logMotion(`[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`, 'warn');
+          logMotion(
+            `[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms, total segments: ${this.segmentCount} (restarting FFmpeg)`,
+            'warn',
+          );
+          if (
+            this.ffmpegCooldownUntil &&
+            Date.now() < this.ffmpegCooldownUntil
+          ) {
+            logMotion(
+              `[${this.config.id}] FFmpeg restart cooldown active. Skipping restart.`,
+              'warn',
+            );
             return;
           }
           this.reconnect();
         } else if (this.segmentCount > 1 && timeSinceLastSegment > 3000) {
-          logMotion(`[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`);
+          logMotion(
+            `[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`,
+          );
         }
       }
       // --- Error handling ---
       if (inputIsRtsp && !hasErrored && this.segmentCount < 3) {
-        const hasRealError = (
+        const hasRealError =
           output.includes('Connection refused') ||
           output.includes('Connection timed out') ||
           output.includes('No route to host') ||
@@ -343,10 +540,11 @@ export class StreamManager {
           output.includes('404 Not Found') ||
           output.includes('Invalid data found when processing input') ||
           output.includes('codec not currently supported in container') ||
-          (output.includes('Packet corrupt') && !output.includes('DTS'))
-        );
+          (output.includes('Packet corrupt') && !output.includes('DTS'));
         if (hasRealError) {
-          console.warn(`[${this.config.id}] Stream copy failed, reconnecting...`);
+          console.warn(
+            `[${this.config.id}] Stream copy failed, reconnecting...`,
+          );
           hasErrored = true;
           this.reconnect();
           return;
@@ -382,7 +580,10 @@ export class StreamManager {
   async reconnect(): Promise<void> {
     const streamId = this.config.id;
     if (this.restartInProgress) {
-      logMotion(`[${streamId}] Reconnect already in progress, skipping...`, 'warn');
+      logMotion(
+        `[${streamId}] Reconnect already in progress, skipping...`,
+        'warn',
+      );
       return;
     }
     this.restartInProgress = true;
@@ -394,7 +595,10 @@ export class StreamManager {
       stopStreamMotionMonitoring(streamId);
       logMotion(`[${streamId}] Stopped stream motion monitoring`);
     } catch (e) {
-      logMotion(`[${streamId}] Error stopping stream motion monitoring: ${e}`, 'warn');
+      logMotion(
+        `[${streamId}] Error stopping stream motion monitoring: ${e}`,
+        'warn',
+      );
     }
     // Kill managed ffmpeg process
     this.ffmpeg?.kill('SIGKILL');
@@ -410,39 +614,58 @@ export class StreamManager {
         if (process.platform === 'win32') {
           // Windows: use WMIC
           const searchStr = hlsDir.replace(/\\/g, '\\\\');
-          exec(`wmic process where "CommandLine like '%${searchStr}%'" get ProcessId,CommandLine /FORMAT:CSV`, (err, stdout) => {
-            if (!err && stdout) {
-              const lines = stdout.split('\n').filter(l => l.toLowerCase().includes('ffmpeg'));
-              for (const line of lines) {
-                const match = line.match(/,ffmpeg.*?(\d+)\s*$/i);
-                if (match) {
-                  const pid = match[1];
-                  logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
-                  try { process.kill(Number(pid), 'SIGKILL'); } catch {
-                    // Ignore failure to kill ffmpeg process
+          exec(
+            `wmic process where "CommandLine like '%${searchStr}%'" get ProcessId,CommandLine /FORMAT:CSV`,
+            (err, stdout) => {
+              if (!err && stdout) {
+                const lines = stdout
+                  .split('\n')
+                  .filter((l) => l.toLowerCase().includes('ffmpeg'));
+                for (const line of lines) {
+                  const match = line.match(/,ffmpeg.*?(\d+)\s*$/i);
+                  if (match) {
+                    const pid = match[1];
+                    logMotion(
+                      `[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`,
+                    );
+                    try {
+                      process.kill(Number(pid), 'SIGKILL');
+                    } catch {
+                      // Ignore failure to kill ffmpeg process
+                    }
                   }
                 }
               }
-            }
-            resolve();
-          });
+              resolve();
+            },
+          );
         } else {
           // Linux/macOS: use ps/grep/awk
           // Escape the hlsDir for grep (spaces, etc)
           const grepStr = hlsDir.replace(/(["'$`\\])/g, '\\$1');
           // Find all ffmpeg processes with the hlsDir in their command line
-          exec(`ps -eo pid,command | grep '[f]fmpeg' | grep '${grepStr}' | awk '{print $1}'`, (err, stdout) => {
-            if (!err && stdout) {
-              const pids = stdout.split('\n').map(line => line.trim()).filter(Boolean);
-              for (const pid of pids) {
-                logMotion(`[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`);
-                try { process.kill(Number(pid), 'SIGKILL'); } catch {
-                  // Ignore failure to kill ffmpeg process
+          exec(
+            `ps -eo pid,command | grep '[f]fmpeg' | grep '${grepStr}' | awk '{print $1}'`,
+            (err, stdout) => {
+              if (!err && stdout) {
+                const pids = stdout
+                  .split('\n')
+                  .map((line) => line.trim())
+                  .filter(Boolean);
+                for (const pid of pids) {
+                  logMotion(
+                    `[${streamId}] Killing ffmpeg process with PID ${pid} (matched by HLS dir)`,
+                  );
+                  try {
+                    process.kill(Number(pid), 'SIGKILL');
+                  } catch {
+                    // Ignore failure to kill ffmpeg process
+                  }
                 }
               }
-            }
-            resolve();
-          });
+              resolve();
+            },
+          );
         }
       } catch (e) {
         logMotion(`[${streamId}] Error killing ffmpeg processes: ${e}`, 'warn');
@@ -452,12 +675,15 @@ export class StreamManager {
     await killFFmpegPromise;
 
     // 2. Wait a bit for OS/camera to release resources
-    await new Promise(res => setTimeout(res, 1500)); // 1.5 seconds
+    await new Promise((res) => setTimeout(res, 1500)); // 1.5 seconds
 
     // 3. Restart FFmpeg
     try {
-      await this.startFFmpeg().catch((err: any) => {
-        console.warn(`[${this.config.id}] FFmpeg failed to start:`, err?.message || err);
+      await this.startFFmpeg().catch((err) => {
+        console.warn(
+          `[${this.config.id}] FFmpeg failed to start:`,
+          err?.message || err,
+        );
       });
       logMotion(`[${streamId}] FFmpeg restarted via reconnect`);
     } catch (e) {
@@ -468,7 +694,10 @@ export class StreamManager {
       await setupStreamMotionMonitoring(streamId);
       logMotion(`[${streamId}] Motion monitoring re-initialized`);
     } catch (e) {
-      logMotion(`[${streamId}] Error re-initializing motion monitoring: ${e}`, 'error');
+      logMotion(
+        `[${streamId}] Error re-initializing motion monitoring: ${e}`,
+        'error',
+      );
     }
     this.restartInProgress = false;
     logMotion(`[${streamId}] Reconnect completed`);
@@ -509,7 +738,11 @@ async function fastCleanDir(dir: string) {
     // Fallback to Node.js for Windows
     if (fs.existsSync(dir)) {
       const files = await fs.promises.readdir(dir);
-      await Promise.all(files.map(f => fs.promises.rm(path.join(dir, f), { force: true, recursive: true })));
+      await Promise.all(
+        files.map((f) =>
+          fs.promises.rm(path.join(dir, f), { force: true, recursive: true }),
+        ),
+      );
     }
   }
 }

@@ -1,7 +1,7 @@
-import { prisma } from "../camera";
-import express from "express";
-import { jwtAuth } from "../middleware/jwtAuth";
-import { StreamManager } from "../streamManager";
+import { prisma, RequestWithUser } from '../camera';
+import express from 'express';
+import { jwtAuth } from '../middleware/jwtAuth';
+import { StreamManager } from '../streamManager';
 import * as admin from 'firebase-admin';
 import webpush from 'web-push';
 
@@ -14,7 +14,7 @@ export default function initializeNotificationRoutes(app: express.Application) {
       await prisma.pushSubscription.upsert({
         where: { sid },
         update: { fcmToken },
-        create: { sid, fcmToken }
+        create: { sid, fcmToken },
       });
       res.json({ success: true });
       return;
@@ -38,7 +38,7 @@ export default function initializeNotificationRoutes(app: express.Application) {
         expirationTime: expirationTime ?? null,
         p256dh: keys.p256dh,
         auth: keys.auth,
-      }
+      },
     });
     res.json({ success: true });
   });
@@ -54,30 +54,38 @@ export default function initializeNotificationRoutes(app: express.Application) {
 
     if (req.body && req.body.fcmToken) {
       // Unsubscribe from FCM only
-      await prisma.pushSubscription.update({
-        where: { sid },
-        data: { fcmToken: null }
-      }).catch(() => { });
+      await prisma.pushSubscription
+        .update({
+          where: { sid },
+          data: { fcmToken: null },
+        })
+        .catch(() => {});
     } else {
       // Unsubscribe from Web Push only
-      await prisma.pushSubscription.update({
-        where: { sid },
-        data: {
-          endpoint: null,
-          expirationTime: null,
-          p256dh: null,
-          auth: null,
-        }
-      }).catch(() => { });
+      await prisma.pushSubscription
+        .update({
+          where: { sid },
+          data: {
+            endpoint: null,
+            expirationTime: null,
+            p256dh: null,
+            auth: null,
+          },
+        })
+        .catch(() => {});
     }
 
     // After update, check if both FCM and Web Push are now null
-    const updated = await prisma.pushSubscription.findUnique({ where: { sid } });
+    const updated = await prisma.pushSubscription.findUnique({
+      where: { sid },
+    });
     if (
-      (!updated?.fcmToken) &&
-      (!updated?.endpoint && !updated?.p256dh && !updated?.auth)
+      !updated?.fcmToken &&
+      !updated?.endpoint &&
+      !updated?.p256dh &&
+      !updated?.auth
     ) {
-      await prisma.pushSubscription.delete({ where: { sid } }).catch(() => { });
+      await prisma.pushSubscription.delete({ where: { sid } }).catch(() => {});
     }
 
     res.json({ success: true });
@@ -85,23 +93,32 @@ export default function initializeNotificationRoutes(app: express.Application) {
 }
 
 /**
-   * Send a notification for a specific stream.
-   * @param streamId The ID of the stream to notify about.
-   * @param custom Optional custom notification data.
-   * @param username Optional username to target the notification.
-   * @returns A promise that resolves when the notification has been sent.
-   */
+ * Send a notification for a specific stream.
+ * @param streamId The ID of the stream to notify about.
+ * @param custom Optional custom notification data.
+ * @param username Optional username to target the notification.
+ * @returns A promise that resolves when the notification has been sent.
+ */
 export async function notify(
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
-  custom?: { title?: string; body?: string, icon?: string, sound?: string, channelId?: string, tag?: string, group?: string },
-  username?: string
+  custom?: {
+    title?: string;
+    body?: string;
+    icon?: string;
+    sound?: string;
+    channelId?: string;
+    tag?: string;
+    group?: string;
+  },
+  username?: string,
 ) {
   let nickname;
-  if (!custom?.body) ({ nickname } = await prisma.stream.findUnique({
-    where: { id: streamId },
-    select: { nickname: true }
-  }) ?? { nickname: dynamicStreams[streamId]?.config.ffmpegInput });
+  if (!custom?.body)
+    ({ nickname } = (await prisma.stream.findUnique({
+      where: { id: streamId },
+      select: { nickname: true },
+    })) ?? { nickname: dynamicStreams[streamId]?.config.ffmpegInput });
   const title = custom?.title ?? 'Motion Detected!';
   const body = custom?.body ?? `Motion was detected by ${nickname}.`;
   const icon = custom?.icon ?? 'push_icon';
@@ -110,7 +127,9 @@ export async function notify(
   const tag = custom?.tag;
   const group = custom?.group || `stream_event_${streamId}`;
 
-  const subs = await prisma.pushSubscription.findMany(username ? { where: { sid: username } } : undefined);
+  const subs = await prisma.pushSubscription.findMany(
+    username ? { where: { sid: username } } : undefined,
+  );
   for (const sub of subs) {
     // Web Push
     if (sub.endpoint && sub.p256dh && sub.auth) {
@@ -118,11 +137,13 @@ export async function notify(
         await webpush.sendNotification(
           {
             endpoint: sub.endpoint,
-            expirationTime: sub.expirationTime ? Number(sub.expirationTime) : undefined,
+            expirationTime: sub.expirationTime
+              ? Number(sub.expirationTime)
+              : undefined,
             keys: {
               p256dh: sub.p256dh,
               auth: sub.auth,
-            }
+            },
           },
           JSON.stringify({
             title,
@@ -131,8 +152,8 @@ export async function notify(
               streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
               cameraId: streamId,
               // ...other custom data
-            }
-          })
+            },
+          }),
         );
       } catch (err) {
         console.error('Web Push notification error:', err);
@@ -141,10 +162,15 @@ export async function notify(
           typeof err === 'object' &&
           err !== null &&
           'statusCode' in err &&
-          (err as any).statusCode === 404 &&
+          err.statusCode === 404 &&
           sub.sid
         ) {
-          await prisma.pushSubscription.update({ where: { sid: sub.sid }, data: { endpoint: null, p256dh: null, auth: null } }).catch(() => { });
+          await prisma.pushSubscription
+            .update({
+              where: { sid: sub.sid },
+              data: { endpoint: null, p256dh: null, auth: null },
+            })
+            .catch(() => {});
         }
       }
     }
@@ -173,7 +199,7 @@ export async function notify(
               vibrateTimingsMillis: [0, 500, 500, 500],
               ...withOptional,
               // clickAction: 'OPEN_STREAM',
-            }
+            },
           },
           token: sub.fcmToken,
           data: {
@@ -181,10 +207,13 @@ export async function notify(
             cameraId: streamId,
             ...(group ? { group } : {}),
             // ...other custom data
-          }
+          },
         });
-      } catch (err: any) {
-        if (!err) throw new Error('FCM notification error: No error object provided');
+      } catch (err) {
+        if (!err || typeof err !== 'object' || !('code' in err))
+          throw new Error(
+            'FCM notification error: No/invalid error object provided',
+          );
 
         if (err.code === 'messaging/server-unavailable') {
           console.warn('FCM server unavailable, retrying...');
@@ -192,11 +221,15 @@ export async function notify(
             notify(dynamicStreams, streamId, custom, username);
           }, 5000); // Retry after 5 seconds
         } else if (err.code === 'messaging/registration-token-not-registered') {
-          console.warn(`Invalid FCM token, removing from subscription for ${sub.sid}`)
-          return prisma.pushSubscription.update({
-            where: { sid: sub.sid },
-            data: { fcmToken: null }
-          }).catch(() => { });
+          console.warn(
+            `Invalid FCM token, removing from subscription for ${sub.sid}`,
+          );
+          return prisma.pushSubscription
+            .update({
+              where: { sid: sub.sid },
+              data: { fcmToken: null },
+            })
+            .catch(() => {});
         }
 
         console.error('FCM notification error:', err);
@@ -205,7 +238,7 @@ export async function notify(
   }
 }
 
-function getPushSubKey(req: express.Request) {
+function getPushSubKey(req: RequestWithUser) {
   // Use username from JWT as the subscription key
-  return (req as any).user.username;
+  return req.user!.username;
 }
