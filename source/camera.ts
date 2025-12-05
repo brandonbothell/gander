@@ -6,7 +6,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import http from 'http';
-import childProcess from 'child_process';
+// import { Server as HttpServer } from 'http';
+import childProcess, { ChildProcess } from 'child_process';
 import open from 'open';
 import * as admin from 'firebase-admin';
 import webpush from 'web-push';
@@ -31,6 +32,7 @@ import initializeStreamRoutes from './routes/streams';
 import { logMotion } from './logMotion';
 import consoleStamp from 'console-stamp';
 import chalk from 'chalk';
+// import { Server as HttpsServer } from 'https';
 
 consoleStamp(console, {
   format: ':date(yyyy-mm-dd HH:MM:ss.l).yellow.bgBlue :level() :msg',
@@ -139,7 +141,7 @@ export interface StreamMotionState {
   motionPaused: boolean;
   startupTime: number;
   savingInProgress: boolean;
-  currentSaveProcess: any | null;
+  currentSaveProcess: ChildProcess | null;
   saveRetryCount: number;
   startedRecordingAt: number;
   lastSegmentProcessAt?: number;
@@ -390,7 +392,7 @@ async function loadStreamsFromDb() {
     if (!dynamicStreams[s.id]) {
       dynamicStreams[s.id] = await createStreamManager(s);
       try {
-        dynamicStreams[s.id].startFFmpeg().catch((err: any) => {
+        dynamicStreams[s.id].startFFmpeg().catch((err) => {
           console.warn(
             `[${s.id}] FFmpeg failed to start:`,
             err?.message || err,
@@ -408,11 +410,11 @@ async function loadStreamsFromDb() {
       const stream = dynamicStreams[streamId];
       if (
         stream &&
-        (stream as any).ffmpegCooldownUntil &&
-        Date.now() < (stream as any).ffmpegCooldownUntil
+        stream.getFFmpegCooldownUntil() &&
+        Date.now() < stream.getFFmpegCooldownUntil()
       ) {
         logMotion(
-          `[${streamId}] FFmpeg restart cooldown active until ${new Date((stream as any).ffmpegCooldownUntil).toLocaleTimeString()}`,
+          `[${streamId}] FFmpeg restart cooldown active until ${new Date(stream.getFFmpegCooldownUntil()).toLocaleTimeString()}`,
           'warn',
         );
         notify(dynamicStreams, streamId, {
@@ -523,23 +525,37 @@ loadStreamsFromDb()
         config.greenlockConfigDir ?? path.join(__dirname, '..', 'greenlock.d'),
       maintainerEmail: config.maintainerEmail,
       cluster: false,
-    }).serve(app);
+    })
+      /* .ready((glx) => {
+        const tlsOptions = null;
+        // @ts-expect-error types
+        const http2Server = glx.http2Server(tlsOptions, app);
+
+        http2Server.listen(8443, '0.0.0.0', function () {
+          console.info('Listening on ', http2Server.address());
+        });
+
+        // @ts-expect-error types
+        const httpServer = glx.httpServer();
+
+        httpServer.listen(8080, '0.0.0.0', function () {
+          console.info('Listening on ', httpServer.address());
+        });
+      }); */
+      .serve(app);
 
     setInterval(syncDeletedRecordings, 1000 * 60 * 60); // Sync deleted recordings every hour
 
-    if (process.env.API_ENV !== 'production') {
-      // Use HTTP for development
-      // Always use Greenlock for HTTPS, but also start HTTP server in development for convenience
-      const port = process.env.PORT ?? 3000;
-      http.createServer(app).listen(port, () => {
-        console.debug(
-          `Development HTTP server running on http://localhost:${port}`,
-        );
-        setTimeout(() => {
-          open(`http://localhost:${port}`);
-        }, 1500);
-      });
-    }
+    // Use HTTP for nginx reverse proxy in production or for development
+    // Always use Greenlock for HTTPS, and also open web client in development for convenience
+    const port = process.env.PORT ?? 3000;
+    http.createServer(app).listen(port, () => {
+      console.debug(`HTTP server running on http://localhost:${port}`);
+      if (process.env.API_ENV === 'production') return;
+      setTimeout(() => {
+        open(`http://localhost:${port}`);
+      }, 1500);
+    });
   });
 
 /**
@@ -565,7 +581,7 @@ async function cleanupExpiredTokensAndDevices() {
     }
     const validJwts = jwts.filter((token) => {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
         return decoded && decoded.exp && decoded.exp * 1000 > now;
       } catch {
         return false;
@@ -582,7 +598,7 @@ async function cleanupExpiredTokensAndDevices() {
     }
     const validRefreshTokens = refreshTokens.filter((token) => {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
         return decoded && decoded.exp && decoded.exp * 1000 > now;
       } catch {
         return false;
@@ -893,8 +909,9 @@ app.get(
           );
           res.setHeader('Pragma', 'no-cache');
           res.setHeader('Expires', '0');
-          res.sendFile(latestMotionJpgPath, (err: any) => {
+          res.sendFile(latestMotionJpgPath, (err) => {
             if (res.headersSent) return;
+            // @ts-expect-error types
             if (err && err.code !== 'ECONNABORTED') {
               res.status(404).json({ error: 'File not found' });
               console.error(
@@ -933,7 +950,7 @@ app.get(
           const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=160:90" -vframes 1 -update 1 "${thumbPath}"`;
           streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>(
             (resolve) => {
-              childProcess.exec(ffmpegCmd, (err: any) => {
+              childProcess.exec(ffmpegCmd, (err) => {
                 if (err) {
                   console.error(
                     `[${streamId}] Failed to generate thumbnail from ${latestTs}:`,
@@ -962,8 +979,9 @@ app.get(
       );
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      res.sendFile(thumbPath, (err: any) => {
+      res.sendFile(thumbPath, (err) => {
         if (res.headersSent) return;
+        // @ts-expect-error types
         if (err && err.code !== 'ECONNABORTED') {
           res.status(404).json({ error: 'File not found' });
           console.error(
@@ -1034,8 +1052,9 @@ app.get(
           );
           res.setHeader('Pragma', 'no-cache');
           res.setHeader('Expires', '0');
-          res.sendFile(latestMotionJpgPath, (err: any) => {
+          res.sendFile(latestMotionJpgPath, (err) => {
             if (res.headersSent) return;
+            // @ts-expect-error types
             if (err && err.code !== 'ECONNABORTED') {
               res.status(404).json({ error: 'File not found' });
               console.error(
@@ -1074,19 +1093,15 @@ app.get(
           const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 "${thumbPath}"`;
           streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>(
             (resolve) => {
-              childProcess.exec(
-                ffmpegCmd,
-                { windowsHide: true },
-                (err: any) => {
-                  if (err) {
-                    console.error(
-                      `[${streamId}] Failed to generate thumbnail from ${latestTs}:`,
-                      err,
-                    );
-                    resolve({ success: false });
-                  } else resolve({ success: true });
-                },
-              );
+              childProcess.exec(ffmpegCmd, { windowsHide: true }, (err) => {
+                if (err) {
+                  console.error(
+                    `[${streamId}] Failed to generate thumbnail from ${latestTs}:`,
+                    err,
+                  );
+                  resolve({ success: false });
+                } else resolve({ success: true });
+              });
             },
           );
         }
@@ -1107,8 +1122,9 @@ app.get(
       );
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      res.sendFile(thumbPath, (err: any) => {
+      res.sendFile(thumbPath, (err) => {
         if (res.headersSent) return;
+        // @ts-expect-error types
         if (err && err.code !== 'ECONNABORTED') {
           res.status(404).json({ error: 'File not found' });
           console.error(
@@ -1183,8 +1199,9 @@ app.get('/signed/video/:streamId/:filename', (req, res) => {
     dynamicStreams[streamId].config.recordDir,
     filename,
   );
-  res.sendFile(filePath, (err: any) => {
+  res.sendFile(filePath, (err) => {
     if (res.headersSent) return;
+    // @ts-expect-error types
     if (err && err.code !== 'ECONNABORTED') {
       res.status(404).json({ error: 'File not found' });
       console.error(
@@ -1215,8 +1232,9 @@ app.get('/signed/thumbnail/:streamId/:filename', (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   }
 
-  res.sendFile(thumbPath, (err: any) => {
+  res.sendFile(thumbPath, (err) => {
     if (res.headersSent) return;
+    // @ts-expect-error types
     if (err && err.code !== 'ECONNABORTED') {
       res.status(404).json({ error: 'File not found' });
       console.error(
@@ -1359,7 +1377,12 @@ export async function safeUnlinkWithRetry(filePath: string, retries = 3) {
 }
 
 // Helper: Create StreamManager instance for a stream
-export async function createStreamManager(stream: any) {
+export async function createStreamManager(stream: {
+  id: string;
+  ffmpegInput: string;
+  rtspUser: string | null;
+  rtspPass: string | null;
+}) {
   // Use unique folders for each stream
   const hlsDir = path.join(__dirname, '..', `hls_${stream.id}`);
   const recordDir = path.join(config.recordingsDirectory, stream.id);
@@ -1407,7 +1430,7 @@ export async function createStreamManager(stream: any) {
 
 async function loadPersistedStreamStates() {
   const all = await prisma.streamState.findMany();
-  const persisted: Record<string, any> = {};
+  const persisted: Record<string, StreamMotionState> = {};
   for (const row of all) {
     try {
       persisted[row.streamId] = JSON.parse(row.state);

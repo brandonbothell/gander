@@ -1,18 +1,35 @@
-import { prisma, RequestWithUser, JWT_SECRET } from "../camera";
+import { prisma, RequestWithUser, JWT_SECRET } from '../camera';
 import { logAuth } from '../logMotion';
-import { jwtAuth } from "../middleware/jwtAuth";
-import { StreamManager } from "../streamManager";
-import { DeviceInfo, TrustedDevice, getDeviceDisplayName } from "../types/deviceInfo";
+import { jwtAuth } from '../middleware/jwtAuth';
+import { StreamManager } from '../streamManager';
+import {
+  DeviceInfo,
+  TrustedDevice,
+  getDeviceDisplayName,
+} from '../types/deviceInfo';
 import config from '../../config.json';
-import express from "express";
+import express from 'express';
 import jwt from 'jsonwebtoken';
-import { notify } from "./notifications";
+import { notify } from './notifications';
 
-export default function initializeAuthRoutes(app: express.Express, dynamicStreams: Record<string, StreamManager>) {
+export default function initializeAuthRoutes(
+  app: express.Express,
+  dynamicStreams: Record<string, StreamManager>,
+) {
   app.post('/api/login', express.json(), async (req, res) => {
-    const { username, password, deviceInfo }: { username: string, password: string, deviceInfo: DeviceInfo } = req.body;
+    const {
+      username,
+      password,
+      deviceInfo,
+    }: { username: string; password: string; deviceInfo: DeviceInfo } =
+      req.body;
 
-    console.log(`[Login] User ${username} attempting log in from IP: ${req.ip}`);
+    console.log(JSON.stringify(req.headers, null, 2));
+
+    const ip =
+      'x-real-ip' in req.headers ? String(req.headers['x-real-ip']) : req.ip;
+
+    console.log(`[Login] User ${username} attempting log in from IP: ${ip}`);
 
     if (!username || !password || !deviceInfo) {
       res.status(400).json({ error: 'Missing required fields' });
@@ -21,20 +38,45 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
 
     // Sanitize deviceInfo fields to avoid prototype pollution and ensure only expected keys
     const safeDeviceInfo: DeviceInfo = {
-      userAgent: typeof deviceInfo?.userAgent === 'string' ? deviceInfo.userAgent : (req.headers['user-agent'] ?? 'Unknown'),
-      platform: typeof deviceInfo?.platform === 'string' ? deviceInfo.platform : 'Unknown',
-      vendor: typeof deviceInfo?.vendor === 'string' ? deviceInfo.vendor : 'Unknown',
-      language: typeof deviceInfo?.language === 'string' ? deviceInfo.language : 'Unknown',
-      timezone: typeof deviceInfo?.timezone === 'string' ? deviceInfo.timezone : 'Unknown',
-      screen: typeof deviceInfo?.screen === 'string' ? deviceInfo.screen : 'Unknown',
-      clientId: typeof deviceInfo?.clientId === 'string' ? deviceInfo.clientId : 'Unknown',
+      userAgent:
+        typeof deviceInfo?.userAgent === 'string'
+          ? deviceInfo.userAgent
+          : (req.headers['user-agent'] ?? 'Unknown'),
+      platform:
+        typeof deviceInfo?.platform === 'string'
+          ? deviceInfo.platform
+          : 'Unknown',
+      vendor:
+        typeof deviceInfo?.vendor === 'string' ? deviceInfo.vendor : 'Unknown',
+      language:
+        typeof deviceInfo?.language === 'string'
+          ? deviceInfo.language
+          : 'Unknown',
+      timezone:
+        typeof deviceInfo?.timezone === 'string'
+          ? deviceInfo.timezone
+          : 'Unknown',
+      screen:
+        typeof deviceInfo?.screen === 'string' ? deviceInfo.screen : 'Unknown',
+      clientId:
+        typeof deviceInfo?.clientId === 'string'
+          ? deviceInfo.clientId
+          : 'Unknown',
     };
 
-    if (config.users.some(user => user.username === username && user.password === password)) {
+    if (
+      config.users.some(
+        (user) => user.username === username && user.password === password,
+      )
+    ) {
       const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '5m' });
       const refreshToken = jwt.sign(
-        { username, type: 'refresh', exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 },
-        JWT_SECRET
+        {
+          username,
+          type: 'refresh',
+          exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+        },
+        JWT_SECRET,
       );
 
       let user = await prisma.user.findUnique({ where: { username } });
@@ -42,11 +84,11 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       // Create user if not exists, or update tokens if exists
       if (!user) {
         const newDevice = {
-          ip: req.ip,
+          ip,
           deviceInfo: safeDeviceInfo,
           firstSeen: new Date().toISOString(),
           lastSeen: new Date().toISOString(),
-          loginCount: 1
+          loginCount: 1,
         };
 
         user = await prisma.user.create({
@@ -54,8 +96,8 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
             username,
             jwts: JSON.stringify([token]),
             refreshTokens: JSON.stringify([refreshToken]),
-            trustedIps: JSON.stringify([newDevice])
-          }
+            trustedIps: JSON.stringify([newDevice]),
+          },
         });
       } else {
         // Update existing user
@@ -66,18 +108,18 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
           trustedDevices = [];
         }
 
-
         // Find existing device or create new one
-        const ipIsTrusted = trustedDevices.some(device => device.ip === req.ip)
-        const existingDeviceIndex = trustedDevices.findIndex(device => {
+        const ipIsTrusted = trustedDevices.some((device) => device.ip === ip);
+        const existingDeviceIndex = trustedDevices.findIndex((device) => {
           // Primary match: same client ID
           if (device.deviceInfo.clientId && safeDeviceInfo.clientId) {
             return device.deviceInfo.clientId === safeDeviceInfo.clientId;
           }
           // Fallback match: same IP and userAgent (for migration)
-          return ipIsTrusted ?
-            device.ip === req.ip && device.deviceInfo.userAgent === safeDeviceInfo.userAgent :
-            device.deviceInfo.userAgent === safeDeviceInfo.userAgent;
+          return ipIsTrusted
+            ? device.ip === ip &&
+                device.deviceInfo.userAgent === safeDeviceInfo.userAgent
+            : device.deviceInfo.userAgent === safeDeviceInfo.userAgent;
         });
         const now = new Date().toISOString();
 
@@ -88,9 +130,11 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
           device.loginCount++;
 
           // Update IP if it changed (network switching)
-          if (device.ip !== (req.ip ?? 'Unknown')) {
-            console.log(`[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${req.ip}`);
-            device.ip = req.ip ?? 'Unknown';
+          if (device.ip !== (ip ?? 'Unknown')) {
+            console.log(
+              `[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${ip}`,
+            );
+            device.ip = ip ?? 'Unknown';
           }
 
           // Update device info if provided
@@ -98,36 +142,54 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
             device.deviceInfo = { ...device.deviceInfo, ...safeDeviceInfo };
           }
         } else {
-          await notify(dynamicStreams, 'login', {
-            title: 'New Device Detected',
-            body: `A login from a new ${getDeviceDisplayName(safeDeviceInfo)} device was detected from IP: ${req.ip}`,
-            group: `security_event`,
-          }, user.username);
+          await notify(
+            dynamicStreams,
+            'login',
+            {
+              title: 'New Device Detected',
+              body: `A login from a new ${getDeviceDisplayName(safeDeviceInfo)} device was detected from IP: ${ip}`,
+              group: `security_event`,
+            },
+            user.username,
+          );
           trustedDevices.push({
-            ip: req.ip ?? 'Unknown',
+            ip: ip ?? 'Unknown',
             deviceInfo: safeDeviceInfo,
             firstSeen: now,
             lastSeen: now,
-            loginCount: 1
+            loginCount: 1,
           });
         }
 
         await prisma.user.update({
           where: { username },
           data: {
-            jwts: JSON.stringify(Array.from(new Set([...(JSON.parse(user.jwts)), token]))),
-            refreshTokens: JSON.stringify(Array.from(new Set([...(JSON.parse(user.refreshTokens)), refreshToken]))),
-            trustedIps: JSON.stringify(trustedDevices)
-          }
+            jwts: JSON.stringify(
+              Array.from(new Set([...JSON.parse(user.jwts), token])),
+            ),
+            refreshTokens: JSON.stringify(
+              Array.from(
+                new Set([...JSON.parse(user.refreshTokens), refreshToken]),
+              ),
+            ),
+            trustedIps: JSON.stringify(trustedDevices),
+          },
         });
       }
 
-      console.log(`[Login] User ${username} logged in successfully from IP: ${req.ip}`);
-      await notify(dynamicStreams, 'login', {
-        title: 'Login Detected',
-        body: `New log in from IP: ${req.ip}`,
-        group: `security_event`,
-      }, username);
+      console.log(
+        `[Login] User ${username} logged in successfully from IP: ${ip}`,
+      );
+      await notify(
+        dynamicStreams,
+        'login',
+        {
+          title: 'Login Detected',
+          body: `New log in from IP: ${ip}`,
+          group: `security_event`,
+        },
+        username,
+      );
 
       res.json({ success: true, token, refreshToken });
     } else {
@@ -142,28 +204,47 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
 
     if (!refreshToken || !deviceInfo) {
       console.error('No refresh token and/or device info provided');
-      res.status(401).json({ error: 'No refresh token and/or device info provided' });
+      res
+        .status(401)
+        .json({ error: 'No refresh token and/or device info provided' });
       return;
     }
 
     // Sanitize deviceInfo fields to avoid prototype pollution and ensure only expected keys
     const safeDeviceInfo: DeviceInfo = {
-      userAgent: typeof deviceInfo?.userAgent === 'string' ? deviceInfo.userAgent : (req.headers['user-agent'] ?? 'Unknown'),
-      platform: typeof deviceInfo?.platform === 'string' ? deviceInfo.platform : 'Unknown',
-      vendor: typeof deviceInfo?.vendor === 'string' ? deviceInfo.vendor : 'Unknown',
-      language: typeof deviceInfo?.language === 'string' ? deviceInfo.language : 'Unknown',
-      timezone: typeof deviceInfo?.timezone === 'string' ? deviceInfo.timezone : 'Unknown',
-      screen: typeof deviceInfo?.screen === 'string' ? deviceInfo.screen : 'Unknown',
-      clientId: typeof deviceInfo?.clientId === 'string' ? deviceInfo.clientId : 'Unknown',
+      userAgent:
+        typeof deviceInfo?.userAgent === 'string'
+          ? deviceInfo.userAgent
+          : (req.headers['user-agent'] ?? 'Unknown'),
+      platform:
+        typeof deviceInfo?.platform === 'string'
+          ? deviceInfo.platform
+          : 'Unknown',
+      vendor:
+        typeof deviceInfo?.vendor === 'string' ? deviceInfo.vendor : 'Unknown',
+      language:
+        typeof deviceInfo?.language === 'string'
+          ? deviceInfo.language
+          : 'Unknown',
+      timezone:
+        typeof deviceInfo?.timezone === 'string'
+          ? deviceInfo.timezone
+          : 'Unknown',
+      screen:
+        typeof deviceInfo?.screen === 'string' ? deviceInfo.screen : 'Unknown',
+      clientId:
+        typeof deviceInfo?.clientId === 'string'
+          ? deviceInfo.clientId
+          : 'Unknown',
     };
 
     // Find the user whose refreshTokens array contains the given refreshToken
     const user = await prisma.user.findFirst({
       where: {
         refreshTokens: {
-          contains: `"${refreshToken}"`
-        }
-      }
+          contains: `"${refreshToken}"`,
+        },
+      },
     });
 
     if (!user) {
@@ -172,20 +253,30 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       return;
     }
 
-    logAuth(`[Refresh Token] User ${user.username} refreshing token from IP: ${req.ip}`);
+    const ip =
+      'x-real-ip' in req.headers ? String(req.headers['x-real-ip']) : req.ip;
+
+    logAuth(
+      `[Refresh Token] User ${user.username} refreshing token from IP: ${ip}`,
+    );
 
     let tokens: string[] = [];
     try {
       tokens = JSON.parse(user.refreshTokens ?? '[]');
     } catch (_) {
-      logAuth(`Failed to parse refresh tokens for user: ${user.username}`, 'error');
+      logAuth(
+        `Failed to parse refresh tokens for user: ${user.username}`,
+        'error',
+      );
       res.status(500).json({ error: 'Failed to parse refresh tokens' });
       return;
     }
 
     const newRefreshToken = (() => {
       try {
-        const decoded = jwt.verify(refreshToken, JWT_SECRET) as { exp?: number };
+        const decoded = jwt.verify(refreshToken, JWT_SECRET) as {
+          exp?: number;
+        };
         if (!decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) {
           logAuth(`Refresh token expired for user: ${user.username}`, 'error');
           res.status(401).json({ error: 'Refresh token expired' });
@@ -193,21 +284,31 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
         }
 
         const newRefreshToken = jwt.sign(
-          { username: user.username, type: 'refresh', exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 },
-          JWT_SECRET
+          {
+            username: user.username,
+            type: 'refresh',
+            exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+          },
+          JWT_SECRET,
         );
         tokens = tokens.filter((t: string) => t !== refreshToken);
         tokens.push(newRefreshToken);
         return newRefreshToken;
       } catch (_) {
-        logAuth(`Failed to verify refresh token for user: ${user.username}`, 'error');
+        logAuth(
+          `Failed to verify refresh token for user: ${user.username}`,
+          'error',
+        );
         res.status(401).json({ error: 'Invalid refresh token' });
         return null;
       }
     })();
 
     if (!newRefreshToken) {
-      logAuth(`Failed to generate new refresh token for user: ${user.username}`, 'error');
+      logAuth(
+        `Failed to generate new refresh token for user: ${user.username}`,
+        'error',
+      );
       res.status(401).json({ error: 'Failed to generate new refresh token' });
       return;
     }
@@ -220,14 +321,15 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       trustedDevices = [];
     }
 
-    const ipIsTrusted = trustedDevices.some(device => device.ip === req.ip)
-    const existingDeviceIndex = trustedDevices.findIndex(device => {
+    const ipIsTrusted = trustedDevices.some((device) => device.ip === ip);
+    const existingDeviceIndex = trustedDevices.findIndex((device) => {
       if (device.deviceInfo.clientId && safeDeviceInfo.clientId) {
         return device.deviceInfo.clientId === safeDeviceInfo.clientId;
       }
-      return ipIsTrusted ?
-        device.ip === req.ip && device.deviceInfo.userAgent === safeDeviceInfo.userAgent :
-        device.deviceInfo.userAgent === safeDeviceInfo.userAgent;
+      return ipIsTrusted
+        ? device.ip === ip &&
+            device.deviceInfo.userAgent === safeDeviceInfo.userAgent
+        : device.deviceInfo.userAgent === safeDeviceInfo.userAgent;
     });
     const now = new Date().toISOString();
 
@@ -238,9 +340,12 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       device.loginCount++;
 
       // Update IP if it changed (network switching)
-      if (device.ip !== (req.ip ?? 'Unknown')) {
-        logAuth(`[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${req.ip}`, 'warn');
-        device.ip = req.ip ?? 'Unknown';
+      if (device.ip !== (ip ?? 'Unknown')) {
+        logAuth(
+          `[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${ip}`,
+          'warn',
+        );
+        device.ip = ip ?? 'Unknown';
       }
 
       // Update device info if provided
@@ -248,13 +353,21 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
         device.deviceInfo = { ...device.deviceInfo, ...safeDeviceInfo };
       }
     } else {
-      await notify(dynamicStreams, 'login', {
-        title: 'Suspicious Activity Detected',
-        body: `Unauthorized activity detected from IP: ${req.ip}`,
-        group: `security_event`,
-      }, user.username);
+      await notify(
+        dynamicStreams,
+        'login',
+        {
+          title: 'Suspicious Activity Detected',
+          body: `Unauthorized activity detected from IP: ${ip}`,
+          group: `security_event`,
+        },
+        user.username,
+      );
       res.status(403).json({ error: 'Unauthorized activity detected' });
-      logAuth(`[${user.username}] Unauthorized activity detected from IP: ${req.ip}`, 'warn');
+      logAuth(
+        `[${user.username}] Unauthorized activity detected from IP: ${ip}`,
+        'warn',
+      );
       return;
     }
 
@@ -262,11 +375,13 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
       where: { username: user.username },
       data: {
         refreshTokens: JSON.stringify(tokens),
-        trustedIps: JSON.stringify(trustedDevices)
-      }
+        trustedIps: JSON.stringify(trustedDevices),
+      },
     });
 
-    const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '5m' });
+    const token = jwt.sign({ username: user.username }, JWT_SECRET, {
+      expiresIn: '5m',
+    });
     res.json({ success: true, token, refreshToken: newRefreshToken });
   });
 
@@ -274,7 +389,7 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
     const username = req.user!.username;
     const user = await prisma.user.findUnique({
       where: { username },
-      select: { trustedIps: true }
+      select: { trustedIps: true },
     });
 
     if (!user) {
@@ -283,7 +398,9 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
     }
 
     try {
-      const trustedDevices: TrustedDevice[] = JSON.parse(user.trustedIps ?? '[]');
+      const trustedDevices: TrustedDevice[] = JSON.parse(
+        user.trustedIps ?? '[]',
+      );
       res.json(trustedDevices);
     } catch {
       res.json([]);
@@ -296,7 +413,9 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
 
     if (refreshToken) {
       // Remove the refreshToken from the user's refreshTokens array
-      const users = await prisma.user.findMany({ where: { refreshTokens: { contains: `"${refreshToken}"` } } });
+      const users = await prisma.user.findMany({
+        where: { refreshTokens: { contains: `"${refreshToken}"` } },
+      });
       for (const user of users) {
         try {
           const tokens = JSON.parse(user.refreshTokens ?? '[]');
@@ -307,18 +426,30 @@ export default function initializeAuthRoutes(app: express.Express, dynamicStream
               data: {
                 refreshTokens: JSON.stringify(newTokens),
                 trustedIps: JSON.stringify(
-                  (JSON.parse(user.trustedIps ?? '[]') as TrustedDevice[])
-                    .filter(device => device.deviceInfo.clientId ? device.deviceInfo.clientId !== clientId : true)
-                )
-              }
+                  (
+                    JSON.parse(user.trustedIps ?? '[]') as TrustedDevice[]
+                  ).filter((device) =>
+                    device.deviceInfo.clientId
+                      ? device.deviceInfo.clientId !== clientId
+                      : true,
+                  ),
+                ),
+              },
             });
 
-            logAuth(`[Logout] User ${user.username} logged out from IP: ${req.ip}`);
+            const ip =
+              'x-real-ip' in req.headers
+                ? String(req.headers['x-real-ip'])
+                : req.ip;
+            logAuth(`[Logout] User ${user.username} logged out from IP: ${ip}`);
             res.json({ success: true });
-            return
+            return;
           }
         } catch {
-          logAuth(`Failed to parse refreshTokens for user ${user.username}, skipping logout.`, 'error');
+          logAuth(
+            `Failed to parse refreshTokens for user ${user.username}, skipping logout.`,
+            'error',
+          );
           res.status(500).json({ error: 'Failed to logout' });
         }
       }
