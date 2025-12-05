@@ -11,7 +11,7 @@
   "scripts": {
     "start": "node ./compiled/camera.js",
     "build": "yarn build:server & yarn build:client",
-    "dev": "yarn build:client && concurrently --kill-others-on-fail --raw \"yarn dev:client\" \"yarn dev:server -- --host 0.0.0.0\"",
+    "dev": "concurrently --kill-others-on-fail --raw \"yarn dev:client\" \"yarn dev:server -- --host 0.0.0.0\"",
     "build:server": "yarn build:server:safe",
     "build:server:safe": "copyfiles -u 1 \"source/generated/**/*\" \"compiled-temp\" && tsc --project tsconfig.json --outDir compiled-temp && ts-node scripts/safeReplace.ts",
     "build:server:force": "copyfiles -u 1 \"source/generated/**/*\" \"compiled\" && tsc --project tsconfig.json",
