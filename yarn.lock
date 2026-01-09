@@ -325,9 +325,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@dotenvx/dotenvx@npm:^1.48.3":
-  version: 1.51.1
-  resolution: "@dotenvx/dotenvx@npm:1.51.1"
+"@dotenvx/dotenvx@npm:^1.51.4":
+  version: 1.51.4
+  resolution: "@dotenvx/dotenvx@npm:1.51.4"
   dependencies:
     commander: "npm:^11.1.0"
     dotenv: "npm:^17.2.1"
@@ -340,7 +340,7 @@ __metadata:
     which: "npm:^4.0.0"
   bin:
     dotenvx: src/cli/dotenvx.js
-  checksum: 10c0/61360547606c89e4bce2971fb524b54d8a1d03545dc17591562ba02affff18ff395ae64205a14fe6b975beaec82014f0bd18bed2c2acbd7bba6eb17a83fcd477
+  checksum: 10c0/b89aa2c3aca5018755c86fa954c6224fa3eda15c0f312d5d5d4a511ec6a27c1563716de9b8669d8d98a05c216250409d52abf53720f860f4e96d905f2c095f75
   languageName: node
   linkType: hard
 
@@ -4991,7 +4991,7 @@ __metadata:
     "@capacitor/preferences": "npm:^7.0.1"
     "@capacitor/push-notifications": "npm:^7.0.1"
     "@capacitor/screen-orientation": "npm:^7.0.1"
-    "@dotenvx/dotenvx": "npm:^1.48.3"
+    "@dotenvx/dotenvx": "npm:^1.51.4"
     "@eslint/js": "npm:^9.39.1"
     "@prisma/client": "npm:^6.9.0"
     "@root/encoding": "npm:^1.0.1"
