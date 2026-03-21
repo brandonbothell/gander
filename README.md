@@ -41,7 +41,9 @@ Run the `yarn` command, bearing in mind this program is known to work with node 
 
 ## Important note!
 
-**You _need_ to start the server and open the client at port 80 or 443 at least once in the configuration it comes in** for greenlock-express to generate SSL certificates. Unfortunately, in order to setup your reverse proxy software to bind to ports 80 and 443 correctly, for now you have to edit `source/camera.ts`, `Ctrl + F` for "`.serve(app)`" in the source code, comment that line out, uncomment the lines consisting of a call to `.ready(...)` directly above the `.serve(app)` line, and finally uncomment the imports from `http` and `https` at the top of the file.
+**You _need_ to start the server and open the client at port 80 or 443 at least once in the following configuration** for greenlock-express to generate SSL certificates. Unfortunately, in order to generate SSL certificates, for now you have to edit `source/camera.ts`, `Ctrl + F` for "`.serve(app)`" in the source code, uncomment that line back in, and remove/comment out the lines consisting of a call to `.ready(...)` directly above the `.serve(app)` line.
+
+Once you've started the server like this once to generate SSL certificates, restore `camera.ts` to its original state to allow your reverse proxy software to bind to ports 80 and 443.
 
 ### Starting the server
 
