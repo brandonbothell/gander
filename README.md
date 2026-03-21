@@ -1,6 +1,6 @@
 # Gander
 
-Go through `config.example.json`, `web/config.example.json`, `greenlock.d/config.example.json`, and `.env.example` and replace the placeholders with real values, then rename the files to `config.json`, `web/config.json`, `greenlock.d/config.json`, and `.env` respectively.
+Go through `config.example.json`, `web/config.example.json`, `greenlock.d/config.example.json`, and `.env.example` and replace the placeholders with real values, then rename the files to `config.json`, `web/config.json`, `greenlock.d/config.json`, and `.env` respectively. Finally, run `yarn db:generate`.
 
 Ensure that you configure a reverse proxy such as nginx to forward requests to the server at http://localhost:PORT (port 3000 by default), setting at a minimum the X-Real-IP header in your nginx configuration file to $remote_addr like so:
 
