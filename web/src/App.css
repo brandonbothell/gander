@@ -6,8 +6,11 @@ html, body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
-  overscroll-behavior: none;
   background: linear-gradient(135deg, #0f2027 0%, #2c5364 40%, #1a2980 100%);
+}
+
+.ios html, .ios body {
+  overscroll-behavior: none;
 }
 
 #root {

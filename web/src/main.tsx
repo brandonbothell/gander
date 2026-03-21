@@ -6,6 +6,10 @@ import { Capacitor } from '@capacitor/core';
 import { LoadingProvider } from './LoadingProvider.tsx';
 import { LoadingBar } from './components/LoadingBar';
 
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
 export type CustomWindow = Window & {
   getDebugLogs: () => string;
   clearDebugLogs: () => void;
@@ -15,6 +19,10 @@ export const API_BASE =
   Capacitor.isNativePlatform()
     ? import.meta.env.VITE_BASE_URL // Use production URL for native apps
     : '';
+
+if (isIOS()) {
+  document.body.classList.add('ios');
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
