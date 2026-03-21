@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import http from 'http';
-// import { Server as HttpServer } from 'http';
+import { Server as HttpServer } from 'http';
 import childProcess, { ChildProcess } from 'child_process';
 import open from 'open';
 import * as admin from 'firebase-admin';
@@ -32,7 +32,7 @@ import initializeStreamRoutes from './routes/streams';
 import { logMotion } from './logMotion';
 import consoleStamp from 'console-stamp';
 import chalk from 'chalk';
-// import { Server as HttpsServer } from 'https';
+import { Server as HttpsServer } from 'https';
 
 consoleStamp(console, {
   format: ':date(yyyy-mm-dd HH:MM:ss.l).yellow.bgBlue :level() :msg',
@@ -526,7 +526,7 @@ loadStreamsFromDb()
       maintainerEmail: config.maintainerEmail,
       cluster: false,
     })
-      /* .ready((glx) => {
+      .ready((glx) => {
         const tlsOptions = null;
         // @ts-expect-error types
         const http2Server = glx.http2Server(tlsOptions, app);
@@ -541,8 +541,8 @@ loadStreamsFromDb()
         httpServer.listen(8080, '0.0.0.0', function () {
           console.info('Listening on ', httpServer.address());
         });
-      }); */
-      .serve(app);
+      });
+      // .serve(app);
 
     setInterval(syncDeletedRecordings, 1000 * 60 * 60); // Sync deleted recordings every hour
 

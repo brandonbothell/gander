@@ -95,7 +95,7 @@ export default function StreamPage({
   const [editingStream, setEditingStream] = useState<Stream | null>(null);
 
   const params = useParams<{ streamId?: string }>();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement & { _hls?: Hls }>(null);
   const recordingsListRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const [cachedRecordings, setCachedRecordings] = useLocalStorageState<{
@@ -301,7 +301,7 @@ export default function StreamPage({
           searchWorkerRef.current = null;
           setIsSearching(false);
         };
-      } catch (err: any) {
+      } catch (err) {
         console.error('Failed to create worker:', err);
         searchWorkerRef.current = null;
       }
@@ -604,7 +604,7 @@ export default function StreamPage({
   const performSearchSync = (recordings: Recording[], requestId: number) => {
     // Use requestIdleCallback or setTimeout to chunk the work
     if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(() => {
+      window.requestIdleCallback(() => {
         processSearchChunk(recordings, 0, [], requestId);
       });
     } else {
@@ -693,7 +693,7 @@ export default function StreamPage({
     if (endIndex < recordings.length) {
       // More chunks to process
       if ('requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(() => {
+        window.requestIdleCallback(() => {
           processSearchChunk(recordings, endIndex, filtered, requestId);
         });
       } else {
@@ -741,12 +741,12 @@ export default function StreamPage({
     }
 
     // IMPORTANT: Cleanup existing HLS instance first to prevent buffer conflicts
-    const existingHls = (videoRef.current as any)._hls;
+    const existingHls = videoRef.current._hls;
     if (existingHls) {
       console.log('Cleaning up existing HLS instance');
       try {
         existingHls.destroy();
-        delete (videoRef.current as any)._hls;
+        delete videoRef.current._hls;
       } catch (error) {
         console.warn('Error cleaning up HLS instance:', error);
       }
@@ -850,7 +850,7 @@ export default function StreamPage({
               );
               setIsLoadingStream(true);
               hls.destroy();
-              delete (videoRef.current as any)._hls;
+              delete videoRef.current?._hls;
               // Fetch a new signed URL and reload the stream
               await loadStream();
               return;
@@ -993,7 +993,7 @@ export default function StreamPage({
           });
 
           // Store HLS instance for cleanup
-          (videoRef.current as any)._hls = hls;
+          videoRef.current._hls = hls;
         } else {
           // Fallback for browsers without HLS.js support
           videoRef.current.src = url;
@@ -1067,12 +1067,12 @@ export default function StreamPage({
     const video = videoRef.current;
     return () => {
       if (video) {
-        const hls = (video as any)._hls;
+        const hls = video._hls;
         if (hls) {
           console.log('Cleaning up HLS instance on component unmount');
           try {
             hls.destroy();
-            delete (video as any)._hls;
+            delete video._hls;
           } catch (error) {
             console.warn('Error cleaning up HLS instance on unmount:', error);
           }
@@ -1184,12 +1184,12 @@ export default function StreamPage({
   useEffect(() => {
     // Make autoScrollUntilRef available globally for SearchTools to access
     if (typeof window !== 'undefined') {
-      (window as any).autoScrollUntilRef = autoScrollUntilRef;
+      (window as typeof window & { autoScrollUntilRef?: React.RefObject<number> }).autoScrollUntilRef = autoScrollUntilRef;
     }
 
     return () => {
       if (typeof window !== 'undefined') {
-        delete (window as any).autoScrollUntilRef;
+        delete (window as typeof window & { autoScrollUntilRef?: React.RefObject<number> }).autoScrollUntilRef;
       }
     };
   }, []);
@@ -1206,7 +1206,7 @@ export default function StreamPage({
       );
       if (!res.ok) return;
       const data = await res.json();
-      const newRecs: Recording[] = (data.recordings || []).map((rec: any) => ({
+      const newRecs: Recording[] = (data.recordings || []).map((rec: Recording) => ({
         filename: rec.filename,
         streamId: stream.id,
       }));
@@ -2021,12 +2021,12 @@ export default function StreamPage({
 
     const interval = setInterval(() => {
       const video = videoRef.current;
-      const hls = video ? (video as any)._hls : null;
+      const hls = video?._hls
 
       if (
         video &&
         hls &&
-        hls.liveSyncPosition !== undefined &&
+        hls.liveSyncPosition !== undefined && hls.liveSyncPosition !== null &&
         !isVideoPaused
       ) {
         const latency = hls.liveSyncPosition - video.currentTime;
@@ -2042,7 +2042,7 @@ export default function StreamPage({
 
   useEffect(() => {
     const video = videoRef.current;
-    const hls = video ? (video as any)._hls : null;
+    const hls = video?._hls;
 
     if (!hls) return;
     if (isVideoPaused) {
@@ -2055,11 +2055,12 @@ export default function StreamPage({
   // Add cleanup for HLS instance
   useEffect(() => {
     return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       const video = videoRef.current;
-      const hls = video ? (video as any)._hls : null;
+      const hls = video?._hls;
       if (hls) {
         hls.destroy();
-        delete (video as any)._hls;
+        delete video?._hls;
       }
     };
   }, []);
@@ -2098,7 +2099,7 @@ export default function StreamPage({
   // --- Scroll to recordings if needed ---
   useEffect(() => {
     if (location.state) {
-      const state = location.state as any;
+      const state = location.state;
 
       // If scrollToRecordings is true, scroll to recordings list
       if (state.scrollToRecordings && recordingsListRef.current) {
@@ -2391,11 +2392,12 @@ export default function StreamPage({
       // Always fetch if missing or expiring soon
       fetchSignedThumbUrls();
     }, 5000);
-    (window as any)._thumbInterval = interval;
+    const windowWithThumbInterval = window as typeof window & { _thumbInterval?: number }
+    windowWithThumbInterval._thumbInterval = interval;
 
     return () => {
-      if ((window as any)._thumbInterval)
-        clearInterval((window as any)._thumbInterval);
+      if (windowWithThumbInterval._thumbInterval)
+        clearInterval(windowWithThumbInterval._thumbInterval);
     };
   }, [activeStream]);
 
@@ -2579,11 +2581,11 @@ export default function StreamPage({
       };
 
       // Store the handler globally so it can be called from App.tsx
-      (window as any).handleSessionMonitorClose = handleSessionMonitorClose;
+      (window as typeof window & { handleSessionMonitorClose?: () => void }).handleSessionMonitorClose = handleSessionMonitorClose;
     }
 
     return () => {
-      delete (window as any).handleSessionMonitorClose;
+      delete (window as typeof window & { handleSessionMonitorClose?: () => void }).handleSessionMonitorClose;
     };
   }, [onSessionMonitorClosed, isMobileWidth]);
 
@@ -2725,7 +2727,7 @@ export default function StreamPage({
           const getActiveStream = () => {
             const storedStreamId = localStorage.getItem('activeStreamId');
             const id =
-              (location.state && (location.state as any).streamId) ||
+              location.state?.streamId ||
               streamId ||
               params.streamId ||
               storedStreamId;
@@ -2733,8 +2735,8 @@ export default function StreamPage({
           };
           setActiveStream(getActiveStream());
         }
-      } catch (err: any) {
-        setStreamError(err.message || 'Failed to load streams');
+      } catch (err: unknown) {
+        setStreamError((err as Error)?.message || 'Failed to load streams');
       } finally {
         setStreamsLoading(false);
       }
@@ -2750,7 +2752,7 @@ export default function StreamPage({
     const getActiveStream = () => {
       const storedStreamId = localStorage.getItem('activeStreamId');
       const id =
-        (location.state && (location.state as any).streamId) ||
+        location.state?.streamId ||
         streamId ||
         params.streamId ||
         storedStreamId;
@@ -2802,7 +2804,7 @@ export default function StreamPage({
     newRtspPass?: string,
   ) => {
     // Build PATCH body with all fields, only if changed
-    const patch: any = {};
+    const patch: Record<string, string | undefined> = {};
     if (newNickname.trim() && newNickname !== stream.nickname) {
       patch.nickname = newNickname.trim();
     }
@@ -3180,10 +3182,10 @@ export default function StreamPage({
                 delete updated[stream.id];
                 return updated;
               });
-            } catch (err: any) {
+            } catch (err: unknown) {
               console.error('Failed to delete stream:', err);
               alert(
-                `Failed to delete stream: ${err.message || 'Network error'}`,
+                `Failed to delete stream: ${ (err as Error)?.message || 'Network error' }`,
               );
             }
           }}
@@ -3329,11 +3331,11 @@ export default function StreamPage({
         ref={recordingsListRef}
         tabIndex={-1}
         onScroll={() => {
+          const windowWithScrollTimeout = window as typeof window & { _scrollTimeout?: number }
           setIsRecordingsListScrolling(true);
           // Debounce: set back to false after scrolling stops for 120ms
-          if ((window as any)._scrollTimeout)
-            clearTimeout((window as any)._scrollTimeout);
-          (window as any)._scrollTimeout = setTimeout(
+          if (windowWithScrollTimeout._scrollTimeout) clearTimeout(windowWithScrollTimeout._scrollTimeout);
+          windowWithScrollTimeout._scrollTimeout = setTimeout(
             () => setIsRecordingsListScrolling(false),
             120,
           );
@@ -3643,10 +3645,10 @@ export default function StreamPage({
               method: 'POST',
             });
             setTimeout(loadStream, 5000); // Reload video element
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error('Failed to reconnect stream:', err);
             alert(
-              `Failed to reconnect stream: ${err.message || 'Network error'}`,
+              `Failed to reconnect stream: ${ (err as Error)?.message || 'Network error' }`,
             );
           } finally {
             setTimeout(() => setIsLoadingStream(false), 5000);
@@ -3659,12 +3661,12 @@ export default function StreamPage({
 
 function seekToLiveEdgeGentle(
   videoRef: React.RefObject<HTMLVideoElement | null>,
-  hls?: any,
+  hls?: Hls,
 ) {
   const video = videoRef.current;
   if (!video || video.paused) return;
 
-  if (hls && hls.liveSyncPosition !== undefined) {
+  if (hls && hls.liveSyncPosition !== undefined && hls.liveSyncPosition !== null) {
     // Be more conservative for initial seek - stay further from live edge
     const targetTime = hls.liveSyncPosition - 3; // 3 seconds behind live edge
     console.log(
@@ -3690,12 +3692,12 @@ function seekToLiveEdgeGentle(
 // Enhanced live seeking function
 function seekToLiveEdge(
   videoRef: React.RefObject<HTMLVideoElement | null>,
-  hls?: any,
+  hls?: Hls,
 ) {
   const video = videoRef.current;
   if (!video || video.paused) return;
 
-  if (hls && hls.liveSyncPosition !== undefined) {
+  if (hls && hls.liveSyncPosition !== undefined && hls.liveSyncPosition !== null) {
     // Use HLS.js live sync position for most accurate live edge
     const targetTime = hls.liveSyncPosition - 1; // 1 second behind live edge for stability
     console.log(`Seeking to HLS live edge: ${targetTime.toFixed(2)}s`);
@@ -3720,12 +3722,12 @@ function seekToLiveEdge(
 }
 
 // Update the existing seekToLive function
-function seekToLive(videoRef: React.RefObject<HTMLVideoElement | null>) {
+function seekToLive(videoRef: React.RefObject<HTMLVideoElement & { _hls?: Hls } | null>) {
   const video = videoRef.current;
   if (!video || video.paused) return;
 
   // Get HLS instance if available
-  const hls = (video as any)._hls;
+  const hls = video._hls;
 
   if (hls) {
     seekToLiveEdge(videoRef, hls);
@@ -3780,7 +3782,7 @@ function playNotificationTone() {
   // This is less likely to interrupt other audio
   try {
     const AudioContext =
-      window.AudioContext ?? (window as any).webkitAudioContext;
+      window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof window.AudioContext }).webkitAudioContext;
     const audioContext = new AudioContext();
 
     // Create a brief, subtle notification tone
