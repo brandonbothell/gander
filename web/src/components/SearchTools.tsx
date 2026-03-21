@@ -1,6 +1,5 @@
 import React, { forwardRef, useRef, useState, useEffect } from "react";
 import { FiRefreshCw } from "react-icons/fi";
-import { isIOS } from "../StreamPage";
 
 interface SearchToolsProps {
   search: string;
@@ -94,6 +93,13 @@ export const SearchTools = forwardRef<HTMLDivElement, SearchToolsProps>(({
       }
     }
     tryFocus();
+  }
+
+  function isIOS() {
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
+    );
   }
 
   // Focus the input when it becomes active

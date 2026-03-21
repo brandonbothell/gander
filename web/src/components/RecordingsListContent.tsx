@@ -1,8 +1,9 @@
 import { VariableSizeGrid as Grid } from "react-window";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { RecordingThumbItem } from "./RecordingThumbItem";
 import { FiArrowUp, FiChevronUp } from "react-icons/fi";
-import { isIOS } from "../StreamPage";
+import type { Recording } from "./Recording";
+import type { Stream } from "../../../source/types/shared";
 
 // Helper to measure nickname height
 function measureNicknameHeight(nickname: string, width: number, font = "bold 1.1em sans-serif") {
@@ -29,15 +30,15 @@ interface RecordingsListContentProps {
   pullStartY: React.RefObject<number | null>;
   gridOuterRef: React.RefObject<HTMLDivElement | null>;
   isMobile: boolean;
-  filteredRecordings: Array<any>;
+  filteredRecordings: Array<Recording>;
   search: string;
   isNicknamedOnly: boolean;
   dateRange: { from?: string | null; to?: string | null };
   isSearching: boolean;
   userTyping: boolean;
-  activeStream: any;
+  activeStream: Stream | null;
   selected: string[];
-  viewingRecordingsFrom: any;
+  viewingRecordingsFrom: Stream | null;
   hovered: string | null;
   setHovered: (filename: string | null) => void;
   recordingsListRef: React.RefObject<HTMLDivElement | null>;
@@ -49,11 +50,11 @@ interface RecordingsListContentProps {
   nicknames: Record<string, string>;
   viewed: Array<{ filename: string; streamId: string }>;
   totalRecordings: Record<string, number>;
-  cachedRecordings: Record<string, Array<any>>;
+  cachedRecordings: Record<string, Array<Recording>>;
   isLoadingMore: boolean;
   setIsLoadingMore: (loading: boolean) => void;
   setCurrentPage: (page: number) => void;
-  loadPage: (stream: any, page: number, append: boolean) => Promise<void>;
+  loadPage: (stream: Stream, page: number, append: boolean) => Promise<void>;
   currentPage: number;
   mobileSearchSticky: boolean;
   setRecordingsListOpen: (open: boolean) => void;
@@ -68,7 +69,26 @@ interface RecordingsListContentProps {
 
 
 // Item renderer as recommended by react-window docs
-const Cell = ({ columnIndex, rowIndex, style, data }: any) => {
+const Cell = ({ columnIndex, rowIndex, style, data }: { columnIndex: number; rowIndex: number; style: React.CSSProperties; data: {
+  numColumns: number;
+  filteredRecordings: Array<Recording>;
+  selected: string[];
+  viewingRecordingsFrom: Stream | null;
+  activeStream: Stream | null;
+  hovered: string | null;
+  setHovered: (filename: string | null) => void;
+  recordingsListRef: React.RefObject<HTMLDivElement | null>;
+  handleTouchStart: (filename: string, checked: boolean) => void;
+  handleTouchMove: (e: React.TouchEvent) => void;
+  handleTouchEnd: () => void;
+  handleView: (filename: string) => void;
+  handleCheckboxChange: (filename: string, checked: boolean) => void;
+  nicknames: Record<string, string>;
+  viewed: Array<{ filename: string; streamId: string }>;
+  THUMB_WIDTH: number;
+  THUMB_HEIGHT: number;
+  GRID_GAP: number;
+} }) => {
   const {
     numColumns,
     filteredRecordings,
@@ -109,7 +129,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }: any) => {
       >
         <RecordingThumbItem
           recordingsListRef={recordingsListRef}
-          streamId={recordingsStream.id}
+          streamId={recordingsStream!.id}
           filename={rec.filename}
           checked={checked}
           hovered={hovered === rec.filename}
@@ -124,7 +144,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }: any) => {
           onCheckboxChange={checked => handleCheckboxChange(rec.filename, checked)}
           nickname={nickname}
           viewed={viewed.find((v: { filename: string; streamId: string }) =>
-            v.filename === rec.filename && v.streamId === recordingsStream.id) !== undefined}
+            v.filename === rec.filename && v.streamId === recordingsStream!.id) !== undefined}
         />
       </div>
     </div>
@@ -142,10 +162,10 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
   const GRID_GAP = props.isMobile ? 12 : 16;
 
   // Dynamically calculate columns
-  const getNumColumns = (width: number) => {
+  const getNumColumns = useCallback((width: number) => {
     const columns = Math.max(1, Math.floor((width + GRID_GAP) / (MIN_THUMB_WIDTH + GRID_GAP)));
     return columns; // Limit to max 4 columns
-  };
+  }, [GRID_GAP, MIN_THUMB_WIDTH]);
 
   const [numColumns, setNumColumns] = useState(getNumColumns(containerWidth));
 
@@ -158,7 +178,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
     updateWidth();
     window.addEventListener("resize", updateWidth);
     return () => window.removeEventListener("resize", updateWidth);
-  }, []);
+  }, [getNumColumns]);
 
   // Calculate thumbnail width based on columns
   let THUMB_WIDTH = Math.max(MIN_THUMB_WIDTH, (containerWidth - GRID_GAP * numColumns) / numColumns);
@@ -206,7 +226,7 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
   };
 
   // Ref for VariableSizeGrid to reset row heights if nicknames change
-  const gridRef = useRef<any>(null);
+  const gridRef = useRef<Grid | null>(null);
 
   useEffect(() => {
     if (gridRef.current) {
@@ -416,4 +436,11 @@ export default function RecordingsListContent(props: RecordingsListContentProps)
       )}
     </>
   );
+
+  function isIOS() {
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
+    );
+  }
 }

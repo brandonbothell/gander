@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE, authFetch } from '../main';
 import { useSignedUrl } from '../hooks/useSignedUrl';
 import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
-import { isIOS } from '../StreamPage';
 import { Capacitor } from '@capacitor/core';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
@@ -48,7 +47,7 @@ export function Recording({
   const [hover, setHover] = useState(false);
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const videoRef = externalVideoRef ?? useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(externalVideoRef?.current || null);
   // Controls fade-away logic
   const [isControlBarVisible, setIsControlBarVisible] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -97,25 +96,32 @@ export function Recording({
     scheduleHide();
   };
 
+  function isIOS() {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
+  );
+}
+
   const handleFullscreen = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (isIOS() && typeof (video as any).webkitEnterFullscreen === 'function') {
+    if (isIOS() && typeof (video as typeof video & { webkitEnterFullscreen: () => void }).webkitEnterFullscreen === 'function') {
       // iOS Safari/PWA: use webkitEnterFullscreen
-      (video as any).webkitEnterFullscreen();
+      (video as typeof video & { webkitEnterFullscreen: () => void }).webkitEnterFullscreen();
     } else if (video.requestFullscreen) {
       video.requestFullscreen();
-    } else if ((video as any).webkitRequestFullscreen) {
-      (video as any).webkitRequestFullscreen();
+    } else if ((video as typeof video & { webkitRequestFullscreen: () => void }).webkitRequestFullscreen) {
+      (video as typeof video & { webkitRequestFullscreen: () => void }).webkitRequestFullscreen();
     }
     if (Capacitor.isNativePlatform()) {
       ScreenOrientation.lock({ orientation: 'landscape' })
     } else if (
       'orientation' in screen &&
-      typeof (screen.orientation as any).lock === 'function'
+      typeof (screen.orientation as typeof screen.orientation & { lock: (orientation: string) => Promise<void> }).lock === 'function'
     ) {
       try {
-        (screen.orientation as any).lock('landscape').catch();
+        (screen.orientation as typeof screen.orientation & { lock: (orientation: string) => Promise<void> }).lock('landscape').catch();
       } catch (_) {
         // Ignore errors
       }
@@ -127,11 +133,11 @@ export function Recording({
       ScreenOrientation.unlock()
     } else if (
       screen.orientation &&
-      typeof (screen.orientation as any).unlock === 'function'
+      typeof screen.orientation.unlock === 'function'
     ) {
       try {
-        const result = (screen.orientation as any).unlock();
-        if (result && typeof result.catch === 'function') {
+        const result = screen.orientation.unlock() as unknown;
+        if (result && typeof result === 'object' && 'catch' in result && typeof result.catch === 'function') {
           result.catch(() => { });
         }
       } catch (error) {
@@ -150,9 +156,9 @@ export function Recording({
       // Check if fullscreen is exited
       if (
         !document.fullscreenElement &&
-        !((document as any).webkitFullscreenElement) &&
-        !((document as any).mozFullScreenElement) &&
-        !((document as any).msFullscreenElement)
+        !((document as typeof document & { webkitFullscreenElement: Element | null }).webkitFullscreenElement) &&
+        !((document as typeof document & { mozFullScreenElement: Element | null }).mozFullScreenElement) &&
+        !((document as typeof document & { msFullscreenElement: Element | null }).msFullscreenElement)
       ) {
         handleExitFullscreen();
       }

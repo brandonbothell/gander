@@ -3765,14 +3765,14 @@ function mergeMasks(
   return merged;
 }
 
-export function isIOS() {
+function isIOS() {
   return (
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
   );
 }
 
-export function isAndroid() {
+function isAndroid() {
   return /Android/i.test(navigator.userAgent);
 }
 

@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
 import { type Stream } from '../../../source/types/shared'
-import { isIOS } from '../StreamPage';
 import { Capacitor } from '@capacitor/core';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
@@ -223,6 +222,13 @@ export function StreamControlBar({
     setIsMuted(video.muted);
     handleShowControls();
   };
+
+  function isIOS() {
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
+    );
+  }
 
   const handleFullscreen = () => {
     const video = videoRef.current;
