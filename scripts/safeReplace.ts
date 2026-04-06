@@ -12,9 +12,12 @@ async function safeReplace() {
     // Check if server is running by looking for a process using the compiled files
     const { exec } = require('child_process');
     const isRunning = await new Promise((resolve) => {
-      exec('lsof compiled/camera.js 2>/dev/null || pgrep -f "compiled/camera.js"', (error: any) => {
-        resolve(!error); // If no error, process is running
-      });
+      exec(
+        'lsof compiled/camera.js 2>/dev/null || pgrep -f "compiled/camera.js"',
+        (error: any) => {
+          resolve(!error); // If no error, process is running
+        },
+      );
     });
 
     if (isRunning) {

@@ -6,8 +6,14 @@ const prisma = new PrismaClient();
 
 // List your streams and their recording directories here
 const streams = [
-  { id: 'cmc549iag0000p0x8kxd7bbid', recordDir: 'D:/Recordings/SecurityCam/cmc549iag0000p0x8kxd7bbid' },
-  { id: 'cmcs4vqkq0000p0ngn9dty48f', recordDir: 'D:/Recordings/SecurityCam/cmcs4vqkq0000p0ngn9dty48f' }
+  {
+    id: 'cmc549iag0000p0x8kxd7bbid',
+    recordDir: 'D:/Recordings/SecurityCam/cmc549iag0000p0x8kxd7bbid',
+  },
+  {
+    id: 'cmcs4vqkq0000p0ngn9dty48f',
+    recordDir: 'D:/Recordings/SecurityCam/cmcs4vqkq0000p0ngn9dty48f',
+  },
 ];
 
 // Helper to get the latest recordedAt date across all streams
@@ -17,7 +23,7 @@ async function getLastRecordingDay(): Promise<string | null> {
     const rec = await prisma.motionRecording.findFirst({
       where: { streamId: stream.id },
       orderBy: { recordedAt: 'desc' },
-      select: { recordedAt: true }
+      select: { recordedAt: true },
     });
     if (rec && (!latest || rec.recordedAt > latest)) {
       latest = rec.recordedAt;
@@ -40,28 +46,29 @@ async function main() {
       where: {
         streamId: stream.id,
         recordedAt: { lt: lastRecordingDay },
-        OR: [
-          { nickname: null },
-          { nickname: '' }
-        ]
-      }
+        OR: [{ nickname: null }, { nickname: '' }],
+      },
     });
 
     for (const rec of oldRecordings) {
       const filePath = path.join(stream.recordDir, rec.filename);
 
       // Add to DeletedRecording table
-      await prisma.deletedRecording.create({
-        data: {
-          streamId: stream.id,
-          filename: rec.filename,
-          // deletedAt will default to now()
-        }
-      }).catch(() => { });
+      await prisma.deletedRecording
+        .create({
+          data: {
+            streamId: stream.id,
+            filename: rec.filename,
+            // deletedAt will default to now()
+          },
+        })
+        .catch(() => {});
 
       // Delete from DB
       await prisma.motionRecording.delete({
-        where: { streamId_filename: { streamId: stream.id, filename: rec.filename } }
+        where: {
+          streamId_filename: { streamId: stream.id, filename: rec.filename },
+        },
       });
 
       // Delete from filesystem if exists
@@ -79,7 +86,9 @@ async function main() {
     }
   }
 
-  console.log(`Done. Deleted ${totalDeleted} recordings before ${lastRecordingDay}.`);
+  console.log(
+    `Done. Deleted ${totalDeleted} recordings before ${lastRecordingDay}.`,
+  );
 }
 
 main().then(() => prisma.$disconnect());
