@@ -28,14 +28,12 @@ const originalLog = console.log;
 console.log = (...args: any[]) => {
   originalLog.apply(console, args);
   const message = args.join(' ');
-  if (message.startsWith('cert_renewal')) {
-    console.log('Certificate renewal detected, terminating.');
-    setTimeout(() => {
-      console.log('No output for 40 seconds, terminating.');
-      process.exit(0);
-    }, 10000); // Wait 10 seconds to allow renewal to complete
+  if (message.startsWith('cert_')) {
+    console.log('Certificate event detected, terminating.');
+    setTimeout(() => process.exit(0), 10000); // Wait 10 seconds to allow completion
+  } else {
+    resetTimeout();
   }
-  resetTimeout();
 };
 
 // Start the timeout initially
