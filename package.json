@@ -25,7 +25,8 @@
     "db:migrate-resolve": "yarn pnpify prisma migrate resolve",
     "lint": "yarn lint:server && yarn lint:client",
     "lint:server": "yarn eslint .",
-    "lint:client": "yarn workspace web eslint ."
+    "lint:client": "yarn workspace web eslint .",
+    "generate:ssl": "ts-node scripts/generateSSLCertificates.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
