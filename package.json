@@ -64,7 +64,7 @@
     "@capacitor/push-notifications": "^7.0.1",
     "@capacitor/screen-orientation": "^7.0.1",
     "@dotenvx/dotenvx": "^1.48.3",
-    "@prisma/client": "^6.9.0",
+    "@prisma/client": "^7.2.0",
     "@root/encoding": "^1.0.1",
     "@root/keypairs": "^0.10.3",
     "@yarnpkg/pnpify": "^4.1.5",
