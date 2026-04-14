@@ -647,7 +647,7 @@ app.use(
     origin: (origin, callback) => {
       const allowedOrigins = (
         process.env.API_ENV === 'production' ? [] : ['http://localhost:3000']
-      ).concat(process.env.VITE_BASE_URL ? [process.env.VITE_BASE_URL] : []);
+      ).concat(config.domains ?? []);
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {

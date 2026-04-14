@@ -496,130 +496,13 @@ export default function StreamPage({
     }
   }, [filteredRecordingsCache, userTyping]);
 
-  // Clean up the search effect:
-  useEffect(() => {
-    if (filterUpdatesBlocked) return;
-
-    const recordingsStream = viewingRecordingsFrom ?? activeStream;
-    if (!recordingsStream) {
-      setFilteredRecordingsCache([]);
-      setIsSearching(false);
-      return;
-    }
-
-    const allCached = cachedRecordings[recordingsStream.id] || [];
-    const notDeleted = deletedRecordings[recordingsStream.id]
-      ? allCached.filter(
-          (rec) =>
-            !deletedRecordings[recordingsStream.id].includes(rec.filename),
-        )
-      : allCached;
-
-    if (
-      ((search && search.length >= 2) ||
-        isNicknamedOnly ||
-        dateRange.from ||
-        dateRange.to) &&
-      notDeleted.length > 0
-    ) {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-
-      lastSearchRequestId.current++;
-      const currentRequestId = lastSearchRequestId.current;
-      const debounceDelay = search && search.length >= 2 ? 300 : 100;
-
-      searchTimeoutRef.current = window.setTimeout(() => {
-        if (currentRequestId !== lastSearchRequestId.current) return;
-
-        const currentRecordingsStream = viewingRecordingsFrom ?? activeStream;
-        if (
-          !currentRecordingsStream ||
-          currentRecordingsStream.id !== recordingsStream.id
-        )
-          return;
-
-        // Use sync search on iOS, worker on other platforms
-        if (isIOS() || !searchWorkerRef.current) {
-          setIsSearching(true);
-          performSearchSync(notDeleted, currentRequestId);
-        } else {
-          setIsSearching(true);
-          searchWorkerRef.current.postMessage({
-            recordings: notDeleted,
-            nicknames,
-            search: search.length >= 2 ? search : '',
-            isNicknamedOnly,
-            dateRange,
-            requestId: currentRequestId,
-          });
-        }
-      }, debounceDelay);
-    } else if (
-      (search && search.length >= 2) ||
-      isNicknamedOnly ||
-      dateRange.from ||
-      dateRange.to
-    ) {
-      setFilteredRecordingsCache([]);
-      setIsSearching(false);
-    } else {
-      setFilteredRecordingsCache([]);
-      setIsSearching(false);
-    }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [
-    search,
-    isNicknamedOnly,
-    dateRange,
-    cachedRecordings,
-    nicknames,
-    activeStream,
-    deletedRecordings,
-    viewingRecordingsFrom,
-    filterUpdatesBlocked,
-  ]);
-
-  // Also add a separate effect to clear search state when stream changes:
-  useEffect(() => {
-    // Clear search results when stream changes
-    setFilteredRecordingsCache([]);
-    setIsSearching(false);
-    setFrozenFilteredRecordings([]);
-
-    // Cancel any ongoing search
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    lastSearchRequestId.current++;
-  }, [activeStream?.id, viewingRecordingsFrom?.id]);
-
-  // Update the performSearchSync function to accept and check request ID:
-  const performSearchSync = (recordings: Recording[], requestId: number) => {
-    // Use requestIdleCallback or setTimeout to chunk the work
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(() => {
-        processSearchChunk(recordings, 0, [], requestId);
-      });
-    } else {
-      setTimeout(() => {
-        processSearchChunk(recordings, 0, [], requestId);
-      }, 0);
-    }
-  };
-
-  const processSearchChunk = (
-    recordings: Recording[],
-    startIndex: number,
-    filtered: Recording[],
-    requestId: number,
-  ) => {
+  const processSearchChunk = useCallback(
+    (
+      recordings: Recording[],
+      startIndex: number,
+      filtered: Recording[],
+      requestId: number
+    ) => {
     // Check if this request was cancelled
     if (requestId !== lastSearchRequestId.current) {
       return; // Request was cancelled, stop processing
@@ -712,12 +595,120 @@ export default function StreamPage({
       setFilteredRecordingsCache(filtered);
       setIsSearching(false);
     }
-  };
+  }, [dateRange.from, dateRange.to, isNicknamedOnly, nicknames, search]);
+
+  // Update the performSearchSync function to accept and check request ID:
+  const performSearchSync = useCallback((recordings: Recording[], requestId: number) => {
+    // Use requestIdleCallback or setTimeout to chunk the work
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => {
+        processSearchChunk(recordings, 0, [], requestId);
+      });
+    } else {
+      setTimeout(() => {
+        processSearchChunk(recordings, 0, [], requestId);
+      }, 0);
+    }
+  }, [processSearchChunk]);
+
+  // Clean up the search effect:
+  useEffect(() => {
+    if (filterUpdatesBlocked) return;
+
+    const recordingsStream = viewingRecordingsFrom ?? activeStream;
+    if (!recordingsStream) {
+      setFilteredRecordingsCache([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const allCached = cachedRecordings[recordingsStream.id] || [];
+    const notDeleted = deletedRecordings[recordingsStream.id]
+      ? allCached.filter(
+          (rec) =>
+            !deletedRecordings[recordingsStream.id].includes(rec.filename),
+        )
+      : allCached;
+
+    if (
+      ((search && search.length >= 2) ||
+        isNicknamedOnly ||
+        dateRange.from ||
+        dateRange.to) &&
+      notDeleted.length > 0
+    ) {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      lastSearchRequestId.current++;
+      const currentRequestId = lastSearchRequestId.current;
+      const debounceDelay = search && search.length >= 2 ? 300 : 100;
+
+      searchTimeoutRef.current = window.setTimeout(() => {
+        if (currentRequestId !== lastSearchRequestId.current) return;
+
+        const currentRecordingsStream = viewingRecordingsFrom ?? activeStream;
+        if (
+          !currentRecordingsStream ||
+          currentRecordingsStream.id !== recordingsStream.id
+        )
+          return;
+
+        // Use sync search on iOS, worker on other platforms
+        if (isIOS() || !searchWorkerRef.current) {
+          setIsSearching(true);
+          performSearchSync(notDeleted, currentRequestId);
+        } else {
+          setIsSearching(true);
+          searchWorkerRef.current.postMessage({
+            recordings: notDeleted,
+            nicknames,
+            search: search.length >= 2 ? search : '',
+            isNicknamedOnly,
+            dateRange,
+            requestId: currentRequestId,
+          });
+        }
+      }, debounceDelay);
+    } else if (
+      (search && search.length >= 2) ||
+      isNicknamedOnly ||
+      dateRange.from ||
+      dateRange.to
+    ) {
+      setFilteredRecordingsCache([]);
+      setIsSearching(false);
+    } else {
+      setFilteredRecordingsCache([]);
+      setIsSearching(false);
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [search, isNicknamedOnly, dateRange, cachedRecordings, nicknames, activeStream, deletedRecordings, viewingRecordingsFrom, filterUpdatesBlocked, performSearchSync]);
+
+  // Also add a separate effect to clear search state when stream changes:
+  useEffect(() => {
+    // Clear search results when stream changes
+    setFilteredRecordingsCache([]);
+    setIsSearching(false);
+    setFrozenFilteredRecordings([]);
+
+    // Cancel any ongoing search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    lastSearchRequestId.current++;
+  }, [activeStream?.id, viewingRecordingsFrom?.id]);
 
   const { setLoading } = useLoading();
 
   // Update the loadStream function with proper HLS cleanup
-  async function loadStream() {
+  const loadStream = useCallback(async () => {
     if (!videoRef.current || !activeStream)
       return console.warn('No video ref and/or active stream set');
 
@@ -1060,7 +1051,8 @@ export default function StreamPage({
       // setIsLoadingStream(false);
       setLoading(false);
     }, 100);
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStream]);
 
   // Also update the cleanup effect to be more thorough
   useEffect(() => {
@@ -1671,7 +1663,7 @@ export default function StreamPage({
       if (observer && sentinel) observer.disconnect();
       window.removeEventListener('scroll', updateMobileSticky);
     };
-  }, [isMobileWidth]); // Add isMobile as dependency
+  }, [forceSticky, isMobileWidth]); // Add isMobile as dependency
 
   // Focus recordings list when the bottom sentinel is intersected
   useEffect(() => {
@@ -1755,14 +1747,15 @@ export default function StreamPage({
     setReachedLastSeen(!recordingsStream); // reachedLastSeen is false if activeStream is set, true if not
     // Fetch the first page of recordings
     if (recordingsStream) loadPage(recordingsStream, 1, true);
-  }, [activeStream, viewingRecordingsFrom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStream, viewingRecordingsFrom, loadStream]);
 
   // 1. --- Load stream video on stream change ---
   useEffect(() => {
     if (!activeStream) return;
     localStorage.setItem('activeStreamId', activeStream.id);
     loadStream();
-  }, [activeStream]);
+  }, [activeStream, loadStream]);
 
   useEffect(() => {
     if (!isVideoPaused) seekToLive(videoRef);
@@ -1832,12 +1825,13 @@ export default function StreamPage({
       if (preCacheTimeout) clearTimeout(preCacheTimeout);
       if (preCacheInterval) clearInterval(preCacheInterval);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     // Only include dependencies that should trigger a restart of the polling
     dateRange.from,
     dateRange.to,
-    activeStream?.id,
-    viewingRecordingsFrom?.id,
+    activeStream,
+    viewingRecordingsFrom,
     // Removed: cachedRecordings, totalRecordings, currentPage, isLoadingMore
     // These change frequently and shouldn't restart the polling interval
   ]);
@@ -1980,7 +1974,8 @@ export default function StreamPage({
         `Switched to stream ${activeStream.id} - not recording or no start time`,
       );
     }
-  }, [activeStream?.id]); // Remove motionStatus dependency to only trigger on stream changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStream]); // Remove motionStatus dependency to only trigger on stream changes
   // Add the playMotionSound function
   const playMotionSound = () => {
     console.log('Playing motion sound...');
@@ -2081,9 +2076,7 @@ export default function StreamPage({
 
   // --- Poll pause state every 3 seconds ---
   useEffect(() => {
-    if (!activeStream) return;
     const pollPauseState = () => {
-      if (!activeStream) return;
       authFetch(`${API_BASE}/api/motion-pause`)
         .then((res) => res.json())
         .then((data) => {
