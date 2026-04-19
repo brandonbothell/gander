@@ -15,7 +15,6 @@ import { PrismaClient } from './generated/prisma';
 import { StreamManager } from './streamManager';
 import { detectMotion, cleanFrameCache, debugLog } from './motionDetector';
 import { TrustedDevice } from './types/deviceInfo';
-import Greenlock from 'greenlock-express';
 import config from '../config.json';
 import { jwtAuth } from './middleware/jwtAuth';
 import initializeMotionRoutes, {
@@ -516,34 +515,9 @@ loadStreamsFromDb()
   .then(() => setupStreamMotionMonitoring())
   .then(() => {
     // --- Start server ---
-    // Use Greenlock for production
-    Greenlock.init({
-      packageRoot: path.join(__dirname, '..'),
-      configDir:
-        config.greenlockConfigDir ?? path.join(__dirname, '..', 'greenlock.d'),
-      maintainerEmail: config.maintainerEmail,
-      cluster: false,
-    }).ready((glx) => {
-      const tlsOptions = null;
-      // @ts-expect-error types
-      const http2Server = glx.http2Server(tlsOptions, app);
-
-      http2Server.listen(8443, '0.0.0.0', function () {
-        console.info('Listening on ', http2Server.address());
-      });
-
-      // @ts-expect-error types
-      const httpServer = glx.httpServer();
-
-      httpServer.listen(8080, '0.0.0.0', function () {
-        console.info('Listening on ', httpServer.address());
-      });
-    });
-
     setInterval(syncDeletedRecordings, 1000 * 60 * 60); // Sync deleted recordings every hour
 
-    // Use HTTP for nginx reverse proxy in production or for development
-    // Always use Greenlock for HTTPS, and also open web client in development for convenience
+    // Use HTTP with an nginx reverse proxy in production or plain HTTP for development
     const port = process.env.PORT ?? 3000;
     http.createServer(app).listen(port, () => {
       console.debug(`HTTP server running on http://localhost:${port}`);

@@ -8,7 +8,8 @@ A security camera application.
 2. Run `yarn db:generate` to set up the database.
 3. Generate SSL certificates: `yarn generate:ssl`.
 4. Build and start: `yarn build && yarn start`.
-5. Access via your reverse proxy (see [nginx config](#nginx-configuration)).
+5. Access via your reverse-proxy (see [nginx config](#nginx-configuration))
+    - Serve the SSL certificates from `greenlock.d/live/YourWebsite.com/`
 
 ## Prerequisites
 
@@ -18,40 +19,45 @@ A security camera application.
 
 ## Detailed Setup
 
-1. **Configuration Files**: Rename the example config files, replacing placeholders with your real values. Required config files:
+1. **Configuration Files**: Rename the following example configuration files, replacing placeholders with your real values:
+  - `.env`
    - `config.json`
    - `web/config.json`
-   - `greenlock.d/config.json`
-   - `.env`
+   - `greenlock.d/config.json` (if you don't have SSL certificates already)
 
-2. **Database**: Run `yarn db:generate` to initialize Prisma.
+2. **Database**: Run `yarn db:generate` to initialize the database manager.
 
-3. **SSL Certificates**: Use `yarn generate:ssl` to generate certificates with greenlock-express. This starts the server on ports 80/443 and terminates automatically after certificate renewal or a 40-second timeout.
+3. **SSL Certificates**: Use `yarn generate:ssl` to generate SSL (HTTPS) certificates **after** editing `greenlock.d/config.json` with greenlock-express.
+    - This starts an ACME authentication server on ports 80/443 and terminates automatically after certificate renewal or a 40-second timeout.
+    - If you wish, you can instead use your own SSL certificates with your reverse-proxy (nginx) by pointing nginx to wherever those are located on your system.
 
 4. **Build**: Run `yarn build` to compile the server and client.
 
-5. **Reverse Proxy**: Configure nginx or similar to proxy to `http://localhost:3000` (default port), using the generated SSL certificates.
+5. **Reverse Proxy**: Configure nginx or a similar reverse-proxy to proxy to `http://localhost:3000` (port 3000 is Gander's default), using the SSL certificates generated in `greenlock.d/live/` (or your own).
 
 ## Starting the Server
 
-Run `yarn start` after building. Ensure ports 80 and 443 are available for the reverse proxy. Access your site through the proxy.
+Run `yarn build` and then `yarn start`. Ensure ports 80 and 443 are available for the reverse proxy. Access your site through the proxy.
 
 ## Nginx Configuration
 
-```conf
+```properties
 # Gander HTTPS server configuration
 server {
   listen 443 ssl;
   listen [::]:443 ssl;
   http2 on;
+  # Change example.tld to your website's address (like example.com)
   server_name example.tld;
 
+  # CHANGE these paths to include YOUR website's domain, NOT "example.tld"
   ssl_certificate /path/to/gander/greenlock.d/live/example.tld/fullchain.pem;
   ssl_certificate_key /path/to/gander/greenlock.d/live/example.tld/privkey.pem;
   ssl_trusted_certificate /path/to/gander/greenlock.d/live/example.tld/fullchain.pem;
   add_header Strict-Transport-Security "max-age=31536000;";
 
   location / {
+    # You may have changed the port from the default of 3000 in config.json
     proxy_pass http://localhost:3000;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
