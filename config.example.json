@@ -4,6 +4,9 @@
   "recordingsDirectory":  "D:/Recordings/ExampleDirectory",
   "maintainerEmail":      "example@email.com",
   "recordingsLowSpaceThresholdMb":  1024,
+  "domains": [
+    "https://example.tld"
+  ],
   "vapid": {
     "email":              "mailto:example@email.com",
     "publicKey":          "BEXAMPLEPUBLICKEY1234567890",
