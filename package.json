@@ -63,7 +63,7 @@
     "@capacitor/preferences": "^7.0.1",
     "@capacitor/push-notifications": "^7.0.1",
     "@capacitor/screen-orientation": "^7.0.1",
-    "@dotenvx/dotenvx": "^1.48.3",
+    "@dotenvx/dotenvx": "^1.51.4",
     "@prisma/client": "^6.9.0",
     "@root/encoding": "^1.0.1",
     "@root/keypairs": "^0.10.3",
