@@ -8,6 +8,7 @@ import {
 import { logMotion } from '../logMotion';
 import { jwtAuth } from '../middleware/jwtAuth';
 import express, { Express } from 'express';
+import rateLimit from 'express-rate-limit';
 import { clearMotionHistory } from '../motionDetector';
 import { StreamManager } from '../streamManager';
 import * as fs from 'fs';
@@ -21,6 +22,13 @@ export default function initializeMotionRoutes(
   streamStates: Record<string, StreamMotionState>,
   dynamicStreams: Record<string, StreamManager>,
 ) {
+  const motionPauseLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 10, // limit each IP to 10 pause/resume requests per minute
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // --- Motion status ---
   app.get('/api/motion-status', jwtAuth, (req, res) => {
     const states: {
@@ -77,9 +85,19 @@ export default function initializeMotionRoutes(
   app.post(
     '/api/motion-pause/:streamId',
     jwtAuth,
+    motionPauseLimiter,
     express.json(),
     async (req, res) => {
       const { streamId } = req.params;
+      if (
+        streamId === '__proto__' ||
+        streamId === 'constructor' ||
+        streamId === 'prototype'
+      ) {
+        res.status(400).json({ paused: false });
+        return;
+      }
+
       const state = streamStates[streamId];
       if (!state) {
         res.status(404).json({ paused: false });
