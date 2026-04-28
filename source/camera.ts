@@ -382,6 +382,10 @@ export function stopStreamMotionMonitoring(streamId?: string) {
   }
 }
 
+export function saveMotionSegments(streamId: string) {
+  return saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId);
+}
+
 // Load streams from DB on startup
 async function loadStreamsFromDb() {
   const dbStreams = await prisma.stream.findMany();
@@ -1518,9 +1522,9 @@ async function cleanExit() {
     }
 
     // Save any pending segments BEFORE stopping FFmpeg and cleaning directories
-    if (state?.motionSegments.length > 0) {
+    if (state?.motionSegments.length > 0 || state.flushRecordings.length > 0) {
       logMotion(
-        `[${streamId}] [cleanExit] Saving ${state.motionSegments.length} pending segments`,
+        `[${streamId}] [cleanExit] Saving ${state.motionSegments.length || state.flushRecordings.length} pending segments`,
       );
       try {
         await saveMotionSegmentsWithRetry(

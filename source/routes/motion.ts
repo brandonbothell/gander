@@ -1,40 +1,62 @@
-import { persistStreamState, prisma, safeUnlinkWithRetry, StreamMotionState } from "../camera";
+import {
+  persistStreamState,
+  prisma,
+  safeUnlinkWithRetry,
+  StreamMotionState,
+  saveMotionSegments as saveMotionSegmentsCamera,
+} from '../camera';
 import { logMotion } from '../logMotion';
-import { jwtAuth } from "../middleware/jwtAuth";
-import express, { Express } from "express";
-import { clearMotionHistory } from "../motionDetector";
-import { StreamManager } from "../streamManager";
-import * as fs from "fs";
-import path from "path";
-import { recordingsLowSpaceThresholdMb } from "../../config.json";
-import { exec } from "child_process";
-import { notify } from "./notifications";
+import { jwtAuth } from '../middleware/jwtAuth';
+import express, { Express } from 'express';
+import { clearMotionHistory } from '../motionDetector';
+import { StreamManager } from '../streamManager';
+import * as fs from 'fs';
+import path from 'path';
+import { recordingsLowSpaceThresholdMb } from '../../config.json';
+import { exec } from 'child_process';
+import { notify } from './notifications';
 
 export default function initializeMotionRoutes(
   app: Express,
   streamStates: Record<string, StreamMotionState>,
-  dynamicStreams: Record<string, StreamManager>
+  dynamicStreams: Record<string, StreamManager>,
 ) {
   // --- Motion status ---
   app.get('/api/motion-status', jwtAuth, (req, res) => {
-    const states: { [streamId: string]:
-      { recording: boolean, secondsLeft: number, saving: boolean, startedRecordingAt: number, lowDiskSpace: boolean } } = {};
+    const states: {
+      [streamId: string]: {
+        recording: boolean;
+        secondsLeft: number;
+        saving: boolean;
+        startedRecordingAt: number;
+        lowDiskSpace: boolean;
+      };
+    } = {};
     for (const streamId in streamStates) {
       const state = streamStates[streamId];
       if (!state) {
-        states[streamId] = { recording: false, secondsLeft: 0, saving: false, startedRecordingAt: 0, lowDiskSpace: false };
+        states[streamId] = {
+          recording: false,
+          secondsLeft: 0,
+          saving: false,
+          startedRecordingAt: 0,
+          lowDiskSpace: false,
+        };
         continue;
       }
       let secondsLeft = 0;
       if (state.motionRecordingActive && state.motionRecordingTimeoutAt) {
-        secondsLeft = Math.max(0, Math.ceil((state.motionRecordingTimeoutAt - Date.now()) / 1000));
+        secondsLeft = Math.max(
+          0,
+          Math.ceil((state.motionRecordingTimeoutAt - Date.now()) / 1000),
+        );
       }
       states[streamId] = {
         recording: state.motionRecordingActive,
         secondsLeft,
         saving: state.savingInProgress ?? false,
         startedRecordingAt: state.startedRecordingAt,
-        lowDiskSpace: state.lowSpaceNotified
+        lowDiskSpace: state.lowSpaceNotified,
       };
     }
     res.json(states);
@@ -42,79 +64,100 @@ export default function initializeMotionRoutes(
 
   // --- Get or set motion pause state ---
   app.get('/api/motion-pause', jwtAuth, (_, res) => {
-    res.json(Object.fromEntries(Object.entries(streamStates).map(([streamId, state]) => [streamId, state.motionPaused])));
+    res.json(
+      Object.fromEntries(
+        Object.entries(streamStates).map(([streamId, state]) => [
+          streamId,
+          state.motionPaused,
+        ]),
+      ),
+    );
   });
 
-  app.post('/api/motion-pause/:streamId', jwtAuth, express.json(), async (req, res) => {
-    const { streamId } = req.params;
-    const state = streamStates[streamId];
-    if (!state) { res.status(404).json({ paused: false }); return; }
-
-    state.motionPaused = !!req.body.paused;
-    clearMotionHistory(streamId); // <-- clear motion/movement history
-    await persistStreamState(streamId); // <-- persist to DB
-
-    const { nickname } = await prisma.stream.findUnique({
-      where: { id: streamId },
-      select: { nickname: true }
-    }) || { nickname: dynamicStreams[streamId].config.ffmpegInput };
-
-    if (state.motionPaused) {
-      if (state.motionRecordingActive) {
-        if (state.motionTimeout) {
-          clearTimeout(state.motionTimeout);
-          state.motionTimeout = undefined;
-        }
-        if (state.flushTimer) {
-          clearInterval(state.flushTimer);
-          state.flushTimer = undefined;
-        }
-
-        if (state.flushingSegments.length > 0) {
-          // Wait for flush to complete before pausing
-          state.cancelFlush = true;
-          const waitForFlush = new Promise<void>(resolveFlush => {
-            const checkFlush = setInterval(() => {
-              if (state.flushingSegments.length === 0 && !state.savingInProgress) {
-                clearInterval(checkFlush);
-                resolveFlush();
-              }
-            }, 1000);
-          });
-          await waitForFlush;
-        }
-
-        if (!state.savingInProgress && !state.currentSaveProcess) {
-          // Save any pending segments before pausing
-          if (state.motionSegments.length > 0 || state.flushRecordings.length > 0) {
-            saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId)
-          }
-        }
-
-        // Pause motion recording
-        state.motionRecordingActive = false;
-        state.motionRecordingTimeoutAt = 0;
+  app.post(
+    '/api/motion-pause/:streamId',
+    jwtAuth,
+    express.json(),
+    async (req, res) => {
+      const { streamId } = req.params;
+      const state = streamStates[streamId];
+      if (!state) {
+        res.status(404).json({ paused: false });
+        return;
       }
 
-      await notify(dynamicStreams, streamId, {
-        title: 'Motion Recording Paused',
-        body: `Motion recording has been paused for ${nickname}.`,
-        channelId: 'motion_event_low_channel',
-        tag: `motion_pause_${streamId}`,
-        group: `motion_pause_${streamId}`
-      });
-    } else {
-      await notify(dynamicStreams, streamId, {
-        title: 'Motion Recording Resumed',
-        body: `Motion recording has been resumed for ${nickname}.`,
-        channelId: 'motion_event_low_channel',
-        tag: `motion_pause_${streamId}`,
-        group: `motion_resume_${streamId}`
-      });
-    }
+      state.motionPaused = !!req.body.paused;
+      clearMotionHistory(streamId); // <-- clear motion/movement history
+      await persistStreamState(streamId); // <-- persist to DB
 
-    res.json({ paused: state.motionPaused });
-  });
+      const { nickname } = (await prisma.stream.findUnique({
+        where: { id: streamId },
+        select: { nickname: true },
+      })) || { nickname: dynamicStreams[streamId].config.ffmpegInput };
+
+      if (state.motionPaused) {
+        if (state.motionRecordingActive) {
+          if (state.motionTimeout) {
+            clearTimeout(state.motionTimeout);
+            state.motionTimeout = undefined;
+          }
+          if (state.flushTimer) {
+            clearInterval(state.flushTimer);
+            state.flushTimer = undefined;
+          }
+
+          if (state.flushingSegments.length > 0) {
+            // Wait for flush to complete before pausing
+            state.cancelFlush = true;
+            const waitForFlush = new Promise<void>((resolveFlush) => {
+              const checkFlush = setInterval(() => {
+                if (
+                  state.flushingSegments.length === 0 &&
+                  !state.savingInProgress
+                ) {
+                  clearInterval(checkFlush);
+                  resolveFlush();
+                }
+              }, 1000);
+            });
+            await waitForFlush;
+          }
+
+          if (!state.savingInProgress && !state.currentSaveProcess) {
+            // Save any pending segments before pausing
+            if (
+              state.motionSegments.length > 0 ||
+              state.flushRecordings.length > 0
+            ) {
+              saveMotionSegmentsCamera(streamId);
+            }
+          }
+
+          // Pause motion recording
+          state.motionRecordingActive = false;
+          state.motionRecordingTimeoutAt = 0;
+        }
+
+        await notify(dynamicStreams, streamId, {
+          title: 'Motion Recording Paused',
+          body: `Motion recording has been paused for ${nickname}.`,
+          channelId: 'motion_event_low_channel',
+          tag: `motion_pause_${streamId}`,
+          group: `motion_pause_${streamId}`,
+        });
+      } else {
+        await notify(dynamicStreams, streamId, {
+          title: 'Motion Recording Resumed',
+          body: `Motion recording has been resumed for ${nickname}.`,
+          channelId: 'motion_event_low_channel',
+          tag: `motion_pause_${streamId}`,
+          group: `motion_resume_${streamId}`,
+        });
+      }
+
+      res.json({ paused: state.motionPaused });
+    },
+  );
 }
 
 // Enhanced save function with retry logic
@@ -122,7 +165,7 @@ export async function saveMotionSegmentsWithRetry(
   streamStates: Record<string, StreamMotionState>,
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
-  retryAttempt: number = 0
+  retryAttempt: number = 0,
 ): Promise<void> {
   const state = streamStates[streamId];
   const maxRetries = 2;
@@ -131,17 +174,28 @@ export async function saveMotionSegmentsWithRetry(
     await saveMotionSegments(streamStates, dynamicStreams, streamId);
     state.saveRetryCount = 0; // Reset retry count on success
   } catch (error) {
-    logMotion(`[${streamId}] Motion save attempt ${retryAttempt + 1} failed: ${error}`);
+    logMotion(
+      `[${streamId}] Motion save attempt ${retryAttempt + 1} failed: ${error}`,
+    );
 
     if (retryAttempt < maxRetries) {
       const delay = Math.min(1000 * Math.pow(2, retryAttempt), 5000); // Exponential backoff, max 5 seconds
-      logMotion(`[${streamId}] Retrying save in ${delay}ms (attempt ${retryAttempt + 2}/${maxRetries + 1})`);
+      logMotion(
+        `[${streamId}] Retrying save in ${delay}ms (attempt ${retryAttempt + 2}/${maxRetries + 1})`,
+      );
 
       setTimeout(() => {
-        saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId, retryAttempt + 1);
+        saveMotionSegmentsWithRetry(
+          streamStates,
+          dynamicStreams,
+          streamId,
+          retryAttempt + 1,
+        );
       }, delay);
     } else {
-      logMotion(`[${streamId}] Failed to save motion segments after ${maxRetries + 1} attempts, giving up`);
+      logMotion(
+        `[${streamId}] Failed to save motion segments after ${maxRetries + 1} attempts, giving up`,
+      );
       // Reset state even on failure
       state.savingInProgress = false;
       state.currentSaveProcess = null;
@@ -156,7 +210,7 @@ export async function flushMotionSegmentsWithRetry(
   streamStates: Record<string, StreamMotionState>,
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
-  retryAttempt: number = 0
+  retryAttempt: number = 0,
 ): Promise<void> {
   const state = streamStates[streamId];
   const maxRetries = 2;
@@ -165,16 +219,27 @@ export async function flushMotionSegmentsWithRetry(
     await flushMotionSegments(streamStates, dynamicStreams, streamId);
     state.saveRetryCount = 0;
   } catch (error) {
-    logMotion(`[${streamId}] Motion flush attempt ${retryAttempt + 1} failed: ${error}`);
+    logMotion(
+      `[${streamId}] Motion flush attempt ${retryAttempt + 1} failed: ${error}`,
+    );
 
     if (retryAttempt < maxRetries) {
       const delay = Math.min(1000 * Math.pow(2, retryAttempt), 5000);
-      logMotion(`[${streamId}] Retrying flush in ${delay}ms (attempt ${retryAttempt + 2}/${maxRetries + 1})`);
+      logMotion(
+        `[${streamId}] Retrying flush in ${delay}ms (attempt ${retryAttempt + 2}/${maxRetries + 1})`,
+      );
       setTimeout(() => {
-        flushMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId, retryAttempt + 1);
+        flushMotionSegmentsWithRetry(
+          streamStates,
+          dynamicStreams,
+          streamId,
+          retryAttempt + 1,
+        );
       }, delay);
     } else {
-      logMotion(`[${streamId}] Failed to flush motion segments after ${maxRetries + 1} attempts, giving up`);
+      logMotion(
+        `[${streamId}] Failed to flush motion segments after ${maxRetries + 1} attempts, giving up`,
+      );
       state.saveRetryCount = 0;
       state.motionSegments = [];
     }
@@ -188,12 +253,16 @@ async function getFreeBytesForPath(dir: string): Promise<number> {
     if (platform === 'win32') {
       try {
         const root = path.parse(path.resolve(dir)).root.replace(/\\/g, ''); // e.g. C:
-        exec(`wmic logicaldisk where "DeviceID='${root}'" get FreeSpace /value`, { windowsHide: true }, (err, stdout) => {
-          if (err || !stdout) return resolve(0);
-          const m = stdout.match(/FreeSpace=(\d+)/);
-          if (!m) return resolve(0);
-          resolve(Number(m[1]));
-        });
+        exec(
+          `wmic logicaldisk where "DeviceID='${root}'" get FreeSpace /value`,
+          { windowsHide: true },
+          (err, stdout) => {
+            if (err || !stdout) return resolve(0);
+            const m = stdout.match(/FreeSpace=(\d+)/);
+            if (!m) return resolve(0);
+            resolve(Number(m[1]));
+          },
+        );
       } catch {
         resolve(0);
       }
@@ -222,7 +291,7 @@ function thresholdBytes(): number {
 export async function checkDiskSpaceAndPurge(
   streamStates: Record<string, StreamMotionState>,
   dynamicStreams: Record<string, StreamManager>,
-  streamId: string
+  streamId: string,
 ): Promise<boolean> {
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
@@ -235,13 +304,16 @@ export async function checkDiskSpaceAndPurge(
     // notify once per stream
     if (!state.lowSpaceNotified) {
       state.lowSpaceNotified = true;
-      logMotion(`[${streamId}] Low disk space detected (${Math.round(free / (1024*1024))}MB) - purging motion segments and pausing saving`, 'warn');
+      logMotion(
+        `[${streamId}] Low disk space detected (${Math.round(free / (1024 * 1024))}MB) - purging motion segments and pausing saving`,
+        'warn',
+      );
       await notify(dynamicStreams, streamId, {
         title: 'Low Disk Space - Motion Saving Paused',
-        body: `Host low on disk space (${Math.round(free / (1024*1024))}MB). Motion segments will be deleted instead of saved.`,
+        body: `Host low on disk space (${Math.round(free / (1024 * 1024))}MB). Motion segments will be deleted instead of saved.`,
         channelId: 'motion_event_low_channel',
         tag: `low_space_${streamId}`,
-        group: `low_space_${streamId}`
+        group: `low_space_${streamId}`,
       });
     }
 
@@ -250,7 +322,7 @@ export async function checkDiskSpaceAndPurge(
       const toDelete: string[] = [
         ...state.motionSegments,
         ...state.flushedSegments,
-        ...state.flushRecordings
+        ...state.flushRecordings,
       ].filter(Boolean);
       // clear arrays first so other logic doesn't try to use them
       state.motionSegments = [];
@@ -258,9 +330,11 @@ export async function checkDiskSpaceAndPurge(
       state.flushRecordings = [];
       state.savingInProgress = false;
       if (state.currentSaveProcess) {
-        try { state.currentSaveProcess.kill('SIGTERM'); } catch {
+        try {
+          state.currentSaveProcess.kill('SIGTERM');
+        } catch {
           // ignore failure to kill save process
-         }
+        }
         state.currentSaveProcess = null;
       }
       for (const p of toDelete) {
@@ -281,13 +355,17 @@ export async function checkDiskSpaceAndPurge(
 async function flushMotionSegments(
   streamStates: Record<string, StreamMotionState>,
   dynamicStreams: Record<string, StreamManager>,
-  streamId: string
+  streamId: string,
 ): Promise<void> {
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
 
   // Check disk space and purge if low - do not attempt to flush when low
-  const low = await checkDiskSpaceAndPurge(streamStates, dynamicStreams, streamId);
+  const low = await checkDiskSpaceAndPurge(
+    streamStates,
+    dynamicStreams,
+    streamId,
+  );
   if (low) {
     logMotion(`[${streamId}] Skipping flush due to low disk space`);
     return;
@@ -314,22 +392,43 @@ async function flushMotionSegments(
   state.motionSegments = [];
 
   const flushNumber = state.nextFlushNumber++;
-  const existingSegmentsPromises = state.flushingSegments.map(async segmentPath => {
-    return { segmentPath, exists: await fs.promises.access(segmentPath).then(() => true).catch(() => false) };
-  });
+  const existingSegmentsPromises = state.flushingSegments.map(
+    async (segmentPath) => {
+      return {
+        segmentPath,
+        exists: await fs.promises
+          .access(segmentPath)
+          .then(() => true)
+          .catch(() => false),
+      };
+    },
+  );
   const existingSegments = (await Promise.all(existingSegmentsPromises))
-    .filter(seg => seg.exists)
-    .sort((a, b) => path.basename(a.segmentPath).localeCompare(path.basename(b.segmentPath)));
+    .filter((seg) => seg.exists)
+    .sort((a, b) =>
+      path.basename(a.segmentPath).localeCompare(path.basename(b.segmentPath)),
+    );
 
   if (existingSegments.length === 0) {
     logMotion(`[${streamId}] No existing segments to flush`);
     return;
   }
 
-  const listFile = path.join(stream.config.flushDir, `concat_list_flush_${flushNumber}.txt`);
-  const flushOutFile = path.join(stream.config.flushDir, `${state.recordingTitle}_flush_${flushNumber}.ts`);
+  const listFile = path.join(
+    stream.config.flushDir,
+    `concat_list_flush_${flushNumber}.txt`,
+  );
+  const flushOutFile = path.join(
+    stream.config.flushDir,
+    `${state.recordingTitle}_flush_${flushNumber}.ts`,
+  );
 
-  await fs.promises.writeFile(listFile, existingSegments.map(seg => `file '${seg.segmentPath.replace(/\\/g, '/')}'`).join('\n'));
+  await fs.promises.writeFile(
+    listFile,
+    existingSegments
+      .map((seg) => `file '${seg.segmentPath.replace(/\\/g, '/')}'`)
+      .join('\n'),
+  );
 
   const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${flushOutFile}"`;
 
@@ -341,7 +440,9 @@ async function flushMotionSegments(
     return;
   }
 
-  logMotion(`[${streamId}] Flushing ${existingSegments.length} segments to ${path.basename(flushOutFile)}`);
+  logMotion(
+    `[${streamId}] Flushing ${existingSegments.length} segments to ${path.basename(flushOutFile)}`,
+  );
 
   await new Promise<void>((resolve, reject) => {
     exec(ffmpegConcatCmd, async (err) => {
@@ -355,9 +456,12 @@ async function flushMotionSegments(
         return;
       }
       // Remove flushed segments except recent ones
-      const promises = state.flushingSegments.map(segment => {
+      const promises = state.flushingSegments.map((segment) => {
         state.flushedSegments.push(segment);
-        if (!state.recentSegments.includes(segment) && !state.motionSegments.includes(segment)) {
+        if (
+          !state.recentSegments.includes(segment) &&
+          !state.motionSegments.includes(segment)
+        ) {
           return safeUnlinkWithRetry(segment);
         }
       });
@@ -374,13 +478,17 @@ async function flushMotionSegments(
 async function saveMotionSegments(
   streamStates: Record<string, StreamMotionState>,
   dynamicStreams: Record<string, StreamManager>,
-  streamId: string
+  streamId: string,
 ): Promise<void> {
   const state = streamStates[streamId];
   const stream = dynamicStreams[streamId];
 
   // If low disk space, purge and skip save
-  const low = await checkDiskSpaceAndPurge(streamStates, dynamicStreams, streamId);
+  const low = await checkDiskSpaceAndPurge(
+    streamStates,
+    dynamicStreams,
+    streamId,
+  );
   if (low) {
     logMotion(`[${streamId}] Skipping save due to low disk space`);
     // ensure state cleaned
@@ -393,15 +501,26 @@ async function saveMotionSegments(
   }
 
   if (state.savingInProgress) {
-    logMotion(`[${streamId}] Save operation already in progress, rescheduling`, 'warn');
-    setTimeout(() => saveMotionSegments(streamStates, dynamicStreams, streamId), 1000);
+    logMotion(
+      `[${streamId}] Save operation already in progress, rescheduling`,
+      'warn',
+    );
+    setTimeout(
+      () => saveMotionSegments(streamStates, dynamicStreams, streamId),
+      1000,
+    );
     return;
   }
 
   if (state.flushingSegments.length > 0) {
-    console.warn(`[${streamId}] Flush and save operations called simultaneously, cancelling flush and rescheduling save`);
+    console.warn(
+      `[${streamId}] Flush and save operations called simultaneously, cancelling flush and rescheduling save`,
+    );
     state.cancelFlush = true;
-    setTimeout(() => saveMotionSegments(streamStates, dynamicStreams, streamId), 1000);
+    setTimeout(
+      () => saveMotionSegments(streamStates, dynamicStreams, streamId),
+      1000,
+    );
     return;
   }
 
@@ -409,30 +528,47 @@ async function saveMotionSegments(
 
   // Gather flushed recordings
   const flushedFiles = [...new Set(state.flushRecordings)];
-  const existingFlushedPromises = flushedFiles.sort((a, b) => {
-    const getNum = (fname: string) => parseInt(fname.match(/_flush_(\d+)\.ts$/)?.[1] || '0', 10);
-    return getNum(a) - getNum(b);
-  }).map(async filePath => {
-    return { filePath, exists: await fs.promises.access(filePath).then(() => true).catch(() => false) };
-  });
+  const existingFlushedPromises = flushedFiles
+    .sort((a, b) => {
+      const getNum = (fname: string) =>
+        parseInt(fname.match(/_flush_(\d+)\.ts$/)?.[1] || '0', 10);
+      return getNum(a) - getNum(b);
+    })
+    .map(async (filePath) => {
+      return {
+        filePath,
+        exists: await fs.promises
+          .access(filePath)
+          .then(() => true)
+          .catch(() => false),
+      };
+    });
   const existingFlushedFiles = (await Promise.all(existingFlushedPromises))
-    .filter(f => f.exists)
-    .map(f => f.filePath);
+    .filter((f) => f.exists)
+    .map((f) => f.filePath);
 
   // Gather unflushed segments
   const uniqueSegments = [...new Set(state.motionSegments)];
-  const existingSegmentsPromises = uniqueSegments.map(async segmentPath => {
-    return { segmentPath, exists: await fs.promises.access(segmentPath).then(() => true).catch(() => false) };
+  const existingSegmentsPromises = uniqueSegments.map(async (segmentPath) => {
+    return {
+      segmentPath,
+      exists: await fs.promises
+        .access(segmentPath)
+        .then(() => true)
+        .catch(() => false),
+    };
   });
   const existingSegments = (await Promise.all(existingSegmentsPromises))
-    .filter(seg => seg.exists)
-    .sort((a, b) => path.basename(a.segmentPath).localeCompare(path.basename(b.segmentPath)))
-    .map(seg => seg.segmentPath);
+    .filter((seg) => seg.exists)
+    .sort((a, b) =>
+      path.basename(a.segmentPath).localeCompare(path.basename(b.segmentPath)),
+    )
+    .map((seg) => seg.segmentPath);
 
   // Build concat list: flushed files first, then remaining segments
   const concatList: string[] = [
-    ...existingFlushedFiles.map(f => `file '${f.replace(/\\/g, '/')}'`),
-    ...existingSegments.map(seg => `file '${seg.replace(/\\/g, '/')}'`)
+    ...existingFlushedFiles.map((f) => `file '${f.replace(/\\/g, '/')}'`),
+    ...existingSegments.map((seg) => `file '${seg.replace(/\\/g, '/')}'`),
   ];
 
   if (concatList.length === 0) {
@@ -447,11 +583,17 @@ async function saveMotionSegments(
   await fs.promises.writeFile(listFile, concatList.join('\n'));
 
   const outFile = path.join(stream.config.recordDir, state.recordingTitle);
-  const thumbFile = path.join(stream.config.thumbDir, path.basename(outFile).replace(/\.mp4$/, '.jpg'));
+  const thumbFile = path.join(
+    stream.config.thumbDir,
+    path.basename(outFile).replace(/\.mp4$/, '.jpg'),
+  );
   const ffmpegConcatCmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outFile}"`;
 
-  logMotion(`[${streamId}] Saving ${concatList.length} items (${existingFlushedFiles.length
-    } flushed + ${existingSegments.length} segments) to ${path.basename(outFile)}`);
+  logMotion(
+    `[${streamId}] Saving ${concatList.length} items (${
+      existingFlushedFiles.length
+    } flushed + ${existingSegments.length} segments) to ${path.basename(outFile)}`,
+  );
 
   return new Promise<void>((resolve) => {
     const ffmpegProcess = exec(ffmpegConcatCmd, async (err) => {
@@ -481,53 +623,63 @@ async function saveMotionSegments(
 
       // Generate thumbnail
       const seek = 7;
-      const thumbProcess = exec(`ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 -update 1 "${thumbFile}"`, async () => {
-        // Clean up segments and flushed files
-        const promises = [
-          state.flushedSegments.concat(existingSegments).map(segment => {
-            if (!state.recentSegments.includes(segment)) {
-              return safeUnlinkWithRetry(segment);
-            }
-          }),
-          ...existingFlushedFiles.map(f => safeUnlinkWithRetry(f)),
-          safeUnlinkWithRetry(listFile)
-        ];
-        await Promise.all(promises);
+      const thumbProcess = exec(
+        `ffmpeg -y -i "${outFile}" -ss ${seek.toFixed(2)} -vframes 1 -update 1 "${thumbFile}"`,
+        async () => {
+          // Clean up segments and flushed files
+          const promises = [
+            state.flushedSegments.concat(existingSegments).map((segment) => {
+              if (!state.recentSegments.includes(segment)) {
+                return safeUnlinkWithRetry(segment);
+              }
+            }),
+            ...existingFlushedFiles.map((f) => safeUnlinkWithRetry(f)),
+            safeUnlinkWithRetry(listFile),
+          ];
+          await Promise.all(promises);
 
-        logMotion(`[${streamId}] Cleared flushDir and saved segments`);
-        state.motionSegments = [];
-        state.flushRecordings = [];
-        state.flushedSegments = [];
-        state.nextFlushNumber = 1;
-        state.notificationSent = false;
-        state.startedRecordingAt = 0;
-        state.savingInProgress = false;
-        state.currentSaveProcess = null;
+          logMotion(`[${streamId}] Cleared flushDir and saved segments`);
+          state.motionSegments = [];
+          state.flushRecordings = [];
+          state.flushedSegments = [];
+          state.nextFlushNumber = 1;
+          state.notificationSent = false;
+          state.startedRecordingAt = 0;
+          state.savingInProgress = false;
+          state.currentSaveProcess = null;
 
-        // Save to DB as before...
-        try {
-          const duration = await getVideoDuration(outFile);
-          const filename = path.basename(outFile);
-          const recordedAt = filename.match(/(\d{4}-\d{2}-\d{2})T/)?.[1] || new Date().toISOString().slice(0, 10);
+          // Save to DB as before...
+          try {
+            const duration = await getVideoDuration(outFile);
+            const filename = path.basename(outFile);
+            const recordedAt =
+              filename.match(/(\d{4}-\d{2}-\d{2})T/)?.[1] ||
+              new Date().toISOString().slice(0, 10);
 
-          await prisma.motionRecording.upsert({
-            where: { streamId_filename: { streamId, filename } },
-            update: { duration, updatedAt: new Date() },
-            create: {
-              streamId,
-              filename,
-              duration,
-              recordedAt,
-              updatedAt: new Date(),
-            }
-          });
+            await prisma.motionRecording.upsert({
+              where: { streamId_filename: { streamId, filename } },
+              update: { duration, updatedAt: new Date() },
+              create: {
+                streamId,
+                filename,
+                duration,
+                recordedAt,
+                updatedAt: new Date(),
+              },
+            });
 
-          logMotion(`[${streamId}] Successfully saved ${filename} (${duration}s, ${concatList.length} items)`);
-        } catch (e) {
-          logMotion(`[${streamId}] Failed to upsert MotionRecording: ${e}`, 'error');
-        }
-        resolve();
-      });
+            logMotion(
+              `[${streamId}] Successfully saved ${filename} (${duration}s, ${concatList.length} items)`,
+            );
+          } catch (e) {
+            logMotion(
+              `[${streamId}] Failed to upsert MotionRecording: ${e}`,
+              'error',
+            );
+          }
+          resolve();
+        },
+      );
 
       thumbProcess.on('exit', () => {
         state.currentSaveProcess = null;

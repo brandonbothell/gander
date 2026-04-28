@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { exec, spawn } from 'child_process';
 import {
+  saveMotionSegments,
   setupStreamMotionMonitoring,
   stopStreamMotionMonitoring,
   StreamMotionState,
@@ -27,6 +28,7 @@ export class StreamManager {
   private segmentMonitorTimer: NodeJS.Timeout | null = null;
   private lastSegmentTimestamp: number = Date.now();
   private segmentCount: number = 0;
+  private recentSegmentGaps: number[] = [];
   private restartInProgress = false;
   private state: StreamMotionState;
   private lastRestartTimestamp = 0;
@@ -452,7 +454,7 @@ export class StreamManager {
     }, 5000);
 
     ffmpegProcess.on('exit', (code, signal) => {
-      if (this.ffmpeg !== ffmpegProcess) return;
+      if (this.ffmpeg?.pid !== ffmpegProcess.pid) return;
       this.ffmpeg = null;
       logMotion(
         `[${this.config.id}] FFmpeg exited with code ${code} and signal ${signal} (${this.segmentCount} segments created)`,
@@ -527,6 +529,19 @@ export class StreamManager {
           logMotion(
             `[${this.config.id}] Segment gap: ${timeSinceLastSegment}ms (possible stutter)`,
           );
+
+          this.recentSegmentGaps.push(now);
+          const stillRecentGapIndex = this.recentSegmentGaps.findIndex(
+            (t) => t > now - 30000,
+          ); // 30 seconds
+          this.recentSegmentGaps =
+            this.recentSegmentGaps.slice(stillRecentGapIndex);
+          if (this.recentSegmentGaps.length >= 5) {
+            logMotion(
+              `[${this.config.id}] 5 or more segment gaps in 30 seconds, reconnecting...`,
+            );
+            this.reconnect();
+          }
         }
       }
       // --- Error handling ---
@@ -591,6 +606,37 @@ export class StreamManager {
       clearInterval(this.segmentMonitorTimer);
       this.segmentMonitorTimer = null;
     }
+
+    if (this.state?.motionTimeout) clearTimeout(this.state.motionTimeout);
+
+    // Cancel any ongoing save operations
+    if (this.state?.savingInProgress && this.state.currentSaveProcess) {
+      console.log(`[${streamId}] [reconnect] Canceling ongoing save operation`);
+      this.state.currentSaveProcess.kill('SIGTERM');
+    }
+
+    // Save any pending segments BEFORE stopping FFmpeg and cleaning directories
+    if (
+      this.state?.motionSegments.length > 0 ||
+      this.state.flushRecordings.length > 0
+    ) {
+      logMotion(
+        `[${streamId}] [reconnect] Saving ${this.state.motionSegments.length || this.state.flushRecordings.length} pending segments/flush recordings`,
+      );
+      try {
+        await saveMotionSegments(streamId);
+      } catch (error) {
+        console.error(
+          `[${streamId}] [reconnect] Failed to save pending segments:`,
+          error,
+        );
+        logMotion(
+          `[${streamId}] [reconnect] Failed to save pending segments: ${JSON.stringify(error, null, 2)}`,
+          'error',
+        );
+      }
+    }
+
     try {
       stopStreamMotionMonitoring(streamId);
       logMotion(`[${streamId}] Stopped stream motion monitoring`);
@@ -631,7 +677,9 @@ export class StreamManager {
                     try {
                       process.kill(Number(pid), 'SIGKILL');
                     } catch {
-                      // Ignore failure to kill ffmpeg process
+                      logMotion(
+                        `[${streamId}] Found no stray ffmpeg processes, continuing.`,
+                      );
                     }
                   }
                 }
@@ -659,7 +707,9 @@ export class StreamManager {
                   try {
                     process.kill(Number(pid), 'SIGKILL');
                   } catch {
-                    // Ignore failure to kill ffmpeg process
+                    logMotion(
+                      `[${streamId}] Found no stray ffmpeg processes, continuing.`,
+                    );
                   }
                 }
               }
