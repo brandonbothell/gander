@@ -501,115 +501,120 @@ export default function StreamPage({
       recordings: Recording[],
       startIndex: number,
       filtered: Recording[],
-      requestId: number
+      requestId: number,
     ) => {
-    // Check if this request was cancelled
-    if (requestId !== lastSearchRequestId.current) {
-      return; // Request was cancelled, stop processing
-    }
-
-    const CHUNK_SIZE = 500;
-    const endIndex = Math.min(startIndex + CHUNK_SIZE, recordings.length);
-
-    // Pre-process search term once
-    const searchLower =
-      search && search.length >= 2 ? search.toLowerCase() : null;
-
-    for (let i = startIndex; i < endIndex; i++) {
-      const rec = recordings[i];
-      const nickname = nicknames[rec.filename];
-
-      // 1. Nicknamed filter - check this FIRST
-      if (isNicknamedOnly && (!nickname || nickname.trim() === '')) {
-        continue;
+      // Check if this request was cancelled
+      if (requestId !== lastSearchRequestId.current) {
+        return; // Request was cancelled, stop processing
       }
 
-      // 2. Search filter (only if 2+ characters)
-      if (searchLower) {
-        const hasNicknameMatch =
-          nickname && nickname.toLowerCase().includes(searchLower);
-        const hasFilenameMatch = rec.filename
-          .toLowerCase()
-          .includes(searchLower);
+      const CHUNK_SIZE = 500;
+      const endIndex = Math.min(startIndex + CHUNK_SIZE, recordings.length);
 
-        // Skip if NEITHER nickname NOR filename matches
-        if (!hasNicknameMatch && !hasFilenameMatch) {
+      // Pre-process search term once
+      const searchLower =
+        search && search.length >= 2 ? search.toLowerCase() : null;
+
+      for (let i = startIndex; i < endIndex; i++) {
+        const rec = recordings[i];
+        const nickname = nicknames[rec.filename];
+
+        // 1. Nicknamed filter - check this FIRST
+        if (isNicknamedOnly && (!nickname || nickname.trim() === '')) {
           continue;
         }
-      }
 
-      // 3. Date range filter
-      if (dateRange.from || dateRange.to) {
-        const match = rec.filename.match(/motion_(.+)\.mp4/);
-        if (match) {
-          const formattedFileDate = match[1].replace(
-            /T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/,
-            (_m, h, m2, s, ms) => `T${h}:${m2}:${s}.${ms}Z`,
-          );
+        // 2. Search filter (only if 2+ characters)
+        if (searchLower) {
+          const hasNicknameMatch =
+            nickname && nickname.toLowerCase().includes(searchLower);
+          const hasFilenameMatch = rec.filename
+            .toLowerCase()
+            .includes(searchLower);
 
-          try {
-            const fileDateObj = new Date(formattedFileDate);
-            const fileDateLocal = getLocalDateString(fileDateObj);
-
-            if (
-              dateRange.from &&
-              /^\d{4}-\d{2}-\d{2}$/.test(dateRange.from) &&
-              fileDateLocal < dateRange.from
-            )
-              continue;
-            if (
-              dateRange.to &&
-              /^\d{4}-\d{2}-\d{2}$/.test(dateRange.to) &&
-              fileDateLocal > dateRange.to
-            )
-              continue;
-          } catch (_dateError) {
-            // If date parsing fails, exclude the recording
+          // Skip if NEITHER nickname NOR filename matches
+          if (!hasNicknameMatch && !hasFilenameMatch) {
             continue;
           }
         }
+
+        // 3. Date range filter
+        if (dateRange.from || dateRange.to) {
+          const match = rec.filename.match(/motion_(.+)\.mp4/);
+          if (match) {
+            const formattedFileDate = match[1].replace(
+              /T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/,
+              (_m, h, m2, s, ms) => `T${h}:${m2}:${s}.${ms}Z`,
+            );
+
+            try {
+              const fileDateObj = new Date(formattedFileDate);
+              const fileDateLocal = getLocalDateString(fileDateObj);
+
+              if (
+                dateRange.from &&
+                /^\d{4}-\d{2}-\d{2}$/.test(dateRange.from) &&
+                fileDateLocal < dateRange.from
+              )
+                continue;
+              if (
+                dateRange.to &&
+                /^\d{4}-\d{2}-\d{2}$/.test(dateRange.to) &&
+                fileDateLocal > dateRange.to
+              )
+                continue;
+            } catch (_dateError) {
+              // If date parsing fails, exclude the recording
+              continue;
+            }
+          }
+        }
+
+        filtered.push(rec);
       }
 
-      filtered.push(rec);
-    }
+      if (endIndex < recordings.length) {
+        // More chunks to process
+        if ('requestIdleCallback' in window) {
+          window.requestIdleCallback(() => {
+            processSearchChunk(recordings, endIndex, filtered, requestId);
+          });
+        } else {
+          setTimeout(() => {
+            processSearchChunk(recordings, endIndex, filtered, requestId);
+          }, 0);
+        }
+      } else {
+        // Check one final time before setting results
+        if (requestId !== lastSearchRequestId.current) {
+          return; // Request was cancelled
+        }
 
-    if (endIndex < recordings.length) {
-      // More chunks to process
+        // Finished processing
+        filtered.sort((a, b) => b.filename.localeCompare(a.filename));
+        setFilteredRecordingsCache(filtered);
+        setIsSearching(false);
+      }
+    },
+    [dateRange.from, dateRange.to, isNicknamedOnly, nicknames, search],
+  );
+
+  // Update the performSearchSync function to accept and check request ID:
+  const performSearchSync = useCallback(
+    (recordings: Recording[], requestId: number) => {
+      // Use requestIdleCallback or setTimeout to chunk the work
       if ('requestIdleCallback' in window) {
         window.requestIdleCallback(() => {
-          processSearchChunk(recordings, endIndex, filtered, requestId);
+          processSearchChunk(recordings, 0, [], requestId);
         });
       } else {
         setTimeout(() => {
-          processSearchChunk(recordings, endIndex, filtered, requestId);
+          processSearchChunk(recordings, 0, [], requestId);
         }, 0);
       }
-    } else {
-      // Check one final time before setting results
-      if (requestId !== lastSearchRequestId.current) {
-        return; // Request was cancelled
-      }
-
-      // Finished processing
-      filtered.sort((a, b) => b.filename.localeCompare(a.filename));
-      setFilteredRecordingsCache(filtered);
-      setIsSearching(false);
-    }
-  }, [dateRange.from, dateRange.to, isNicknamedOnly, nicknames, search]);
-
-  // Update the performSearchSync function to accept and check request ID:
-  const performSearchSync = useCallback((recordings: Recording[], requestId: number) => {
-    // Use requestIdleCallback or setTimeout to chunk the work
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(() => {
-        processSearchChunk(recordings, 0, [], requestId);
-      });
-    } else {
-      setTimeout(() => {
-        processSearchChunk(recordings, 0, [], requestId);
-      }, 0);
-    }
-  }, [processSearchChunk]);
+    },
+    [processSearchChunk],
+  );
 
   // Clean up the search effect:
   useEffect(() => {
@@ -689,7 +694,18 @@ export default function StreamPage({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [search, isNicknamedOnly, dateRange, cachedRecordings, nicknames, activeStream, deletedRecordings, viewingRecordingsFrom, filterUpdatesBlocked, performSearchSync]);
+  }, [
+    search,
+    isNicknamedOnly,
+    dateRange,
+    cachedRecordings,
+    nicknames,
+    activeStream,
+    deletedRecordings,
+    viewingRecordingsFrom,
+    filterUpdatesBlocked,
+    performSearchSync,
+  ]);
 
   // Also add a separate effect to clear search state when stream changes:
   useEffect(() => {
@@ -1051,7 +1067,7 @@ export default function StreamPage({
       // setIsLoadingStream(false);
       setLoading(false);
     }, 100);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStream]);
 
   // Also update the cleanup effect to be more thorough
@@ -1176,12 +1192,20 @@ export default function StreamPage({
   useEffect(() => {
     // Make autoScrollUntilRef available globally for SearchTools to access
     if (typeof window !== 'undefined') {
-      (window as typeof window & { autoScrollUntilRef?: React.RefObject<number> }).autoScrollUntilRef = autoScrollUntilRef;
+      (
+        window as typeof window & {
+          autoScrollUntilRef?: React.RefObject<number>;
+        }
+      ).autoScrollUntilRef = autoScrollUntilRef;
     }
 
     return () => {
       if (typeof window !== 'undefined') {
-        delete (window as typeof window & { autoScrollUntilRef?: React.RefObject<number> }).autoScrollUntilRef;
+        delete (
+          window as typeof window & {
+            autoScrollUntilRef?: React.RefObject<number>;
+          }
+        ).autoScrollUntilRef;
       }
     };
   }, []);
@@ -1198,10 +1222,12 @@ export default function StreamPage({
       );
       if (!res.ok) return;
       const data = await res.json();
-      const newRecs: Recording[] = (data.recordings || []).map((rec: Recording) => ({
-        filename: rec.filename,
-        streamId: stream.id,
-      }));
+      const newRecs: Recording[] = (data.recordings || []).map(
+        (rec: Recording) => ({
+          filename: rec.filename,
+          streamId: stream.id,
+        }),
+      );
 
       // Handle deleted recordings from server
       if (data.deletedRecordings && Array.isArray(data.deletedRecordings)) {
@@ -1747,7 +1773,7 @@ export default function StreamPage({
     setReachedLastSeen(!recordingsStream); // reachedLastSeen is false if activeStream is set, true if not
     // Fetch the first page of recordings
     if (recordingsStream) loadPage(recordingsStream, 1, true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStream, viewingRecordingsFrom, loadStream]);
 
   // 1. --- Load stream video on stream change ---
@@ -1825,7 +1851,7 @@ export default function StreamPage({
       if (preCacheTimeout) clearTimeout(preCacheTimeout);
       if (preCacheInterval) clearInterval(preCacheInterval);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     // Only include dependencies that should trigger a restart of the polling
     dateRange.from,
@@ -1974,7 +2000,7 @@ export default function StreamPage({
         `Switched to stream ${activeStream.id} - not recording or no start time`,
       );
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStream]); // Remove motionStatus dependency to only trigger on stream changes
   // Add the playMotionSound function
   const playMotionSound = () => {
@@ -2016,12 +2042,13 @@ export default function StreamPage({
 
     const interval = setInterval(() => {
       const video = videoRef.current;
-      const hls = video?._hls
+      const hls = video?._hls;
 
       if (
         video &&
         hls &&
-        hls.liveSyncPosition !== undefined && hls.liveSyncPosition !== null &&
+        hls.liveSyncPosition !== undefined &&
+        hls.liveSyncPosition !== null &&
         !isVideoPaused
       ) {
         const latency = hls.liveSyncPosition - video.currentTime;
@@ -2385,7 +2412,9 @@ export default function StreamPage({
       // Always fetch if missing or expiring soon
       fetchSignedThumbUrls();
     }, 5000);
-    const windowWithThumbInterval = window as typeof window & { _thumbInterval?: number }
+    const windowWithThumbInterval = window as typeof window & {
+      _thumbInterval?: number;
+    };
     windowWithThumbInterval._thumbInterval = interval;
 
     return () => {
@@ -2574,11 +2603,15 @@ export default function StreamPage({
       };
 
       // Store the handler globally so it can be called from App.tsx
-      (window as typeof window & { handleSessionMonitorClose?: () => void }).handleSessionMonitorClose = handleSessionMonitorClose;
+      (
+        window as typeof window & { handleSessionMonitorClose?: () => void }
+      ).handleSessionMonitorClose = handleSessionMonitorClose;
     }
 
     return () => {
-      delete (window as typeof window & { handleSessionMonitorClose?: () => void }).handleSessionMonitorClose;
+      delete (
+        window as typeof window & { handleSessionMonitorClose?: () => void }
+      ).handleSessionMonitorClose;
     };
   }, [onSessionMonitorClosed, isMobileWidth]);
 
@@ -2931,7 +2964,7 @@ export default function StreamPage({
               setMasks={setMasks}
               authFetch={authFetch}
               API_BASE={API_BASE}
-              pauseMaskPollingUntil={pauseMaskPollingUntil}
+              pauseMaskPollingUntilRef={pauseMaskPollingUntil}
             />
 
             {/* Main stream element with loading state and StreamControlBar */}
@@ -3178,7 +3211,7 @@ export default function StreamPage({
             } catch (err: unknown) {
               console.error('Failed to delete stream:', err);
               alert(
-                `Failed to delete stream: ${ (err as Error)?.message || 'Network error' }`,
+                `Failed to delete stream: ${(err as Error)?.message || 'Network error'}`,
               );
             }
           }}
@@ -3324,10 +3357,13 @@ export default function StreamPage({
         ref={recordingsListRef}
         tabIndex={-1}
         onScroll={() => {
-          const windowWithScrollTimeout = window as typeof window & { _scrollTimeout?: number }
+          const windowWithScrollTimeout = window as typeof window & {
+            _scrollTimeout?: number;
+          };
           setIsRecordingsListScrolling(true);
           // Debounce: set back to false after scrolling stops for 120ms
-          if (windowWithScrollTimeout._scrollTimeout) clearTimeout(windowWithScrollTimeout._scrollTimeout);
+          if (windowWithScrollTimeout._scrollTimeout)
+            clearTimeout(windowWithScrollTimeout._scrollTimeout);
           windowWithScrollTimeout._scrollTimeout = setTimeout(
             () => setIsRecordingsListScrolling(false),
             120,
@@ -3641,7 +3677,7 @@ export default function StreamPage({
           } catch (err: unknown) {
             console.error('Failed to reconnect stream:', err);
             alert(
-              `Failed to reconnect stream: ${ (err as Error)?.message || 'Network error' }`,
+              `Failed to reconnect stream: ${(err as Error)?.message || 'Network error'}`,
             );
           } finally {
             setTimeout(() => setIsLoadingStream(false), 5000);
@@ -3659,7 +3695,11 @@ function seekToLiveEdgeGentle(
   const video = videoRef.current;
   if (!video || video.paused) return;
 
-  if (hls && hls.liveSyncPosition !== undefined && hls.liveSyncPosition !== null) {
+  if (
+    hls &&
+    hls.liveSyncPosition !== undefined &&
+    hls.liveSyncPosition !== null
+  ) {
     // Be more conservative for initial seek - stay further from live edge
     const targetTime = hls.liveSyncPosition - 3; // 3 seconds behind live edge
     console.log(
@@ -3690,7 +3730,11 @@ function seekToLiveEdge(
   const video = videoRef.current;
   if (!video || video.paused) return;
 
-  if (hls && hls.liveSyncPosition !== undefined && hls.liveSyncPosition !== null) {
+  if (
+    hls &&
+    hls.liveSyncPosition !== undefined &&
+    hls.liveSyncPosition !== null
+  ) {
     // Use HLS.js live sync position for most accurate live edge
     const targetTime = hls.liveSyncPosition - 1; // 1 second behind live edge for stability
     console.log(`Seeking to HLS live edge: ${targetTime.toFixed(2)}s`);
@@ -3715,7 +3759,9 @@ function seekToLiveEdge(
 }
 
 // Update the existing seekToLive function
-function seekToLive(videoRef: React.RefObject<HTMLVideoElement & { _hls?: Hls } | null>) {
+function seekToLive(
+  videoRef: React.RefObject<(HTMLVideoElement & { _hls?: Hls }) | null>,
+) {
   const video = videoRef.current;
   if (!video || video.paused) return;
 
@@ -3775,7 +3821,12 @@ function playNotificationTone() {
   // This is less likely to interrupt other audio
   try {
     const AudioContext =
-      window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof window.AudioContext }).webkitAudioContext;
+      window.AudioContext ??
+      (
+        window as typeof window & {
+          webkitAudioContext?: typeof window.AudioContext;
+        }
+      ).webkitAudioContext;
     const audioContext = new AudioContext();
 
     // Create a brief, subtle notification tone

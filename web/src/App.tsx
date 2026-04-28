@@ -7,20 +7,36 @@ import StreamPage from './StreamPage';
 import { RouterLoadingHandler } from './components/RouterLoadingHandler';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import SecureStorage from './utils/secureStorage';
-import { getSessionId, SessionMonitor, type Session } from './components/SessionMonitor';
-import { getDeviceFingerprint, type TrustedDevice } from '../../source/types/deviceInfo';
+import { getSessionId } from './utils/session';
+import { SessionMonitor } from './components/SessionMonitor';
+import {
+  getDeviceFingerprint,
+  type TrustedDevice,
+  type Session,
+} from '../../source/types/deviceInfo';
 import { Capacitor } from '@capacitor/core';
 import { debugLog } from './utils/debugLog';
 
-export type Recording = { streamId: string, filename: string };
+export type Recording = { streamId: string; filename: string };
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [___, setCachedRecordings] = useLocalStorageState<{ [streamId: string]: Recording[] }>('cachedRecordings', {});
-  const [____, setTotalRecordings] = useLocalStorageState<{ [streamId: string]: number }>('totalRecordings', {});
-  const [__, setCachedRecordingRanges] = useLocalStorageState<{ [streamId: string]: Array<{ from: string, to: string }> }>('cachedRecordingRanges', {});
-  const [_, setCachedPages] = useLocalStorageState<{ [streamId: string]: number[] }>('cachedPages', {});
-  const [knownSessions, setKnownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
+  const [___, setCachedRecordings] = useLocalStorageState<{
+    [streamId: string]: Recording[];
+  }>('cachedRecordings', {});
+  const [____, setTotalRecordings] = useLocalStorageState<{
+    [streamId: string]: number;
+  }>('totalRecordings', {});
+  const [__, setCachedRecordingRanges] = useLocalStorageState<{
+    [streamId: string]: Array<{ from: string; to: string }>;
+  }>('cachedRecordingRanges', {});
+  const [_, setCachedPages] = useLocalStorageState<{
+    [streamId: string]: number[];
+  }>('cachedPages', {});
+  const [knownSessions, setKnownSessions] = useLocalStorageState<string[]>(
+    'knownSessionIds',
+    [],
+  );
   const [showSessionMonitor, setShowSessionMonitor] = useState(false);
   const [hasCheckedSessions, setHasCheckedSessions] = useState(false);
   const [sessions, setSessions] = useState<(Session & TrustedDevice)[]>([]);
@@ -43,13 +59,17 @@ export default function App() {
 
       // Check if another tab is already refreshing (only on web)
       if (!Capacitor.isNativePlatform()) {
-        const refreshInProgress = localStorage.getItem('tokenRefreshInProgress');
+        const refreshInProgress = localStorage.getItem(
+          'tokenRefreshInProgress',
+        );
         if (refreshInProgress) {
           const startTime = parseInt(refreshInProgress);
           const timeSinceStart = Date.now() - startTime;
 
           if (timeSinceStart < 5000) {
-            debugLog(`Another tab is refreshing (${timeSinceStart}ms ago), waiting...`);
+            debugLog(
+              `Another tab is refreshing (${timeSinceStart}ms ago), waiting...`,
+            );
 
             return new Promise((resolve) => {
               let attempts = 0;
@@ -58,7 +78,9 @@ export default function App() {
 
               const handleTokenUpdate = (event: MessageEvent) => {
                 if (event.data.type === 'TOKEN_UPDATED') {
-                  debugLog('Another tab successfully refreshed token via broadcast');
+                  debugLog(
+                    'Another tab successfully refreshed token via broadcast',
+                  );
                   setAuthenticated(true);
                   tokenChannel.close();
                   resolve(true);
@@ -69,16 +91,23 @@ export default function App() {
 
               const checkComplete = () => {
                 attempts++;
-                const stillInProgress = localStorage.getItem('tokenRefreshInProgress');
+                const stillInProgress = localStorage.getItem(
+                  'tokenRefreshInProgress',
+                );
                 const newToken = localStorage.getItem('jwt');
 
                 if (!stillInProgress && newToken) {
-                  debugLog('Another tab successfully refreshed token via localStorage check');
+                  debugLog(
+                    'Another tab successfully refreshed token via localStorage check',
+                  );
                   setAuthenticated(true);
                   tokenChannel.close();
                   resolve(true);
                 } else if (!stillInProgress || attempts >= maxAttempts) {
-                  debugLog('Token refresh failed or timed out in other tab', 'error');
+                  debugLog(
+                    'Token refresh failed or timed out in other tab',
+                    'error',
+                  );
                   setAuthenticated(false);
                   tokenChannel.close();
                   resolve(false);
@@ -89,7 +118,9 @@ export default function App() {
               setTimeout(checkComplete, 100);
             });
           } else {
-            debugLog(`Stale refresh in progress flag detected (${timeSinceStart}ms old), clearing and proceeding`);
+            debugLog(
+              `Stale refresh in progress flag detected (${timeSinceStart}ms old), clearing and proceeding`,
+            );
             localStorage.removeItem('tokenRefreshInProgress');
           }
         }
@@ -101,7 +132,9 @@ export default function App() {
       }
 
       const deviceInfo = getDeviceFingerprint();
-      debugLog(`Making refresh token request to: ${API_BASE}/api/refresh-token`);
+      debugLog(
+        `Making refresh token request to: ${API_BASE}/api/refresh-token`,
+      );
 
       const refreshStartTime = Date.now();
       const res = await Promise.race([
@@ -109,17 +142,22 @@ export default function App() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'refresh-token': refreshToken
+            'refresh-token': refreshToken,
           },
-          body: JSON.stringify({ deviceInfo })
+          body: JSON.stringify({ deviceInfo }),
         }),
         new Promise<Response>((_, reject) =>
-          setTimeout(() => reject(new Error('Token refresh request timeout')), 15000)
-        )
+          setTimeout(
+            () => reject(new Error('Token refresh request timeout')),
+            15000,
+          ),
+        ),
       ]);
 
       const requestDuration = Date.now() - refreshStartTime;
-      debugLog(`Refresh token response received after ${requestDuration}ms, status: ${res.status}`);
+      debugLog(
+        `Refresh token response received after ${requestDuration}ms, status: ${res.status}`,
+      );
 
       if (res.status === 200) {
         const data = await res.json();
@@ -140,7 +178,7 @@ export default function App() {
             tokenChannel.postMessage({
               type: 'TOKEN_UPDATED',
               token: data.token,
-              timestamp: Date.now()
+              timestamp: Date.now(),
             });
             tokenChannel.close();
           }
@@ -188,9 +226,9 @@ export default function App() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'refresh-token': refreshToken
+            'refresh-token': refreshToken,
           },
-          body: JSON.stringify({ clientId: localStorage.getItem('clientId') })
+          body: JSON.stringify({ clientId: localStorage.getItem('clientId') }),
         }).catch(console.error);
       }
     } catch (error) {
@@ -207,7 +245,7 @@ export default function App() {
         const tokenChannel = new BroadcastChannel('tokenUpdates');
         tokenChannel.postMessage({
           type: 'LOGOUT',
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
         tokenChannel.close();
       } else {
@@ -267,42 +305,56 @@ export default function App() {
       debugLog('=== STARTING INITIAL AUTH CHECK ===');
 
       // Add a small delay to ensure BroadcastChannel is fully set up
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       const token = localStorage.getItem('jwt');
       debugLog(`JWT in localStorage: ${token ? 'EXISTS' : 'NOT_FOUND'}`);
 
       // On native platforms, always check for refresh token even if JWT exists
       if (Capacitor.isNativePlatform()) {
-        debugLog('Native platform detected, checking refresh token availability');
+        debugLog(
+          'Native platform detected, checking refresh token availability',
+        );
 
         try {
           const refreshToken = await SecureStorage.getRefreshToken();
-          debugLog(`Refresh token check result: ${refreshToken ? 'EXISTS' : 'NOT_FOUND'}`);
+          debugLog(
+            `Refresh token check result: ${refreshToken ? 'EXISTS' : 'NOT_FOUND'}`,
+          );
 
           if (refreshToken) {
             if (token) {
-              debugLog('Found both JWT and refresh token, testing JWT validity with server');
+              debugLog(
+                'Found both JWT and refresh token, testing JWT validity with server',
+              );
 
               // Test the JWT validity by making a quick API call
               try {
-                const testResponse = await fetch(`${API_BASE}/api/user/sessions`, {
-                  method: 'GET',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
+                const testResponse = await fetch(
+                  `${API_BASE}/api/user/sessions`,
+                  {
+                    method: 'GET',
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                  },
+                );
 
                 if (testResponse.ok) {
                   debugLog('JWT is valid, setting authenticated to true');
                   setAuthenticated(true);
                   return;
                 } else {
-                  debugLog(`JWT test failed with status ${testResponse.status}, attempting refresh`);
+                  debugLog(
+                    `JWT test failed with status ${testResponse.status}, attempting refresh`,
+                  );
                   const refreshSuccess = await tryRefreshToken();
                   if (!refreshSuccess) {
-                    debugLog('Token refresh failed after JWT test failure', 'error');
+                    debugLog(
+                      'Token refresh failed after JWT test failure',
+                      'error',
+                    );
                     setAuthenticated(false);
                   } else {
                     debugLog('Token refresh succeeded after JWT test failure');
@@ -315,7 +367,10 @@ export default function App() {
 
                 const refreshSuccess = await tryRefreshToken();
                 if (!refreshSuccess) {
-                  debugLog('Token refresh failed after JWT test error', 'error');
+                  debugLog(
+                    'Token refresh failed after JWT test error',
+                    'error',
+                  );
                   setAuthenticated(false);
                 } else {
                   debugLog('Token refresh succeeded after JWT test error');
@@ -323,10 +378,15 @@ export default function App() {
                 return;
               }
             } else {
-              debugLog('Found refresh token but no JWT, attempting token refresh');
+              debugLog(
+                'Found refresh token but no JWT, attempting token refresh',
+              );
               const refreshSuccess = await tryRefreshToken();
               if (!refreshSuccess) {
-                debugLog('Token refresh failed on native platform, logging out', 'error');
+                debugLog(
+                  'Token refresh failed on native platform, logging out',
+                  'error',
+                );
                 setAuthenticated(false);
               } else {
                 debugLog('Token refresh succeeded on native platform');
@@ -334,12 +394,17 @@ export default function App() {
               return;
             }
           } else {
-            debugLog('No refresh token found on native platform, user not authenticated');
+            debugLog(
+              'No refresh token found on native platform, user not authenticated',
+            );
             setAuthenticated(false);
             return;
           }
         } catch (storageError) {
-          debugLog(`Storage access error on native platform: ${storageError}`, 'error');
+          debugLog(
+            `Storage access error on native platform: ${storageError}`,
+            'error',
+          );
           setAuthenticated(false);
           return;
         }
@@ -358,7 +423,7 @@ export default function App() {
       debugLog('=== INITIAL AUTH CHECK COMPLETE ===');
     };
 
-    initAuth().catch(error => {
+    initAuth().catch((error) => {
       debugLog(`Critical error in initAuth: ${error}`, 'error');
       setAuthenticated(false);
     });
@@ -377,28 +442,32 @@ export default function App() {
       console.log(`Fetched ${trustedDevices.length} trusted devices`);
 
       // Create sessions list
-      const sessionsList: (Session & TrustedDevice)[] = trustedDevices.map(device => {
-        // Use the proper getSessionId function from SessionMonitor
-        const sessionId = getSessionId(device.ip, device.deviceInfo);
-        return {
-          ip: device.ip,
-          firstSeen: device.firstSeen,
-          lastSeen: device.lastSeen,
-          isNew: !knownSessions.includes(sessionId),
-          geolocated: false, // Mark as not geolocated so SessionMonitor can handle it
-          isGeolocating: false,
-          location: undefined,
-          deviceInfo: device.deviceInfo,
-          loginCount: device.loginCount,
-        };
-      });
+      const sessionsList: (Session & TrustedDevice)[] = trustedDevices.map(
+        (device) => {
+          // Use the proper getSessionId function from SessionMonitor
+          const sessionId = getSessionId(device.ip, device.deviceInfo);
+          return {
+            ip: device.ip,
+            firstSeen: device.firstSeen,
+            lastSeen: device.lastSeen,
+            isNew: !knownSessions.includes(sessionId),
+            geolocated: false, // Mark as not geolocated so SessionMonitor can handle it
+            isGeolocating: false,
+            location: undefined,
+            deviceInfo: device.deviceInfo,
+            loginCount: device.loginCount,
+          };
+        },
+      );
 
       // Sort sessions with new ones first
-      const sortedSessions = sessionsList.sort((a, b) => a.isNew === b.isNew ? 0 : a.isNew ? -1 : 1);
+      const sortedSessions = sessionsList.sort((a, b) =>
+        a.isNew === b.isNew ? 0 : a.isNew ? -1 : 1,
+      );
       setSessions(sortedSessions);
 
       // Check if there are new sessions
-      const newSessionsDetected = sortedSessions.some(s => s.isNew);
+      const newSessionsDetected = sortedSessions.some((s) => s.isNew);
 
       if (newSessionsDetected) {
         console.log('New sessions detected, auto-showing session monitor');
@@ -456,10 +525,13 @@ export default function App() {
   useEffect(() => {
     if (!authenticated) return;
 
-    const interval = setInterval(() => {
-      // Reset hasCheckedSessions to allow periodic checks
-      setHasCheckedSessions(false);
-    }, 5 * 60 * 1000); // 5 minutes
+    const interval = setInterval(
+      () => {
+        // Reset hasCheckedSessions to allow periodic checks
+        setHasCheckedSessions(false);
+      },
+      5 * 60 * 1000,
+    ); // 5 minutes
 
     return () => clearInterval(interval);
   }, [authenticated]);
@@ -476,8 +548,14 @@ export default function App() {
     const handleBeforeUnload = () => {
       // Only clear JWT from memory, keep refresh token for next session
       // This is optional - you might want to keep the JWT for better UX
-      const navigationEntries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
-      if (navigationEntries.length > 0 && navigationEntries[0].type === "reload") { // Only on refresh, not on navigation
+      const navigationEntries = performance.getEntriesByType(
+        'navigation',
+      ) as PerformanceNavigationTiming[];
+      if (
+        navigationEntries.length > 0 &&
+        navigationEntries[0].type === 'reload'
+      ) {
+        // Only on refresh, not on navigation
         localStorage.removeItem('jwt');
       }
     };
@@ -492,12 +570,16 @@ export default function App() {
 
     // Mark all sessions as known when closing
     if (sessions.length > 0) {
-      const allSessionIds = sessions.map(s => getSessionId(s.ip, s.deviceInfo));
-      setKnownSessions(prev => Array.from(new Set([...prev, ...allSessionIds])));
+      const allSessionIds = sessions.map((s) =>
+        getSessionId(s.ip, s.deviceInfo),
+      );
+      setKnownSessions((prev) =>
+        Array.from(new Set([...prev, ...allSessionIds])),
+      );
 
       // Update sessions state to reflect they're no longer new
-      setSessions(prevSessions =>
-        prevSessions.map(session => ({ ...session, isNew: false }))
+      setSessions((prevSessions) =>
+        prevSessions.map((session) => ({ ...session, isNew: false })),
       );
     }
 
@@ -509,8 +591,14 @@ export default function App() {
 
   const handleLogin = async (token: string, refreshToken: string) => {
     // Show user-friendly error message
-    if (!window.isSecureContext && location.protocol !== 'https:' && location.hostname !== 'localhost') {
-      alert('Note: For enhanced security on remote devices, consider using HTTPS. Authentication will work but tokens will use basic encoding.');
+    if (
+      !window.isSecureContext &&
+      location.protocol !== 'https:' &&
+      location.hostname !== 'localhost'
+    ) {
+      alert(
+        'Note: For enhanced security on remote devices, consider using HTTPS. Authentication will work but tokens will use basic encoding.',
+      );
     }
 
     try {
@@ -532,34 +620,47 @@ export default function App() {
     return <LoginPage onLogin={handleLogin} />;
   }
   if (authenticated === null) {
-    return <div className="App"><h2>Loading...</h2></div>;
+    return (
+      <div className="App">
+        <h2>Loading...</h2>
+      </div>
+    );
   }
 
   return (
     <Router>
       <RouterLoadingHandler />
       <Routes>
-        <Route path="/" element={
-          <StreamPage
-            onShowSessionMonitor={() => setShowSessionMonitor(true)}
-            onSessionMonitorClosed={handleSessionMonitorClose}
-            logout={logout}
-          />
-        } />
-        <Route path="/stream/:streamId" element={
-          <StreamPage
-            onShowSessionMonitor={() => setShowSessionMonitor(true)}
-            onSessionMonitorClosed={handleSessionMonitorClose}
-            logout={logout}
-          />
-        } />
-        <Route path="/recordings/:streamId/:filename" element={
-          <StreamPage
-            onShowSessionMonitor={() => setShowSessionMonitor(true)}
-            onSessionMonitorClosed={handleSessionMonitorClose}
-            logout={logout}
-          />
-        } />
+        <Route
+          path="/"
+          element={
+            <StreamPage
+              onShowSessionMonitor={() => setShowSessionMonitor(true)}
+              onSessionMonitorClosed={handleSessionMonitorClose}
+              logout={logout}
+            />
+          }
+        />
+        <Route
+          path="/stream/:streamId"
+          element={
+            <StreamPage
+              onShowSessionMonitor={() => setShowSessionMonitor(true)}
+              onSessionMonitorClosed={handleSessionMonitorClose}
+              logout={logout}
+            />
+          }
+        />
+        <Route
+          path="/recordings/:streamId/:filename"
+          element={
+            <StreamPage
+              onShowSessionMonitor={() => setShowSessionMonitor(true)}
+              onSessionMonitorClosed={handleSessionMonitorClose}
+              logout={logout}
+            />
+          }
+        />
       </Routes>
       {showSessionMonitor && (
         <SessionMonitor
