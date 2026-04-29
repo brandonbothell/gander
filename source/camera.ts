@@ -219,9 +219,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
             const expiredSegment = state.recentSegments.shift()
             if (
               expiredSegment &&
-              ((!state.motionRecordingActive &&
-                !state.savingInProgress &&
-                expiredSegment) ||
+              ((state.motionRecordingActive && !state.savingInProgress) ||
                 state.flushedSegments.includes(expiredSegment))
             ) {
               safeUnlinkWithRetry(expiredSegment)
