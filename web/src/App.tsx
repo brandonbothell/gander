@@ -493,8 +493,8 @@ export default function App() {
       let lastUpdate = localStorage.getItem('lastUsedAppVersion')
 
       if (!lastUpdate) {
-        localStorage.setItem('lastUsedAppVersion', currentVersion)
-        lastUpdate = currentVersion
+        localStorage.setItem('lastUsedAppVersion', '1.0.0')
+        lastUpdate = '1.0.0'
       }
 
       // If new version, reset cached data
