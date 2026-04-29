@@ -227,6 +227,30 @@ export async function notify(
         }
         await admin.messaging().send({
           android: {
+            data: {
+              title,
+              body,
+              icon,
+              color: '#2196F3',
+              sound,
+              visibility: 'public',
+              sticky: 'false',
+              localOnly: 'false',
+              defaultLightSettings: 'true',
+              eventTimestamp: new Date().getTime().toString(10),
+              vibrateTimingsMillis: '0,500,500,500',
+              ...withOptional,
+
+              streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
+              cameraId: streamId,
+              ...(group ? { group } : {}),
+              actions: title === 'Motion Detected!' ? 'true' : 'false',
+              // ...other custom data
+            },
+          },
+          token: sub.fcmToken,
+        })
+        /* android: {
             priority: 'high',
             notification: {
               title,
@@ -239,20 +263,11 @@ export async function notify(
               localOnly: false,
               defaultLightSettings: true,
               eventTimestamp: new Date(),
-              notificationCount: 1,
               vibrateTimingsMillis: [0, 500, 500, 500],
               ...withOptional,
               // clickAction: 'OPEN_STREAM',
             },
-          },
-          token: sub.fcmToken,
-          data: {
-            streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
-            cameraId: streamId,
-            ...(group ? { group } : {}),
-            // ...other custom data
-          },
-        })
+          }, */
       } catch (err) {
         if (!err || typeof err !== 'object' || !('code' in err)) {
           throw new Error(

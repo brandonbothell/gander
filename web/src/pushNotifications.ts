@@ -52,7 +52,7 @@ export async function setupPushNotifications() {
         async (notification: PushNotificationSchema) => {
           console.log('Push notification received:', notification)
 
-          await LocalNotifications.schedule({
+          /* await LocalNotifications.schedule({
             notifications: [
               {
                 title: notification.title ?? 'Notification',
@@ -62,7 +62,7 @@ export async function setupPushNotifications() {
                 group: notification.data.group,
               },
             ],
-          })
+          }) */
         },
       )
 

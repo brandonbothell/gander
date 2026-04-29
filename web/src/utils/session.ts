@@ -4,6 +4,7 @@ import {
   type Session,
 } from '../../../source/types/deviceInfo'
 import { fetchWithRetry } from '../main'
+import SecureStorage from './secureStorage'
 
 // Helper function to create a unique session identifier
 export const getSessionId = (_: string, deviceInfo: DeviceInfo): string => {
@@ -93,5 +94,29 @@ export const geolocateIP = async (
       geolocated: true,
       isGeolocating: false,
     }
+  }
+}
+
+export async function getDeviceFingerprint(): Promise<DeviceInfo> {
+  let clientId = await SecureStorage.getClientId()
+  if (!clientId) {
+    clientId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          const r = (Math.random() * 16) | 0
+          const v = c === 'x' ? r : (r & 0x3) | 0x8
+          return v.toString(16)
+        })
+    SecureStorage.setClientId(clientId)
+  }
+
+  return {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform ?? 'Unknown',
+    vendor: navigator.vendor ?? 'Unknown',
+    language: navigator.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    screen: `${screen.width}x${screen.height}`,
+    clientId,
   }
 }

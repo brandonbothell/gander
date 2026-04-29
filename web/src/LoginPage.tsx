@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { API_BASE } from './main'
-import { getDeviceFingerprint } from '../../source/types/deviceInfo'
 import { Capacitor } from '@capacitor/core'
+import { getDeviceFingerprint } from './utils/session'
 
 export default function LoginPage({
   onLogin,

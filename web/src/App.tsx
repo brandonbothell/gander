@@ -7,13 +7,9 @@ import StreamPage from './StreamPage'
 import { RouterLoadingHandler } from './components/RouterLoadingHandler'
 import { useLocalStorageState } from './hooks/useLocalStorageState'
 import SecureStorage from './utils/secureStorage'
-import { getSessionId } from './utils/session'
+import { getDeviceFingerprint, getSessionId } from './utils/session'
 import { SessionMonitor } from './components/SessionMonitor'
-import {
-  getDeviceFingerprint,
-  type TrustedDevice,
-  type Session,
-} from '../../source/types/deviceInfo'
+import { type TrustedDevice, type Session } from '../../source/types/deviceInfo'
 import { Capacitor } from '@capacitor/core'
 import { debugLog } from './utils/debugLog'
 

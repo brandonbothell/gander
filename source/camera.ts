@@ -637,6 +637,7 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true)
       } else {
+        console.error(`[CORS] Denied request from origin: ${origin}`)
         callback(new Error(`[CORS] Denied request from origin: ${origin}`))
       }
     },

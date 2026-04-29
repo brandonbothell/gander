@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
 import android.net.Uri;
@@ -21,8 +22,9 @@ public class MotionForegroundService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+
         android.util.Log.d("MotionForegroundService", "Service created");
-        createNotificationChannels();
+        MotionForegroundService.createNotificationChannels(getApplicationContext());
 
         // Create an intent to launch the app's main activity
         Intent launchIntent = getPackageManager().getLaunchIntentForPackage(getPackageName());
@@ -66,9 +68,9 @@ public class MotionForegroundService extends Service {
         // You can also add other cleanup code here if needed
     }
 
-    private void createNotificationChannels() {
+    public static void createNotificationChannels(Context ctx) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationManager manager = getSystemService(NotificationManager.class);
+            NotificationManager manager = ctx.getSystemService(NotificationManager.class);
 
             // Service notification to keep the service running
             NotificationChannel serviceChannel = new NotificationChannel(
@@ -78,7 +80,7 @@ public class MotionForegroundService extends Service {
             manager.createNotificationChannel(serviceChannel);
 
             // Motion notification with custom sound
-            Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/raw/motion_alert");
+            Uri soundUri = Uri.parse("android.resource://" + ctx.getPackageName() + "/raw/motion_alert");
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)

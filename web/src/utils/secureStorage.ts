@@ -152,6 +152,37 @@ class SecureStorageService {
     }
   }
 
+  async setClientId(clientId: string): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.set({
+        key: 'clientId',
+        value: clientId,
+      })
+    } else {
+      const encrypted = await this.encrypt(clientId)
+      localStorage.setItem('_cid', encrypted)
+    }
+  }
+
+  async getClientId(): Promise<string | null> {
+    if (Capacitor.isNativePlatform()) {
+      const result = await Preferences.get({ key: 'clientId' })
+      return result.value
+    } else {
+      const encrypted = localStorage.getItem('_cid')
+      if (!encrypted) return null
+
+      try {
+        return await this.decrypt(encrypted)
+      } catch (error) {
+        console.error('Failed to decrypt client ID:', error)
+        // Clear corrupted token
+        localStorage.removeItem('_cid')
+        return null
+      }
+    }
+  }
+
   async clearAll(): Promise<void> {
     if (Capacitor.isNativePlatform()) {
       await Preferences.clear()
