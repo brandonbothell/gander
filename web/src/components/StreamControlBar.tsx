@@ -1,51 +1,69 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
+import React, { useEffect, useState, useRef } from 'react'
+import {
+  FiPlay,
+  FiPause,
+  FiVolume2,
+  FiVolumeX,
+  FiMaximize,
+} from 'react-icons/fi'
 import { type Stream } from '../../../source/types/shared'
-import { Capacitor } from '@capacitor/core';
-import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { Capacitor } from '@capacitor/core'
+import { ScreenOrientation } from '@capacitor/screen-orientation'
 
 /**
  * Typed extension for WebKit fullscreen methods present on some mobile Safari video elements.
  * This avoids using `any` while still allowing guarded access to vendor-prefixed methods.
  */
 interface WebkitVideoElement extends HTMLVideoElement {
-  webkitEnterFullscreen?: () => void;
-  webkitRequestFullscreen?: () => void | Promise<void>;
+  webkitEnterFullscreen?: () => void
+  webkitRequestFullscreen?: () => void | Promise<void>
 }
 
 interface WebkitDocument extends Document {
-  webkitFullscreenElement?: Element | null;
-  mozFullScreenElement?: Element | null;
-  msFullscreenElement?: Element | null;
+  webkitFullscreenElement?: Element | null
+  mozFullScreenElement?: Element | null
+  msFullscreenElement?: Element | null
 }
 
 interface StreamControlBarProps {
-  videoRef: React.RefObject<HTMLVideoElement | null>;
-  activeStream: Stream | null;
+  videoRef: React.RefObject<HTMLVideoElement | null>
+  activeStream: Stream | null
 }
 
 export function StreamControlBar({
   videoRef,
   activeStream,
 }: StreamControlBarProps) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const isPausedRef = useRef(isPaused);
-  const [isMuted, setIsMuted] = useState(true);
-  const [videoRect, setVideoRect] = useState<{ width: number; height: number; top: number; left: number } | null>(null);
-  const hideTimeoutRef = useRef<number | null>(null);
-  const lastActiveStreamRef = useRef(activeStream);
+  const [isVisible, setIsVisible] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const isPausedRef = useRef(isPaused)
+  const [isMuted, setIsMuted] = useState(true)
+  const [videoRect, setVideoRect] = useState<{
+    width: number
+    height: number
+    top: number
+    left: number
+  } | null>(null)
+  const hideTimeoutRef = useRef<number | null>(null)
+  const lastActiveStreamRef = useRef(activeStream)
 
   useEffect(() => {
-    isPausedRef.current = isPaused;
-  }, [isPaused]);
+    isPausedRef.current = isPaused
+  }, [isPaused])
 
   // Calculate responsive sizes based on video dimensions
   const getResponsiveSizes = () => {
-    if (!videoRect) return { barHeight: 80, iconSize: 24, padding: 20, gap: 20, buttonPadding: 8 };
+    if (!videoRect)
+      return {
+        barHeight: 80,
+        iconSize: 24,
+        padding: 20,
+        gap: 20,
+        buttonPadding: 8,
+      }
 
-    const videoWidth = videoRect.width;
-    const videoHeight = videoRect.height;
+    const videoWidth = videoRect.width
+    const videoHeight = videoRect.height
 
     // Define breakpoints based on video size
     if (videoWidth < 400 || videoHeight < 300) {
@@ -57,8 +75,8 @@ export function StreamControlBar({
         gap: 12,
         buttonPadding: 6,
         controlPadding: '8px 12px',
-        borderRadius: '8px'
-      };
+        borderRadius: '8px',
+      }
     } else if (videoWidth < 600 || videoHeight < 400) {
       // Small video
       return {
@@ -68,8 +86,8 @@ export function StreamControlBar({
         gap: 16,
         buttonPadding: 7,
         controlPadding: '10px 16px',
-        borderRadius: '10px'
-      };
+        borderRadius: '10px',
+      }
     } else {
       // Normal/large video
       return {
@@ -79,241 +97,250 @@ export function StreamControlBar({
         gap: 20,
         buttonPadding: 8,
         controlPadding: '12px 20px',
-        borderRadius: '12px'
-      };
+        borderRadius: '12px',
+      }
     }
-  };
+  }
 
-  const sizes = getResponsiveSizes();
+  const sizes = getResponsiveSizes()
 
   // Track video element position and size
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     const updateVideoRect = () => {
-      const wrapper = video.parentElement;
-      if (!wrapper) return;
+      const wrapper = video.parentElement
+      if (!wrapper) return
 
-      const videoRect = video.getBoundingClientRect();
-      const wrapperRect = wrapper.getBoundingClientRect();
+      const videoRect = video.getBoundingClientRect()
+      const wrapperRect = wrapper.getBoundingClientRect()
 
       setVideoRect({
         width: video.offsetWidth, // Use offsetWidth/Height for exact dimensions
         height: video.offsetHeight,
         top: videoRect.top - wrapperRect.top,
         left: videoRect.left - wrapperRect.left,
-      });
-    };
+      })
+    }
 
     // Initial update
-    updateVideoRect();
+    updateVideoRect()
 
     // Listen for video load and resize events
-    video.addEventListener('loadedmetadata', updateVideoRect);
+    video.addEventListener('loadedmetadata', updateVideoRect)
 
     // Use ResizeObserver for more accurate tracking
-    let resizeObserver: ResizeObserver | null = null;
+    let resizeObserver: ResizeObserver | null = null
     if ('ResizeObserver' in window) {
-      resizeObserver = new ResizeObserver(updateVideoRect);
-      resizeObserver.observe(video);
+      resizeObserver = new ResizeObserver(updateVideoRect)
+      resizeObserver.observe(video)
     }
 
     // Also update on window resize
-    window.addEventListener('resize', updateVideoRect);
+    window.addEventListener('resize', updateVideoRect)
 
     return () => {
-      video.removeEventListener('loadedmetadata', updateVideoRect);
-      if (resizeObserver) resizeObserver.disconnect();
-      window.removeEventListener('resize', updateVideoRect);
-    };
-  }, [videoRef, activeStream]);
+      video.removeEventListener('loadedmetadata', updateVideoRect)
+      if (resizeObserver) resizeObserver.disconnect()
+      window.removeEventListener('resize', updateVideoRect)
+    }
+  }, [videoRef, activeStream])
 
   // Show controls when activeStream changes
   useEffect(() => {
     if (activeStream && activeStream !== lastActiveStreamRef.current) {
-      setIsVisible(true);
-      scheduleHide();
-      lastActiveStreamRef.current = activeStream;
+      setIsVisible(true)
+      scheduleHide()
+      lastActiveStreamRef.current = activeStream
     }
-  }, [activeStream]);
+  }, [activeStream])
 
   // Ensure video starts muted
   useEffect(() => {
-    const video = videoRef.current;
+    const video = videoRef.current
     if (video) {
-      video.muted = true;
-      setIsMuted(true);
+      video.muted = true
+      setIsMuted(true)
     }
-  }, [videoRef, activeStream]);
+  }, [videoRef, activeStream])
 
   // Listen for video events to sync state
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
-    const handlePlay = () => setIsPaused(false);
-    const handlePause = () => setIsPaused(true);
-    const handleVolumeChange = () => setIsMuted(video.muted);
+    const handlePlay = () => setIsPaused(false)
+    const handlePause = () => setIsPaused(true)
+    const handleVolumeChange = () => setIsMuted(video.muted)
 
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('volumechange', handleVolumeChange);
+    video.addEventListener('play', handlePlay)
+    video.addEventListener('pause', handlePause)
+    video.addEventListener('volumechange', handleVolumeChange)
 
     // Set initial state
-    setIsPaused(video.paused);
-    setIsMuted(video.muted);
+    setIsPaused(video.paused)
+    setIsMuted(video.muted)
 
     return () => {
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('volumechange', handleVolumeChange);
-    };
-  }, [videoRef, activeStream]);
+      video.removeEventListener('play', handlePlay)
+      video.removeEventListener('pause', handlePause)
+      video.removeEventListener('volumechange', handleVolumeChange)
+    }
+  }, [videoRef, activeStream])
 
   const scheduleHide = () => {
     if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
+      clearTimeout(hideTimeoutRef.current)
     }
     hideTimeoutRef.current = window.setTimeout(() => {
-      if (!isPausedRef.current) setIsVisible(false);
-    }, 3000);
-  };
+      if (!isPausedRef.current) setIsVisible(false)
+    }, 3000)
+  }
 
   const handleShowControls = () => {
-    setIsVisible(true);
-    scheduleHide();
-  };
+    setIsVisible(true)
+    scheduleHide()
+  }
 
   const handleMouseEnter = () => {
     if (!window.ontouchstart) {
-      handleShowControls();
+      handleShowControls()
     }
-  };
+  }
 
   const handleMouseMove = () => {
     if (!window.ontouchstart) {
-      handleShowControls();
+      handleShowControls()
     }
-  };
+  }
 
   const handleTouchStart = () => {
-    handleShowControls();
-  };
+    handleShowControls()
+  }
 
   const handlePlayPause = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     if (video.paused) {
-      video.play().catch(() => { });
+      video.play().catch(() => {})
     } else {
-      video.pause();
+      video.pause()
     }
 
-    scheduleHide();
-  };
+    scheduleHide()
+  }
 
   const handleMuteToggle = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
-    handleShowControls();
-  };
+    video.muted = !video.muted
+    setIsMuted(video.muted)
+    handleShowControls()
+  }
 
   function isIOS() {
     return (
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
-    );
+    )
   }
 
   const handleFullscreen = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     // Cast to a typed extension that may include WebKit fullscreen helpers
-    const webkitVideo = video as WebkitVideoElement;
+    const webkitVideo = video as WebkitVideoElement
 
     if (isIOS() && typeof webkitVideo.webkitEnterFullscreen === 'function') {
       // iOS Safari/PWA: use webkitEnterFullscreen
-      webkitVideo.webkitEnterFullscreen();
+      webkitVideo.webkitEnterFullscreen()
     } else if (video.requestFullscreen) {
-      video.requestFullscreen();
+      video.requestFullscreen()
     } else if (typeof webkitVideo.webkitRequestFullscreen === 'function') {
-      webkitVideo.webkitRequestFullscreen();
+      webkitVideo.webkitRequestFullscreen()
     }
 
     // Only lock orientation if supported
     if (Capacitor.isNativePlatform()) {
       ScreenOrientation.lock({ orientation: 'landscape' })
     } else {
-      const orientation = (screen as unknown as { orientation?: { lock?: (orientation: string) => Promise<void> } }).orientation;
+      const orientation = (
+        screen as unknown as {
+          orientation?: { lock?: (orientation: string) => Promise<void> }
+        }
+      ).orientation
       if (orientation && typeof orientation.lock === 'function') {
         try {
-          const lockResult = orientation.lock('landscape');
-          if (lockResult && typeof (lockResult as Promise<void>).catch === 'function') {
-            (lockResult as Promise<void>).catch(() => { });
+          const lockResult = orientation.lock('landscape')
+          if (
+            lockResult &&
+            typeof (lockResult as Promise<void>).catch === 'function'
+          ) {
+            ;(lockResult as Promise<void>).catch(() => {})
           }
         } catch (_) {
           // Ignore errors
         }
       }
     }
-    handleShowControls();
-  };
+    handleShowControls()
+  }
 
   const handleExitFullscreen = () => {
     if (Capacitor.isNativePlatform()) {
       ScreenOrientation.unlock()
     } else {
-      const orientation = (screen as unknown as { orientation?: { unlock?: () => Promise<void> } }).orientation;
-      if (!orientation || typeof orientation.unlock !== 'function') return;
+      const orientation = (
+        screen as unknown as { orientation?: { unlock?: () => Promise<void> } }
+      ).orientation
+      if (!orientation || typeof orientation.unlock !== 'function') return
       try {
-        const result = orientation.unlock();
+        const result = orientation.unlock()
         if (result && typeof result.catch === 'function') {
-          result.catch(() => { });
+          result.catch(() => {})
         }
       } catch (error) {
-        console.error('Failed to exit fullscreen orientation lock:', error);
+        console.error('Failed to exit fullscreen orientation lock:', error)
       }
     }
   }
 
   // Add fullscreenchange event listener to video
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     function onFullscreenChange() {
       console.warn('Fullscreen change detected:')
       // Check if fullscreen is exited
       if (
         !document.fullscreenElement &&
-        !((document as WebkitDocument).webkitFullscreenElement) &&
-        !((document as WebkitDocument).mozFullScreenElement) &&
-        !((document as WebkitDocument).msFullscreenElement)
+        !(document as WebkitDocument).webkitFullscreenElement &&
+        !(document as WebkitDocument).mozFullScreenElement &&
+        !(document as WebkitDocument).msFullscreenElement
       ) {
-        handleExitFullscreen();
+        handleExitFullscreen()
       }
     }
 
-    video.addEventListener('fullscreenchange', onFullscreenChange);
-    video.addEventListener('webkitfullscreenchange', onFullscreenChange);
-    video.addEventListener('mozfullscreenchange', onFullscreenChange);
-    video.addEventListener('MSFullscreenChange', onFullscreenChange);
+    video.addEventListener('fullscreenchange', onFullscreenChange)
+    video.addEventListener('webkitfullscreenchange', onFullscreenChange)
+    video.addEventListener('mozfullscreenchange', onFullscreenChange)
+    video.addEventListener('MSFullscreenChange', onFullscreenChange)
 
     return () => {
-      video.removeEventListener('fullscreenchange', onFullscreenChange);
-      video.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-      video.removeEventListener('mozfullscreenchange', onFullscreenChange);
-      video.removeEventListener('MSFullscreenChange', onFullscreenChange);
-    };
-  }, [videoRef]);
+      video.removeEventListener('fullscreenchange', onFullscreenChange)
+      video.removeEventListener('webkitfullscreenchange', onFullscreenChange)
+      video.removeEventListener('mozfullscreenchange', onFullscreenChange)
+      video.removeEventListener('MSFullscreenChange', onFullscreenChange)
+    }
+  }, [videoRef])
 
-  if (!activeStream || !videoRect) return null;
+  if (!activeStream || !videoRect) return null
 
   return (
     <>
@@ -343,7 +370,8 @@ export function StreamControlBar({
           left: `${videoRect.left}px`,
           width: `${videoRect.width}px`,
           height: `${sizes.barHeight}px`, // Responsive height
-          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 100%)',
+          background:
+            'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 100%)',
           display: 'flex',
           alignItems: 'flex-end',
           justifyContent: 'center',
@@ -384,10 +412,10 @@ export function StreamControlBar({
               transition: 'background 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.background = 'transparent'
             }}
             aria-label={isPaused ? 'Play' : 'Pause'}
           >
@@ -414,10 +442,10 @@ export function StreamControlBar({
               transition: 'background 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.background = 'transparent'
             }}
             aria-label={isMuted ? 'Unmute' : 'Mute'}
           >
@@ -441,8 +469,12 @@ export function StreamControlBar({
               justifyContent: 'center',
               transition: 'background 0.2s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = 'transparent')
+            }
             aria-label="Fullscreen"
           >
             <FiMaximize size={24} />
@@ -450,5 +482,5 @@ export function StreamControlBar({
         </div>
       </div>
     </>
-  );
+  )
 }

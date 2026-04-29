@@ -1,16 +1,16 @@
-import React from 'react';
-import { BatchDeleteButton } from './BatchDeleteButton';
-import { DeselectButton } from './DeselectButton';
-import type { Recording } from '../App';
+import React from 'react'
+import { BatchDeleteButton } from './BatchDeleteButton'
+import { DeselectButton } from './DeselectButton'
+import type { Recording } from '../App'
 
 interface FloatingMenuPopoutProps {
-  open: boolean;
-  selected: string[];
-  setSelected: (sel: string[]) => void;
-  viewingStreamId: string;
-  cachedRecordings: Recording[];
-  setRecordings: (recs: Recording[]) => void;
-  recordingsListRef: React.RefObject<HTMLDivElement | null>;
+  open: boolean
+  selected: string[]
+  setSelected: (sel: string[]) => void
+  viewingStreamId: string
+  cachedRecordings: Recording[]
+  setRecordings: (recs: Recording[]) => void
+  recordingsListRef: React.RefObject<HTMLDivElement | null>
 }
 
 export function FloatingMenuPopout({
@@ -44,9 +44,12 @@ export function FloatingMenuPopout({
             setSelected={setSelected}
             recordingsListRef={recordingsListRef}
           />
-          <DeselectButton setSelected={setSelected} recordingsListRef={recordingsListRef} />
+          <DeselectButton
+            setSelected={setSelected}
+            recordingsListRef={recordingsListRef}
+          />
         </div>
       )}
     </div>
-  );
+  )
 }

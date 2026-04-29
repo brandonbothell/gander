@@ -1,15 +1,9 @@
-import { VariableSizeGrid as Grid } from 'react-window';
-import {
-  useRef,
-  useEffect,
-  useState,
-  useCallback,
-  type RefObject,
-} from 'react';
-import { RecordingThumbItem } from './RecordingThumbItem';
-import { FiArrowUp, FiChevronUp } from 'react-icons/fi';
-import type { Recording } from './Recording';
-import type { Stream } from '../../../source/types/shared';
+import { VariableSizeGrid as Grid } from 'react-window'
+import { useRef, useEffect, useState, useCallback, type RefObject } from 'react'
+import { RecordingThumbItem } from './RecordingThumbItem'
+import { FiArrowUp, FiChevronUp } from 'react-icons/fi'
+import type { Recording } from './Recording'
+import type { Stream } from '../../../source/types/shared'
 
 // Helper to measure nickname height
 function measureNicknameHeight(
@@ -17,64 +11,64 @@ function measureNicknameHeight(
   width: number,
   font = 'bold 1.1em sans-serif',
 ) {
-  if (!nickname) return 0;
+  if (!nickname) return 0
   // Create offscreen span for measurement
-  const span = document.createElement('span');
-  span.style.visibility = 'hidden';
-  span.style.position = 'absolute';
-  span.style.font = font;
-  span.style.whiteSpace = 'pre-wrap';
-  span.style.width = width + 'px';
-  span.style.lineHeight = '1.2';
-  span.innerText = nickname;
-  document.body.appendChild(span);
-  const height = span.offsetHeight;
-  document.body.removeChild(span);
-  return height;
+  const span = document.createElement('span')
+  span.style.visibility = 'hidden'
+  span.style.position = 'absolute'
+  span.style.font = font
+  span.style.whiteSpace = 'pre-wrap'
+  span.style.width = width + 'px'
+  span.style.lineHeight = '1.2'
+  span.innerText = nickname
+  document.body.appendChild(span)
+  const height = span.offsetHeight
+  document.body.removeChild(span)
+  return height
 }
 
 interface RecordingsListContentProps {
-  recordingsListOpen: boolean;
-  pullDistance: number;
-  pullThreshold: number;
-  pullStartY: React.RefObject<number | null>;
-  gridOuterRef: React.RefObject<HTMLDivElement | null>;
-  isMobile: boolean;
-  filteredRecordings: Array<Recording>;
-  search: string;
-  isNicknamedOnly: boolean;
-  dateRange: { from?: string | null; to?: string | null };
-  isSearching: boolean;
-  userTyping: boolean;
-  activeStream: Stream | null;
-  selected: string[];
-  viewingRecordingsFrom: Stream | null;
-  hovered: string | null;
-  setHovered: (filename: string | null) => void;
-  recordingsListRef: React.RefObject<HTMLDivElement | null>;
-  handleTouchStart: (filename: string, checked: boolean) => void;
-  handleTouchMove: (e: React.TouchEvent) => void;
-  handleTouchEnd: () => void;
-  handleView: (filename: string) => void;
-  handleCheckboxChange: (filename: string, checked: boolean) => void;
-  nicknames: Record<string, string>;
-  viewed: Array<{ filename: string; streamId: string }>;
-  totalRecordings: Record<string, number>;
-  cachedRecordings: Record<string, Array<Recording>>;
-  isLoadingMore: boolean;
-  setIsLoadingMore: (loading: boolean) => void;
-  setCurrentPage: (page: number) => void;
-  loadPage: (stream: Stream, page: number, append: boolean) => Promise<void>;
-  currentPage: number;
-  mobileSearchSticky: boolean;
-  setRecordingsListOpen: (open: boolean) => void;
-  setTransferScrollToPage: (value: boolean) => void;
-  lastRecordingsListCloseTime: React.RefObject<number>;
-  videoRef: React.RefObject<HTMLVideoElement | null>;
-  openingRecording: boolean;
-  onRequestClose: () => void;
-  setPullDistance: (distance: number) => void;
-  transferScrollToPage: boolean; // Optional prop for pull-to-close
+  recordingsListOpen: boolean
+  pullDistance: number
+  pullThreshold: number
+  pullStartY: React.RefObject<number | null>
+  gridOuterRef: React.RefObject<HTMLDivElement | null>
+  isMobile: boolean
+  filteredRecordings: Array<Recording>
+  search: string
+  isNicknamedOnly: boolean
+  dateRange: { from?: string | null; to?: string | null }
+  isSearching: boolean
+  userTyping: boolean
+  activeStream: Stream | null
+  selected: string[]
+  viewingRecordingsFrom: Stream | null
+  hovered: string | null
+  setHovered: (filename: string | null) => void
+  recordingsListRef: React.RefObject<HTMLDivElement | null>
+  handleTouchStart: (filename: string, checked: boolean) => void
+  handleTouchMove: (e: React.TouchEvent) => void
+  handleTouchEnd: () => void
+  handleView: (filename: string) => void
+  handleCheckboxChange: (filename: string, checked: boolean) => void
+  nicknames: Record<string, string>
+  viewed: Array<{ filename: string; streamId: string }>
+  totalRecordings: Record<string, number>
+  cachedRecordings: Record<string, Array<Recording>>
+  isLoadingMore: boolean
+  setIsLoadingMore: (loading: boolean) => void
+  setCurrentPage: (page: number) => void
+  loadPage: (stream: Stream, page: number, append: boolean) => Promise<void>
+  currentPage: number
+  mobileSearchSticky: boolean
+  setRecordingsListOpen: (open: boolean) => void
+  setTransferScrollToPage: (value: boolean) => void
+  lastRecordingsListCloseTime: React.RefObject<number>
+  videoRef: React.RefObject<HTMLVideoElement | null>
+  openingRecording: boolean
+  onRequestClose: () => void
+  setPullDistance: (distance: number) => void
+  transferScrollToPage: boolean // Optional prop for pull-to-close
 }
 
 // Item renderer as recommended by react-window docs
@@ -84,29 +78,29 @@ const Cell = ({
   style,
   data,
 }: {
-  columnIndex: number;
-  rowIndex: number;
-  style: React.CSSProperties;
+  columnIndex: number
+  rowIndex: number
+  style: React.CSSProperties
   data: {
-    numColumns: number;
-    filteredRecordings: Array<Recording>;
-    selected: string[];
-    viewingRecordingsFrom: Stream | null;
-    activeStream: Stream | null;
-    hovered: string | null;
-    setHovered: (filename: string | null) => void;
-    recordingsListRef: React.RefObject<HTMLDivElement | null>;
-    handleTouchStart: (filename: string, checked: boolean) => void;
-    handleTouchMove: (e: React.TouchEvent) => void;
-    handleTouchEnd: () => void;
-    handleView: (filename: string) => void;
-    handleCheckboxChange: (filename: string, checked: boolean) => void;
-    nicknames: Record<string, string>;
-    viewed: Array<{ filename: string; streamId: string }>;
-    THUMB_WIDTH: number;
-    THUMB_HEIGHT: number;
-    GRID_GAP: number;
-  };
+    numColumns: number
+    filteredRecordings: Array<Recording>
+    selected: string[]
+    viewingRecordingsFrom: Stream | null
+    activeStream: Stream | null
+    hovered: string | null
+    setHovered: (filename: string | null) => void
+    recordingsListRef: React.RefObject<HTMLDivElement | null>
+    handleTouchStart: (filename: string, checked: boolean) => void
+    handleTouchMove: (e: React.TouchEvent) => void
+    handleTouchEnd: () => void
+    handleView: (filename: string) => void
+    handleCheckboxChange: (filename: string, checked: boolean) => void
+    nicknames: Record<string, string>
+    viewed: Array<{ filename: string; streamId: string }>
+    THUMB_WIDTH: number
+    THUMB_HEIGHT: number
+    GRID_GAP: number
+  }
 }) => {
   const {
     numColumns,
@@ -127,14 +121,14 @@ const Cell = ({
     THUMB_WIDTH,
     THUMB_HEIGHT,
     GRID_GAP,
-  } = data;
+  } = data
 
-  const idx = rowIndex * numColumns + columnIndex;
-  if (idx >= filteredRecordings.length) return null;
-  const rec = filteredRecordings[idx];
-  const checked = selected.includes(rec.filename);
-  const recordingsStream = viewingRecordingsFrom ?? activeStream;
-  const nickname = nicknames[rec.filename];
+  const idx = rowIndex * numColumns + columnIndex
+  if (idx >= filteredRecordings.length) return null
+  const rec = filteredRecordings[idx]
+  const checked = selected.includes(rec.filename)
+  const recordingsStream = viewingRecordingsFrom ?? activeStream
+  const nickname = nicknames[rec.filename]
 
   return (
     <div style={style}>
@@ -174,20 +168,20 @@ const Cell = ({
         />
       </div>
     </div>
-  );
-};
+  )
+}
 
 export default function RecordingsListContent(
   props: RecordingsListContentProps,
 ) {
   // Responsive sizing
-  const [containerWidth, setContainerWidth] = useState(360);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(360)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Minimum thumbnail width
-  const MIN_THUMB_WIDTH = props.isMobile ? 180 : 200;
-  const MAX_THUMB_WIDTH = props.isMobile ? 240 : 215;
-  const GRID_GAP = props.isMobile ? 12 : 16;
+  const MIN_THUMB_WIDTH = props.isMobile ? 180 : 200
+  const MAX_THUMB_WIDTH = props.isMobile ? 240 : 215
+  const GRID_GAP = props.isMobile ? 12 : 16
 
   // Dynamically calculate columns
   const getNumColumns = useCallback(
@@ -195,61 +189,61 @@ export default function RecordingsListContent(
       const columns = Math.max(
         1,
         Math.floor((width + GRID_GAP) / (MIN_THUMB_WIDTH + GRID_GAP)),
-      );
-      return columns; // Limit to max 4 columns
+      )
+      return columns // Limit to max 4 columns
     },
     [GRID_GAP, MIN_THUMB_WIDTH],
-  );
+  )
 
-  const [numColumns, setNumColumns] = useState(getNumColumns(containerWidth));
+  const [numColumns, setNumColumns] = useState(getNumColumns(containerWidth))
 
   useEffect(() => {
     function updateWidth() {
-      const width = window.innerWidth;
-      setContainerWidth(width);
-      setNumColumns(getNumColumns(width));
+      const width = window.innerWidth
+      setContainerWidth(width)
+      setNumColumns(getNumColumns(width))
     }
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, [getNumColumns]);
+    updateWidth()
+    window.addEventListener('resize', updateWidth)
+    return () => window.removeEventListener('resize', updateWidth)
+  }, [getNumColumns])
 
   // Calculate thumbnail width based on columns
   let THUMB_WIDTH = Math.max(
     MIN_THUMB_WIDTH,
     (containerWidth - GRID_GAP * numColumns) / numColumns,
-  );
-  if (THUMB_WIDTH > MAX_THUMB_WIDTH) THUMB_WIDTH = MAX_THUMB_WIDTH;
-  const THUMB_HEIGHT = props.isMobile ? 180 : 150;
+  )
+  if (THUMB_WIDTH > MAX_THUMB_WIDTH) THUMB_WIDTH = MAX_THUMB_WIDTH
+  const THUMB_HEIGHT = props.isMobile ? 180 : 150
 
   // Calculate row count
-  const rowCount = Math.ceil(props.filteredRecordings.length / numColumns);
+  const rowCount = Math.ceil(props.filteredRecordings.length / numColumns)
 
   // --- Dynamic row heights for nicknames ---
   // Precompute nickname heights for each row
-  const [rowHeights, setRowHeights] = useState<number[]>([]);
+  const [rowHeights, setRowHeights] = useState<number[]>([])
 
   useEffect(() => {
-    const heights: number[] = [];
+    const heights: number[] = []
     for (let row = 0; row < rowCount; row++) {
-      let maxHeight = THUMB_HEIGHT;
+      let maxHeight = THUMB_HEIGHT
       for (let col = 0; col < numColumns; col++) {
-        const idx = row * numColumns + col;
+        const idx = row * numColumns + col
         if (idx < props.filteredRecordings.length) {
-          const rec = props.filteredRecordings[idx];
-          const nickname = props.nicknames[rec.filename];
+          const rec = props.filteredRecordings[idx]
+          const nickname = props.nicknames[rec.filename]
           if (nickname) {
             const nicknameHeight = measureNicknameHeight(
               nickname,
               THUMB_WIDTH - 24,
-            ); // 24px padding
-            maxHeight = Math.max(maxHeight, THUMB_HEIGHT + nicknameHeight + 8);
+            ) // 24px padding
+            maxHeight = Math.max(maxHeight, THUMB_HEIGHT + nicknameHeight + 8)
           }
         }
       }
-      heights[row] = maxHeight + GRID_GAP;
+      heights[row] = maxHeight + GRID_GAP
     }
-    setRowHeights(heights);
+    setRowHeights(heights)
   }, [
     props.filteredRecordings,
     props.nicknames,
@@ -258,12 +252,12 @@ export default function RecordingsListContent(
     numColumns,
     THUMB_HEIGHT,
     GRID_GAP,
-  ]);
+  ])
 
   // VariableSizeGrid rowHeight/columnWidth
   const rowHeight = (rowIdx: number) =>
-    rowHeights[rowIdx] || THUMB_HEIGHT + GRID_GAP;
-  const columnWidth = () => THUMB_WIDTH + GRID_GAP;
+    rowHeights[rowIdx] || THUMB_HEIGHT + GRID_GAP
+  const columnWidth = () => THUMB_WIDTH + GRID_GAP
 
   // Compose all needed data for the cell renderer
   const itemData = {
@@ -272,64 +266,64 @@ export default function RecordingsListContent(
     THUMB_WIDTH,
     THUMB_HEIGHT,
     GRID_GAP,
-  };
+  }
 
   // Ref for VariableSizeGrid to reset row heights if nicknames change
-  const gridRef = useRef<Grid | null>(null);
+  const gridRef = useRef<Grid | null>(null)
 
   useEffect(() => {
     if (gridRef.current) {
-      gridRef.current.resetAfterRowIndex(0, true);
+      gridRef.current.resetAfterRowIndex(0, true)
     }
-  }, [rowHeights]);
+  }, [rowHeights])
 
   // Add this effect to reset columns when numColumns, THUMB_WIDTH, or GRID_GAP change
   useEffect(() => {
     if (gridRef.current) {
-      gridRef.current.resetAfterColumnIndex(0, true);
+      gridRef.current.resetAfterColumnIndex(0, true)
     }
-  }, [numColumns, THUMB_WIDTH, GRID_GAP]);
+  }, [numColumns, THUMB_WIDTH, GRID_GAP])
 
   // --- Touch handling for pull-to-refresh ---
   const handleTouchStart = (e: React.TouchEvent) => {
     const gridAtTop =
       props.gridOuterRef.current?.scrollTop !== undefined
         ? props.gridOuterRef.current.scrollTop <= 50
-        : false;
+        : false
     if (gridAtTop) {
-      updateRef(props.pullStartY, e.touches[0].clientY);
-      props.setPullDistance(0);
+      updateRef(props.pullStartY, e.touches[0].clientY)
+      props.setPullDistance(0)
     }
-  };
+  }
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (props.pullStartY.current !== null && !props.transferScrollToPage) {
-      const delta = e.touches[0].clientY - props.pullStartY.current;
+      const delta = e.touches[0].clientY - props.pullStartY.current
       // Always set pullDistance to the current delta, even if user moves back up
-      props.setPullDistance(Math.max(0, delta));
+      props.setPullDistance(Math.max(0, delta))
     } else if (props.transferScrollToPage) {
       const deltaY =
         e.touches[0].clientY -
-        (props.pullStartY.current ?? e.touches[0].clientY);
-      window.scrollBy({ top: -deltaY, behavior: 'instant' });
-      updateRef(props.pullStartY, e.touches[0].clientY);
-      e.preventDefault();
+        (props.pullStartY.current ?? e.touches[0].clientY)
+      window.scrollBy({ top: -deltaY, behavior: 'instant' })
+      updateRef(props.pullStartY, e.touches[0].clientY)
+      e.preventDefault()
     }
-  };
+  }
 
   const handleTouchEnd = () => {
     if (
       props.pullStartY.current !== null &&
       props.pullDistance > props.pullThreshold
     ) {
-      props.onRequestClose();
+      props.onRequestClose()
     }
-    updateRef(props.pullStartY, null);
-    props.setPullDistance(0);
-  };
+    updateRef(props.pullStartY, null)
+    props.setPullDistance(0)
+  }
 
   // --- Render ---
-  const gridWidth = numColumns * (THUMB_WIDTH + GRID_GAP);
+  const gridWidth = numColumns * (THUMB_WIDTH + GRID_GAP)
 
   return (
     <>
@@ -463,15 +457,15 @@ export default function RecordingsListContent(
           tabIndex={0}
           aria-label="Recordings list handle"
           onClick={() => {
-            props.setRecordingsListOpen(false);
-            props.setTransferScrollToPage(false);
-            updateRef(props.lastRecordingsListCloseTime, Date.now());
+            props.setRecordingsListOpen(false)
+            props.setTransferScrollToPage(false)
+            updateRef(props.lastRecordingsListCloseTime, Date.now())
             setTimeout(() => {
               props.videoRef.current?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'center',
-              });
-            }, 450);
+              })
+            }, 450)
           }}
         >
           <div
@@ -504,16 +498,16 @@ export default function RecordingsListContent(
         </div>
       )}
     </>
-  );
+  )
 
   function isIOS() {
     return (
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
-    );
+    )
   }
 
   function updateRef<T>(ref: RefObject<T>, value: T) {
-    ref.current = value;
+    ref.current = value
   }
 }

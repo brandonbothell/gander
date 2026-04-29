@@ -1,47 +1,53 @@
-import type { CustomWindow } from "../main";
+import type { CustomWindow } from '../main'
 
-const DEBUG_LOGS_KEY = 'debug_logs';
-const MAX_DEBUG_LOGS = 100;
+const DEBUG_LOGS_KEY = 'debug_logs'
+const MAX_DEBUG_LOGS = 100
 
-export const debugLog = (message: string, level: 'info' | 'error' | 'warn' = 'info') => {
-  const timestamp = new Date().toISOString();
-  const logEntry = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+export const debugLog = (
+  message: string,
+  level: 'info' | 'error' | 'warn' = 'info',
+) => {
+  const timestamp = new Date().toISOString()
+  const logEntry = `[${timestamp}] [${level.toUpperCase()}] ${message}`
 
   // Always console.log (works in web dev)
   if (level === 'error') {
-    console.error(logEntry);
+    console.error(logEntry)
   } else if (level === 'warn') {
-    console.warn(logEntry);
+    console.warn(logEntry)
   } else {
-    console.log(logEntry);
+    console.log(logEntry)
   }
 
   // Store in localStorage for native debugging
   try {
-    const existingLogs = JSON.parse(localStorage.getItem(DEBUG_LOGS_KEY) || '[]');
-    existingLogs.push(logEntry);
+    const existingLogs = JSON.parse(
+      localStorage.getItem(DEBUG_LOGS_KEY) || '[]',
+    )
+    existingLogs.push(logEntry)
 
     // Keep only the last MAX_DEBUG_LOGS entries
     if (existingLogs.length > MAX_DEBUG_LOGS) {
-      existingLogs.splice(0, existingLogs.length - MAX_DEBUG_LOGS);
+      existingLogs.splice(0, existingLogs.length - MAX_DEBUG_LOGS)
     }
 
-    localStorage.setItem(DEBUG_LOGS_KEY, JSON.stringify(existingLogs));
+    localStorage.setItem(DEBUG_LOGS_KEY, JSON.stringify(existingLogs))
   } catch (_) {
     // Ignore localStorage errors
   }
-};
+}
 
 // Add this function to view debug logs (you can call this in browser dev tools)
 export const getDebugLogs = () => {
   try {
-    const logs = JSON.parse(localStorage.getItem(DEBUG_LOGS_KEY) || '[]');
-    return logs.join('\n');
+    const logs = JSON.parse(localStorage.getItem(DEBUG_LOGS_KEY) || '[]')
+    return logs.join('\n')
   } catch (_) {
-    return 'No debug logs available';
+    return 'No debug logs available'
   }
-};
+}
 
 // Make it globally available for debugging
-(window as unknown as CustomWindow).getDebugLogs = getDebugLogs;
-(window as unknown as CustomWindow).clearDebugLogs = () => localStorage.removeItem(DEBUG_LOGS_KEY);
+;(window as unknown as CustomWindow).getDebugLogs = getDebugLogs
+;(window as unknown as CustomWindow).clearDebugLogs = () =>
+  localStorage.removeItem(DEBUG_LOGS_KEY)

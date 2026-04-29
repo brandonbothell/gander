@@ -1,39 +1,39 @@
 // Update the SessionMonitor.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'
 import {
   FiChevronLeft,
   FiChevronRight,
   FiMapPin,
   FiClock,
   FiGlobe,
-} from 'react-icons/fi';
-import { useLocalStorageState } from '../hooks/useLocalStorageState';
+} from 'react-icons/fi'
+import { useLocalStorageState } from '../hooks/useLocalStorageState'
 import {
   type TrustedDevice,
   type Session,
   getDeviceDisplayName,
-} from '../../../source/types/deviceInfo';
-import { geolocateIP, getSessionId } from '../utils/session';
+} from '../../../source/types/deviceInfo'
+import { geolocateIP, getSessionId } from '../utils/session'
 
 interface SessionMonitorProps {
-  onClose: () => void;
-  sessions?: (Session & TrustedDevice)[]; // Pre-fetched sessions
-  knownSessions?: string[];
+  onClose: () => void
+  sessions?: (Session & TrustedDevice)[] // Pre-fetched sessions
+  knownSessions?: string[]
   setKnownSessions?: (
     sessions: string[] | ((prev: string[]) => string[]),
-  ) => void;
+  ) => void
   setSessions?: (
     sessions:
       | (Session & TrustedDevice)[]
       | ((prev: (Session & TrustedDevice)[]) => (Session & TrustedDevice)[]),
-  ) => void;
+  ) => void
 }
 
 declare global {
   interface Window {
-    initGoogleMaps?: () => void;
+    initGoogleMaps?: () => void
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    google?: { maps?: { [key: string]: any } };
+    google?: { maps?: { [key: string]: any } }
   }
 }
 
@@ -46,103 +46,103 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
 }) => {
   const [localSessions, setLocalSessions] = useState<
     (Session & TrustedDevice)[]
-  >([]);
+  >([])
   const [localKnownSessions, setLocalKnownSessions] = useLocalStorageState<
     string[]
-  >('knownSessionIds', []);
+  >('knownSessionIds', [])
 
-  const sessions = propSessions ?? localSessions;
-  const knownSessions = propKnownSessions ?? localKnownSessions;
-  const setSessions = propSetSessions ?? setLocalSessions;
-  const setKnownSessions = propSetKnownSessions ?? setLocalKnownSessions;
-  const [currentSessionIndex, setCurrentSessionIndex] = useState(0);
-  const [loading, setLoading] = useState(!propSessions); // Don't show loading if sessions provided
-  const [error, setError] = useState<string | null>(null);
-  const [mapsLoaded, setMapsLoaded] = useState(false);
-  const [hasLoadedSessions, setHasLoadedSessions] = useState(!!propSessions); // Mark as loaded if sessions provided
+  const sessions = propSessions ?? localSessions
+  const knownSessions = propKnownSessions ?? localKnownSessions
+  const setSessions = propSetSessions ?? setLocalSessions
+  const setKnownSessions = propSetKnownSessions ?? setLocalKnownSessions
+  const [currentSessionIndex, setCurrentSessionIndex] = useState(0)
+  const [loading, setLoading] = useState(!propSessions) // Don't show loading if sessions provided
+  const [error, setError] = useState<string | null>(null)
+  const [mapsLoaded, setMapsLoaded] = useState(false)
+  const [hasLoadedSessions, setHasLoadedSessions] = useState(!!propSessions) // Mark as loaded if sessions provided
 
   // Only fetch sessions if not provided via props
-  const shouldFetchSessions = !propSessions;
+  const shouldFetchSessions = !propSessions
 
   // Prevent document scroll when modal is open
   useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
 
     return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
+      document.body.style.overflow = originalOverflow
+    }
+  }, [])
 
   // Skip initial loading if sessions are provided
   useEffect(() => {
     if (propSessions && propSessions.length > 0) {
-      setLoading(false);
-      setHasLoadedSessions(true);
+      setLoading(false)
+      setHasLoadedSessions(true)
     }
-  }, [propSessions]);
+  }, [propSessions])
 
   // Load Google Maps API
   useEffect(() => {
     if (window.google?.maps?.Map) {
-      setMapsLoaded(true);
-      return;
+      setMapsLoaded(true)
+      return
     }
 
-    const script = document.createElement('script');
+    const script = document.createElement('script')
     script.src = `https://maps.googleapis.com/maps/api/js?key=${
       import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-    }&loading=async&libraries=geometry,marker&callback=initGoogleMaps`;
-    script.async = true;
-    script.defer = true;
+    }&loading=async&libraries=geometry,marker&callback=initGoogleMaps`
+    script.async = true
+    script.defer = true
 
     // Add a global callback function
     window.initGoogleMaps = () => {
-      console.log('Google Maps API loaded successfully');
-      setMapsLoaded(true);
+      console.log('Google Maps API loaded successfully')
+      setMapsLoaded(true)
       // Clean up the global callback
-      delete window.initGoogleMaps;
-    };
+      delete window.initGoogleMaps
+    }
 
     script.onerror = () => {
-      console.error('Failed to load Google Maps API');
-      setError('Failed to load maps. Please check your internet connection.');
+      console.error('Failed to load Google Maps API')
+      setError('Failed to load maps. Please check your internet connection.')
       // Clean up the global callback
-      delete window.initGoogleMaps;
-    };
+      delete window.initGoogleMaps
+    }
 
-    document.head.appendChild(script);
+    document.head.appendChild(script)
 
     return () => {
       if (script.parentNode) {
-        script.parentNode.removeChild(script);
+        script.parentNode.removeChild(script)
       }
       // Clean up the global callback if component unmounts
       if (window.initGoogleMaps) {
-        delete window.initGoogleMaps;
+        delete window.initGoogleMaps
       }
-    };
-  }, []);
+    }
+  }, [])
 
   // Fetch sessions (without geolocation)
   useEffect(() => {
-    if (hasLoadedSessions || !shouldFetchSessions) return;
+    if (hasLoadedSessions || !shouldFetchSessions) return
     console.warn(
       'Missing session details from main thread, please contact the developer to fix this bug',
-    );
-  }, [hasLoadedSessions, shouldFetchSessions]);
+    )
+  }, [hasLoadedSessions, shouldFetchSessions])
 
   // Geolocate current session
   useEffect(() => {
-    if (!sessions.length || currentSessionIndex >= sessions.length) return;
+    if (!sessions.length || currentSessionIndex >= sessions.length) return
 
-    const currentSession = sessions[currentSessionIndex];
+    const currentSession = sessions[currentSessionIndex]
 
     // Skip if already geolocated or currently geolocating
-    if (currentSession.geolocated || currentSession.isGeolocating) return;
+    if (currentSession.geolocated || currentSession.isGeolocating) return
 
     const geolocateCurrentSession = async () => {
-      console.log(`Geolocating current session: ${currentSession.ip}`);
+      console.log(`Geolocating current session: ${currentSession.ip}`)
 
       // Mark as geolocating
       setSessions((prev) =>
@@ -151,10 +151,10 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
             ? { ...session, isGeolocating: true }
             : session,
         ),
-      );
+      )
 
       try {
-        const updatedSession = await geolocateIP(knownSessions, currentSession);
+        const updatedSession = await geolocateIP(knownSessions, currentSession)
 
         // Update the session with geolocation data
         setSessions((prev) =>
@@ -168,12 +168,12 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
                 }
               : session,
           ),
-        );
+        )
       } catch (error) {
         console.error(
           `Failed to geolocate session ${currentSession.ip}:`,
           error,
-        );
+        )
 
         // Mark as failed geolocation
         setSessions((prev) =>
@@ -186,19 +186,19 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
                 }
               : session,
           ),
-        );
+        )
       }
-    };
+    }
 
-    geolocateCurrentSession();
-  }, [sessions, currentSessionIndex, knownSessions]);
+    geolocateCurrentSession()
+  }, [sessions, currentSessionIndex, knownSessions])
 
   // Add a new effect to handle marking sessions as known when navigating away
   useEffect(() => {
     // When currentSessionIndex changes, mark the PREVIOUS session as known
     // (not the current one we're navigating to)
     const markPreviousSessionAsKnown = () => {
-      if (sessions.length === 0) return;
+      if (sessions.length === 0) return
 
       // Find sessions that are currently "new" but not the current session
       const sessionsToMarkAsKnown = sessions
@@ -207,32 +207,32 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
           ({ session, index }) =>
             session.isNew && index !== currentSessionIndex,
         )
-        .map(({ session }) => getSessionId(session.ip, session.deviceInfo));
+        .map(({ session }) => getSessionId(session.ip, session.deviceInfo))
 
       if (sessionsToMarkAsKnown.length > 0) {
-        console.log('Marking sessions as known:', sessionsToMarkAsKnown);
+        console.log('Marking sessions as known:', sessionsToMarkAsKnown)
         setKnownSessions((prev) =>
           Array.from(new Set([...prev, ...sessionsToMarkAsKnown])),
-        );
+        )
 
         // Update the sessions state to reflect the change
         setSessions((prevSessions) =>
           prevSessions.map((session) => {
-            const sessionId = getSessionId(session.ip, session.deviceInfo);
+            const sessionId = getSessionId(session.ip, session.deviceInfo)
             if (sessionsToMarkAsKnown.includes(sessionId)) {
-              return { ...session, isNew: false };
+              return { ...session, isNew: false }
             }
-            return session;
+            return session
           }),
-        );
+        )
       }
-    };
+    }
 
     // Only run this after initial load and when user actually changes sessions
     if (hasLoadedSessions && sessions.length > 0) {
-      markPreviousSessionAsKnown();
+      markPreviousSessionAsKnown()
     }
-  }, [currentSessionIndex, hasLoadedSessions]);
+  }, [currentSessionIndex, hasLoadedSessions])
 
   // Initialize map when both maps API and current session location are loaded
   useEffect(() => {
@@ -246,16 +246,16 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
       sessions.length === 0 ||
       currentSessionIndex >= sessions.length
     ) {
-      return;
+      return
     }
 
-    const currentSession = sessions[currentSessionIndex];
+    const currentSession = sessions[currentSessionIndex]
     if (!currentSession.location) {
-      return;
+      return
     }
 
-    const mapContainer = document.getElementById('session-map');
-    if (!mapContainer) return;
+    const mapContainer = document.getElementById('session-map')
+    if (!mapContainer) return
 
     try {
       const map = new window.google.maps.Map(mapContainer, {
@@ -266,7 +266,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
         zoom: 10,
         mapTypeId: 'roadmap',
         mapId: 'f07b9b94ba34907f16488778',
-      });
+      })
 
       new window.google.maps.marker.AdvancedMarkerElement({
         position: {
@@ -275,15 +275,15 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
         },
         map: map,
         title: `${currentSession.location.city}, ${currentSession.location.region}`,
-      });
+      })
     } catch (error) {
-      console.error('Error initializing Google Maps:', error);
-      setError('Failed to initialize map. Please refresh the page.');
+      console.error('Error initializing Google Maps:', error)
+      setError('Failed to initialize map. Please refresh the page.')
     }
-  }, [mapsLoaded, sessions, currentSessionIndex]);
+  }, [mapsLoaded, sessions, currentSessionIndex])
 
-  const currentSession = sessions[currentSessionIndex];
-  const newSessions = sessions.filter((s) => s.isNew);
+  const currentSession = sessions[currentSessionIndex]
+  const newSessions = sessions.filter((s) => s.isNew)
 
   // Rest of the component remains the same...
   // (keeping all the existing JSX and render logic)
@@ -330,7 +330,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
           <div>Loading session data...</div>
         </div>
       </div>
-    );
+    )
   }
 
   if (error || sessions.length === 0) {
@@ -392,7 +392,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -1183,5 +1183,5 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
         </div>
       </div>
     </div>
-  );
-};
+  )
+}

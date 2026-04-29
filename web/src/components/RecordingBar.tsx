@@ -1,52 +1,53 @@
-import { useEffect, useRef, useState } from 'react';
-import { Recording } from './Recording';
+import { useEffect, useRef, useState } from 'react'
+import { Recording } from './Recording'
 
 interface RecordingBarProps {
-  open: boolean;
-  streamId: string;
-  filename: string;
-  onClose: () => void;
-  cachedRecordings: { streamId: string; filename: string }[];
-  onNavigate: (filename: string) => void;
-  setAutoScrollUntilRef: (until: number) => void;
-  setNicknames: React.Dispatch<React.SetStateAction<{
-    [filename: string]: string;
-  }>>;
-  setOpeningRecording: (opening: boolean) => void;
+  open: boolean
+  streamId: string
+  filename: string
+  onClose: () => void
+  cachedRecordings: { streamId: string; filename: string }[]
+  onNavigate: (filename: string) => void
+  setAutoScrollUntilRef: (until: number) => void
+  setNicknames: React.Dispatch<
+    React.SetStateAction<{
+      [filename: string]: string
+    }>
+  >
+  setOpeningRecording: (opening: boolean) => void
 }
 
-const ANIMATION_DURATION = 700; // ms, match your CSS
+const ANIMATION_DURATION = 700 // ms, match your CSS
 
 export function RecordingBar(props: RecordingBarProps) {
-  const barRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [viewing, setViewing] = useState(props.open);
-
+  const barRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [viewing, setViewing] = useState(props.open)
 
   // Sync video state
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const handlePlay = () => setViewing(true);
-    const handlePause = () => setViewing(false);
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
+    const video = videoRef.current
+    if (!video) return
+    const handlePlay = () => setViewing(true)
+    const handlePause = () => setViewing(false)
+    video.addEventListener('play', handlePlay)
+    video.addEventListener('pause', handlePause)
     return () => {
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-    };
-  }, [videoRef, props.filename]);
+      video.removeEventListener('play', handlePlay)
+      video.removeEventListener('pause', handlePause)
+    }
+  }, [videoRef, props.filename])
 
   useEffect(() => {
     if (props.open) {
-      setViewing(true);
+      setViewing(true)
     } else {
-      const timeout = setTimeout(() => setViewing(false), ANIMATION_DURATION);
-      return () => clearTimeout(timeout);
+      const timeout = setTimeout(() => setViewing(false), ANIMATION_DURATION)
+      return () => clearTimeout(timeout)
     }
-  }, [props.open]);
+  }, [props.open])
 
-  if (!viewing && !props.open) return null;
+  if (!viewing && !props.open) return null
 
   return (
     <div
@@ -78,7 +79,8 @@ export function RecordingBar(props: RecordingBarProps) {
             maxWidth: '98vw',
             width: 'min(900px, 98vw)',
             opacity: props.open ? 1 : 0,
-            transition: 'transform 0.7s cubic-bezier(.4,2,.6,1), opacity 0.7s cubic-bezier(.4,2,.6,1)',
+            transition:
+              'transform 0.7s cubic-bezier(.4,2,.6,1), opacity 0.7s cubic-bezier(.4,2,.6,1)',
             overflow: 'hidden',
             pointerEvents: props.open ? 'auto' : 'none',
           }}
@@ -88,5 +90,5 @@ export function RecordingBar(props: RecordingBarProps) {
         </div>
       </div>
     </div>
-  );
+  )
 }

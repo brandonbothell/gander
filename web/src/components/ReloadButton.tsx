@@ -22,12 +22,17 @@ export function ReloadButton() {
           title="Reload Page"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M4 10a6 6 0 1 1 2.2 4.6" stroke="#fff" strokeWidth="2" fill="none" />
+            <path
+              d="M4 10a6 6 0 1 1 2.2 4.6"
+              stroke="#fff"
+              strokeWidth="2"
+              fill="none"
+            />
             <path d="M2 14v3h3" stroke="#fff" strokeWidth="2" fill="none" />
           </svg>
           Reload
         </button>
       </div>
     </div>
-  );
+  )
 }

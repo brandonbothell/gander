@@ -2252,6 +2252,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/express-rate-limit@npm:6.0.2":
+  version: 6.0.2
+  resolution: "@types/express-rate-limit@npm:6.0.2"
+  dependencies:
+    express-rate-limit: "npm:*"
+  checksum: 10c0/079dcea4a65242e7777ffd36e336dc86762988eb91534d8c691e0d2856bb12e5c28d5b8812641f51e2f86bdd2994da23b7cff683453cf20d78501bd0b13a70ba
+  languageName: node
+  linkType: hard
+
 "@types/express-serve-static-core@npm:^4.17.33":
   version: 4.19.7
   resolution: "@types/express-serve-static-core@npm:4.19.7"
@@ -5021,6 +5030,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"express-rate-limit@npm:*, express-rate-limit@npm:8.4.1":
+  version: 8.4.1
+  resolution: "express-rate-limit@npm:8.4.1"
+  dependencies:
+    ip-address: "npm:10.1.0"
+  peerDependencies:
+    express: ">= 4.11"
+  checksum: 10c0/ead87bcf7b9b4094d2a597b6a77569eed34c7d2ff3a449eeef25e1cd4a96dc3de17b8da93e8cf82f757ef441974846138b4bc371621fbc72346f8cc4a07a712b
+  languageName: node
+  linkType: hard
+
 "express-session@npm:1.19.0":
   version: 1.19.0
   resolution: "express-session@npm:1.19.0"
@@ -5545,6 +5565,7 @@ __metadata:
     "@types/copyfiles": "npm:2.4.4"
     "@types/cors": "npm:2.8.19"
     "@types/express": "npm:5.0.6"
+    "@types/express-rate-limit": "npm:6.0.2"
     "@types/express-session": "npm:1.19.0"
     "@types/greenlock-express": "npm:4.0.3"
     "@types/jsonwebtoken": "npm:9.0.10"
@@ -5568,6 +5589,7 @@ __metadata:
     eslint-plugin-react-hooks: "npm:7.1.1"
     eslint-plugin-unused-imports: "npm:4.4.1"
     express: "npm:5.2.1"
+    express-rate-limit: "npm:8.4.1"
     express-session: "npm:1.19.0"
     firebase-admin: "npm:13.8.0"
     globals: "npm:17.5.0"
@@ -6354,7 +6376,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ip-address@npm:^10.0.1":
+"ip-address@npm:10.1.0, ip-address@npm:^10.0.1":
   version: 10.1.0
   resolution: "ip-address@npm:10.1.0"
   checksum: 10c0/0103516cfa93f6433b3bd7333fa876eb21263912329bfa47010af5e16934eeeff86f3d2ae700a3744a137839ddfad62b900c7a445607884a49b5d1e32a3d7566

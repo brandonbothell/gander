@@ -1,28 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
-import { FiCircle, FiPause, FiPlay, FiSettings, FiX } from 'react-icons/fi';
-import { type Stream } from '../../../source/types/shared';
+import { useEffect, useRef, useState } from 'react'
+import { FiCircle, FiPause, FiPlay, FiSettings, FiX } from 'react-icons/fi'
+import { type Stream } from '../../../source/types/shared'
 
 interface StreamTilesGridProps {
-  streams: Stream[];
-  canAddStream: boolean;
-  onAddStream: () => void;
-  onOpenSettings: (stream: Stream) => void;
-  getThumbUrl: (stream: Stream) => string;
-  setActiveStream: (stream: Stream) => void;
-  onViewRecordings: (stream: Stream) => void;
-  onToggleMotionPause: (stream: Stream, enabled: boolean) => Promise<void>;
-  onDeleteStream?: (stream: Stream) => void; // Add this prop
-  motionRecordingPaused: { [streamId: string]: boolean };
+  streams: Stream[]
+  canAddStream: boolean
+  onAddStream: () => void
+  onOpenSettings: (stream: Stream) => void
+  getThumbUrl: (stream: Stream) => string
+  setActiveStream: (stream: Stream) => void
+  onViewRecordings: (stream: Stream) => void
+  onToggleMotionPause: (stream: Stream, enabled: boolean) => Promise<void>
+  onDeleteStream?: (stream: Stream) => void // Add this prop
+  motionRecordingPaused: { [streamId: string]: boolean }
   motionStatus: {
     [streamId: string]: {
-      recording: boolean;
-      secondsLeft: number;
-      saving: boolean;
-      startedRecordingAt: number;
-    };
-  };
-  motionSaving: { [streamId: string]: boolean };
-  activeStreamId?: string;
+      recording: boolean
+      secondsLeft: number
+      saving: boolean
+      startedRecordingAt: number
+    }
+  }
+  motionSaving: { [streamId: string]: boolean }
+  activeStreamId?: string
 }
 
 export function StreamTilesGrid({
@@ -40,25 +40,25 @@ export function StreamTilesGrid({
   motionSaving,
   activeStreamId,
 }: StreamTilesGridProps) {
-  const gridRef = useRef<HTMLDivElement>(null);
-  const lastActiveStreamIdRef = useRef<string | undefined>(activeStreamId);
-  const animationTimeoutRef = useRef<number | null>(null);
-  const [deletingStreamId, setDeletingStreamId] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null)
+  const lastActiveStreamIdRef = useRef<string | undefined>(activeStreamId)
+  const animationTimeoutRef = useRef<number | null>(null)
+  const [deletingStreamId, setDeletingStreamId] = useState<string | null>(null)
   const [isUpdatingMotionPaused, setIsUpdatingMotionPaused] = useState<{
-    [streamId: string]: boolean;
-  }>({});
+    [streamId: string]: boolean
+  }>({})
 
   // Capture positions and animate when active stream changes
   useEffect(() => {
-    if (!gridRef.current || !activeStreamId) return;
+    if (!gridRef.current || !activeStreamId) return
 
     // Check if active stream actually changed
-    if (lastActiveStreamIdRef.current === activeStreamId) return;
+    if (lastActiveStreamIdRef.current === activeStreamId) return
 
     // Only animate if we have a previous active stream (not initial load)
     if (!lastActiveStreamIdRef.current) {
-      lastActiveStreamIdRef.current = activeStreamId;
-      return;
+      lastActiveStreamIdRef.current = activeStreamId
+      return
     }
 
     console.log(
@@ -66,46 +66,46 @@ export function StreamTilesGrid({
       lastActiveStreamIdRef.current,
       '->',
       activeStreamId,
-    );
+    )
 
     // Clear any existing animation timeout
     if (animationTimeoutRef.current) {
-      clearTimeout(animationTimeoutRef.current);
+      clearTimeout(animationTimeoutRef.current)
     }
 
     // Capture current positions before React reorders
-    const tiles = gridRef.current.querySelectorAll('.stream-tile-button');
-    const currentPositions = new Map<string, DOMRect>();
+    const tiles = gridRef.current.querySelectorAll('.stream-tile-button')
+    const currentPositions = new Map<string, DOMRect>()
 
     tiles.forEach((tile) => {
-      const streamId = tile.getAttribute('data-stream-id');
+      const streamId = tile.getAttribute('data-stream-id')
       if (streamId) {
-        currentPositions.set(streamId, tile.getBoundingClientRect());
+        currentPositions.set(streamId, tile.getBoundingClientRect())
         // console.log(`Captured position for ${streamId}:`, tile.getBoundingClientRect());
       } else {
-        console.warn('Tile missing data-stream-id attribute:', tile);
+        console.warn('Tile missing data-stream-id attribute:', tile)
       }
-    });
+    })
 
     // Use longer delay for Android WebView to ensure DOM is ready
-    const delay = navigator.userAgent.includes('Android') ? 100 : 32;
+    const delay = navigator.userAgent.includes('Android') ? 100 : 32
 
     animationTimeoutRef.current = window.setTimeout(() => {
-      if (!gridRef.current) return;
+      if (!gridRef.current) return
 
-      const newTiles = gridRef.current.querySelectorAll('.stream-tile-button');
-      const animations: Animation[] = [];
+      const newTiles = gridRef.current.querySelectorAll('.stream-tile-button')
+      const animations: Animation[] = []
 
       newTiles.forEach((tile) => {
-        const streamId = tile.getAttribute('data-stream-id');
-        if (!streamId) return;
+        const streamId = tile.getAttribute('data-stream-id')
+        if (!streamId) return
 
-        const oldRect = currentPositions.get(streamId);
-        const newRect = tile.getBoundingClientRect();
+        const oldRect = currentPositions.get(streamId)
+        const newRect = tile.getBoundingClientRect()
 
         if (oldRect && newRect) {
-          const deltaX = oldRect.left - newRect.left;
-          const deltaY = oldRect.top - newRect.top;
+          const deltaX = oldRect.left - newRect.left
+          const deltaY = oldRect.top - newRect.top
 
           // Only animate if position actually changed significantly
           if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
@@ -130,44 +130,44 @@ export function StreamTilesGrid({
                     easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                     fill: 'both',
                   },
-                );
+                )
 
-                animations.push(animation);
+                animations.push(animation)
 
                 // Clean up animation when it finishes
                 animation.addEventListener('finish', () => {
-                  animation.cancel();
-                });
+                  animation.cancel()
+                })
               } catch (error) {
                 console.warn(
                   'Web Animations API failed, falling back to CSS:',
                   error,
-                );
+                )
                 // Fallback to CSS transitions for Android WebView
-                fallbackCSSAnimation(tile as HTMLElement, deltaX, deltaY);
+                fallbackCSSAnimation(tile as HTMLElement, deltaX, deltaY)
               }
             } else {
               // Fallback for browsers without Web Animations API
               // console.log('Web Animations API not supported, using CSS fallback');
-              fallbackCSSAnimation(tile as HTMLElement, deltaX, deltaY);
+              fallbackCSSAnimation(tile as HTMLElement, deltaX, deltaY)
             }
           }
         }
-      });
+      })
 
-      console.log(`Started ${animations.length} animations`);
-    }, delay);
+      console.log(`Started ${animations.length} animations`)
+    }, delay)
 
-    lastActiveStreamIdRef.current = activeStreamId;
+    lastActiveStreamIdRef.current = activeStreamId
 
     // Cleanup function
     return () => {
       if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current);
-        animationTimeoutRef.current = null;
+        clearTimeout(animationTimeoutRef.current)
+        animationTimeoutRef.current = null
       }
-    };
-  }, [activeStreamId]);
+    }
+  }, [activeStreamId])
 
   return (
     <div className="stream-tiles-grid" ref={gridRef}>
@@ -185,7 +185,7 @@ export function StreamTilesGrid({
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') setActiveStream(stream);
+            if (e.key === 'Enter' || e.key === ' ') setActiveStream(stream)
           }}
         >
           <div className="stream-tile">
@@ -262,14 +262,14 @@ export function StreamTilesGrid({
             {stream.id === activeStreamId && onDeleteStream && (
               <button
                 onClick={(e) => {
-                  e.stopPropagation();
+                  e.stopPropagation()
                   if (
                     window.confirm(
                       `Are you sure you want to delete the stream "${stream.nickname || stream.id}"? This action cannot be undone.`,
                     )
                   ) {
-                    setDeletingStreamId(stream.id);
-                    onDeleteStream(stream);
+                    setDeletingStreamId(stream.id)
+                    onDeleteStream(stream)
                   }
                 }}
                 disabled={deletingStreamId === stream.id}
@@ -294,14 +294,13 @@ export function StreamTilesGrid({
                 }}
                 onMouseEnter={(e) => {
                   if (deletingStreamId !== stream.id) {
-                    e.currentTarget.style.boxShadow =
-                      'inset 0 -3px 0 0 #1cf1d1';
-                    e.currentTarget.style.color = '#1cf1d1';
+                    e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+                    e.currentTarget.style.color = '#1cf1d1'
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+                  e.currentTarget.style.color = '#fff'
                 }}
                 title="Delete stream"
               >
@@ -341,8 +340,8 @@ export function StreamTilesGrid({
               </div>
               <button
                 onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenSettings(stream);
+                  e.stopPropagation()
+                  onOpenSettings(stream)
                 }}
                 style={{
                   background: 'transparent',
@@ -361,12 +360,12 @@ export function StreamTilesGrid({
                   boxShadow: 'inset 0 -3px 0 0 #fff',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                  e.currentTarget.style.color = '#1cf1d1';
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+                  e.currentTarget.style.color = '#1cf1d1'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+                  e.currentTarget.style.color = '#fff'
                 }}
               >
                 <FiSettings style={{ marginRight: 8 }} />
@@ -374,12 +373,12 @@ export function StreamTilesGrid({
               </button>
               <button
                 onClick={(e) => {
-                  e.stopPropagation();
-                  onViewRecordings(stream);
+                  e.stopPropagation()
+                  onViewRecordings(stream)
                   window.scrollTo({
                     top: document.body.scrollHeight,
                     behavior: 'smooth',
-                  });
+                  })
                 }}
                 style={{
                   background: 'transparent',
@@ -397,12 +396,12 @@ export function StreamTilesGrid({
                   boxShadow: 'inset 0 -3px 0 0 #fff',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                  e.currentTarget.style.color = '#1cf1d1';
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+                  e.currentTarget.style.color = '#1cf1d1'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+                  e.currentTarget.style.color = '#fff'
                 }}
               >
                 <FiCircle style={{ marginRight: 8, fill: 'currentColor' }} />
@@ -410,11 +409,11 @@ export function StreamTilesGrid({
               </button>
               <button
                 onClick={(e) => {
-                  e.stopPropagation();
+                  e.stopPropagation()
                   setIsUpdatingMotionPaused((prev) => ({
                     ...prev,
                     [stream.id]: true,
-                  }));
+                  }))
                   onToggleMotionPause(
                     stream,
                     motionRecordingPaused[stream.id],
@@ -423,7 +422,7 @@ export function StreamTilesGrid({
                       ...prev,
                       [stream.id]: false,
                     })),
-                  );
+                  )
                 }}
                 disabled={
                   isUpdatingMotionPaused[stream.id] || motionSaving[stream.id]
@@ -444,12 +443,12 @@ export function StreamTilesGrid({
                   boxShadow: 'inset 0 -3px 0 0 #fff',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-                  e.currentTarget.style.color = '#1cf1d1';
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+                  e.currentTarget.style.color = '#1cf1d1'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+                  e.currentTarget.style.color = '#fff'
                 }}
                 aria-pressed={motionRecordingPaused[stream.id]}
               >
@@ -476,7 +475,7 @@ export function StreamTilesGrid({
         </button>
       )}
     </div>
-  );
+  )
 }
 
 // CSS-based animation fallback for Android WebView
@@ -486,28 +485,28 @@ const fallbackCSSAnimation = (
   deltaY: number,
 ) => {
   // Set initial position
-  element.style.transition = 'none';
-  element.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-  element.style.zIndex = '10';
+  element.style.transition = 'none'
+  element.style.transform = `translate(${deltaX}px, ${deltaY}px)`
+  element.style.zIndex = '10'
 
   // Force layout then apply transition on next frame to ensure the browser sees the start state
   // (avoids relying on the magic of reading offsetHeight)
-  void element.getBoundingClientRect();
+  void element.getBoundingClientRect()
   requestAnimationFrame(() => {
     element.style.transition =
-      'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-    element.style.transform = 'translate(0, 0)';
-  });
+      'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+    element.style.transform = 'translate(0, 0)'
+  })
 
   // Animate to final position
   element.style.transition =
-    'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-  element.style.transform = 'translate(0, 0)';
+    'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+  element.style.transform = 'translate(0, 0)'
 
   // Clean up after animation
   setTimeout(() => {
-    element.style.transition = '';
-    element.style.transform = '';
-    element.style.zIndex = '';
-  }, 800);
-};
+    element.style.transition = ''
+    element.style.transform = ''
+    element.style.zIndex = ''
+  }, 800)
+}

@@ -2,36 +2,36 @@ import {
   type TrustedDevice,
   type DeviceInfo,
   type Session,
-} from '../../../source/types/deviceInfo';
-import { fetchWithRetry } from '../main';
+} from '../../../source/types/deviceInfo'
+import { fetchWithRetry } from '../main'
 
 // Helper function to create a unique session identifier
 export const getSessionId = (_: string, deviceInfo: DeviceInfo): string => {
-  return deviceInfo.clientId;
-};
+  return deviceInfo.clientId
+}
 
 export const geolocateIP = async (
   knownSessions?: string[],
   device?: TrustedDevice,
 ) => {
-  const ip = device?.ip || null;
+  const ip = device?.ip || null
   try {
     // console.log(`Geolocating IP ${ip || 'local'}...`);
     const geoResponse = await fetchWithRetry(() =>
       fetch(`https://ipinfo.io/${ip ? ip + '/' : ''}json`),
-    );
-    const geoData = await geoResponse.json();
+    )
+    const geoData = await geoResponse.json()
 
     // console.log(`Geolocation data for ${ip || 'local'}:`, geoData);
 
     if (geoData.error) {
-      throw new Error(`API Error: ${geoData.error.message || 'Unknown error'}`);
+      throw new Error(`API Error: ${geoData.error.message || 'Unknown error'}`)
     }
 
-    const { ip: geoIp }: { ip: string } = geoData;
+    const { ip: geoIp }: { ip: string } = geoData
     const [lat, lon] = geoData.loc
       ? geoData.loc.split(',').map(Number)
-      : [null, null];
+      : [null, null]
 
     if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
       const session: Session = {
@@ -59,11 +59,11 @@ export const geolocateIP = async (
           : true,
         geolocated: true,
         isGeolocating: false,
-      };
+      }
       // console.log(`Successfully created session for ${ip}`);
-      return session;
+      return session
     } else {
-      console.warn(`No valid coordinates found for IP ${ip}`);
+      console.warn(`No valid coordinates found for IP ${ip}`)
       return {
         ip: geoIp,
         firstSeen: new Date().toISOString(),
@@ -77,10 +77,10 @@ export const geolocateIP = async (
           : true,
         geolocated: true,
         isGeolocating: false,
-      };
+      }
     }
   } catch (error) {
-    console.error(`Failed to geolocate IP ${ip || 'local'}:`, error);
+    console.error(`Failed to geolocate IP ${ip || 'local'}:`, error)
     return {
       ip: ip || 'local',
       firstSeen: new Date().toISOString(),
@@ -92,6 +92,6 @@ export const geolocateIP = async (
         : false,
       geolocated: true,
       isGeolocating: false,
-    };
+    }
   }
-};
+}
