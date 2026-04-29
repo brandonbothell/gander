@@ -637,7 +637,16 @@ app.use(express.json())
 
 app.set('trust proxy', true)
 
-app.get('/hls/:streamId/stream.m3u8', jwtAuth, (req, res) => {
+import rateLimit from 'express-rate-limit'
+
+const hlsStreamLimiter = rateLimit({
+  windowMs: 10 * 1000, // 10 seconds
+  max: 4,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+app.get('/hls/:streamId/stream.m3u8', hlsStreamLimiter, jwtAuth, (req, res) => {
   const { streamId } = req.params
   const stream = dynamicStreams[streamId]
   if (!stream) {
@@ -653,35 +662,38 @@ app.get('/hls/:streamId/stream.m3u8', jwtAuth, (req, res) => {
   })
 })
 
-import rateLimit from 'express-rate-limit'
-
-const hlsLimiter = rateLimit({
+const hlsSegmentLimiter = rateLimit({
   windowMs: 1000, // 1 second
-  max: 4,
+  max: 2,
   standardHeaders: true,
   legacyHeaders: false,
 })
 
-app.get('/hls/:streamId/:segment', jwtAuth, async (req, res) => {
-  const { streamId, segment } = req.params
-  const stream = dynamicStreams[streamId]
-  if (!stream || !/^segment_\d+\.ts$/.test(segment)) {
-    res.status(404).send('Not found')
-    return
-  }
+app.get(
+  '/hls/:streamId/:segment',
+  hlsSegmentLimiter,
+  jwtAuth,
+  async (req, res) => {
+    const { streamId, segment } = req.params
+    const stream = dynamicStreams[streamId]
+    if (!stream || !/^segment_\d+\.ts$/.test(segment)) {
+      res.status(404).send('Not found')
+      return
+    }
 
-  try {
-    const segmentPath = stream.getSegmentPath(segment)
-    fs.createReadStream(segmentPath)
-      .on('error', () => {
-        res.type('text/html').status(404).send('Segment not found')
-      })
-      .pipe(res.type('video/MP2T'))
-  } catch {
-    res.type('text/html').status(404).send('Segment not found')
-    return
-  }
-})
+    try {
+      const segmentPath = stream.getSegmentPath(segment)
+      fs.createReadStream(segmentPath)
+        .on('error', () => {
+          res.type('text/html').status(404).send('Segment not found')
+        })
+        .pipe(res.type('video/MP2T'))
+    } catch {
+      res.type('text/html').status(404).send('Segment not found')
+      return
+    }
+  },
+)
 
 process.on('SIGINT', () => cleanExit())
 process.on('SIGTERM', () => cleanExit())
