@@ -12,6 +12,7 @@ export default function initializeRecordingRoutes(
   dynamicStreams: Record<string, StreamManager>,
 ) {
   const getAllRecordingsLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 60 * 1000, // 1 minute
     max: 2,
     standardHeaders: true,
@@ -19,6 +20,7 @@ export default function initializeRecordingRoutes(
   })
 
   const getPageRecordingsLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 10 * 1000, // 10 seconds
     max: 20,
     standardHeaders: true,
@@ -26,6 +28,7 @@ export default function initializeRecordingRoutes(
   })
 
   const getLatestRecordingsLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 10 * 1000, // 10 seconds
     max: 20,
     standardHeaders: true,
@@ -33,6 +36,7 @@ export default function initializeRecordingRoutes(
   })
 
   const getRecordingLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 3000, // 3 seconds
     max: 2,
     standardHeaders: true,
@@ -40,6 +44,7 @@ export default function initializeRecordingRoutes(
   })
 
   const getRecordingNicknameLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 3000, // 3 seconds
     max: 2,
     standardHeaders: true,
@@ -47,6 +52,7 @@ export default function initializeRecordingRoutes(
   })
 
   const setRecordingNicknameLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 3000, // 3 seconds
     max: 2,
     standardHeaders: true,
@@ -54,6 +60,7 @@ export default function initializeRecordingRoutes(
   })
 
   const getRecordingNicknamesLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 3000, // 3 seconds
     max: 2,
     standardHeaders: true,
@@ -61,6 +68,7 @@ export default function initializeRecordingRoutes(
   })
 
   const deleteRecordingsLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 5 * 1000, // 5 seconds
     max: 5,
     standardHeaders: true,
@@ -68,6 +76,7 @@ export default function initializeRecordingRoutes(
   })
 
   const getDeletedRecordingsLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 10 * 1000, // 10 seconds
     max: 20,
     standardHeaders: true,

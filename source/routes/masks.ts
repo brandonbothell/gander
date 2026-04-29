@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit'
 
 export default function initializeMaskRoutes(app: express.Application) {
   const getMasksLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 30 * 1000, // 30 seconds
     max: 20,
     standardHeaders: true,
@@ -12,6 +13,7 @@ export default function initializeMaskRoutes(app: express.Application) {
   })
 
   const postMasksLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 30 * 1000, // 30 seconds
     max: 20,
     standardHeaders: true,
@@ -19,6 +21,7 @@ export default function initializeMaskRoutes(app: express.Application) {
   })
 
   const patchMasksLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 15 * 1000, // 15 seconds
     max: 10,
     standardHeaders: true,
@@ -26,6 +29,7 @@ export default function initializeMaskRoutes(app: express.Application) {
   })
 
   const deleteMasksLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 5000, // 5 seconds
     max: 10,
     standardHeaders: true,

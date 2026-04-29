@@ -23,6 +23,7 @@ export default function initializeMotionRoutes(
   dynamicStreams: Record<string, StreamManager>,
 ) {
   const setMotionPauseLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 60 * 1000, // 1 minute
     max: 40, // limit each IP to 20 pause/resume requests per minute
     standardHeaders: true,
@@ -30,6 +31,7 @@ export default function initializeMotionRoutes(
   })
 
   const getMotionPauseLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 60 * 1000, // 1 minute
     max: 50, // limit each IP to 20 pause/resume requests per minute
     standardHeaders: true,
@@ -37,6 +39,7 @@ export default function initializeMotionRoutes(
   })
 
   const motionStatusLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 5000, // 5 seconds
     max: 16, // limit each IP to 8 status requests in 5 seconds
     standardHeaders: true,

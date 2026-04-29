@@ -9,6 +9,7 @@ export default function initializeStreamRoutes(
   dynamicStreams: Record<string, StreamManager>,
 ) {
   const getStreamsLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 10 * 1000, // 10 seconds
     max: 20,
     standardHeaders: true,
@@ -16,6 +17,7 @@ export default function initializeStreamRoutes(
   })
 
   const createStreamLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 10 * 1000, // 10 seconds
     max: 4,
     standardHeaders: true,
@@ -23,6 +25,7 @@ export default function initializeStreamRoutes(
   })
 
   const updateStreamLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 10 * 1000, // 10 seconds
     max: 4,
     standardHeaders: true,
@@ -30,6 +33,7 @@ export default function initializeStreamRoutes(
   })
 
   const reconnectStreamLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 10 * 1000, // 10 seconds
     max: 4,
     standardHeaders: true,
@@ -37,6 +41,7 @@ export default function initializeStreamRoutes(
   })
 
   const deleteStreamLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 10 * 1000, // 10 seconds
     max: 4,
     standardHeaders: true,

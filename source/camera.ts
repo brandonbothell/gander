@@ -635,11 +635,12 @@ app.use(
 
 app.use(express.json())
 
-app.set('trust proxy', true)
+app.set('trust proxy', () => true)
 
 import rateLimit from 'express-rate-limit'
 
 const hlsStreamLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 10 * 1000, // 10 seconds
   max: 4,
   standardHeaders: true,
@@ -663,6 +664,7 @@ app.get('/hls/:streamId/stream.m3u8', hlsStreamLimiter, jwtAuth, (req, res) => {
 })
 
 const hlsSegmentLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 1000, // 1 second
   max: 2,
   standardHeaders: true,
@@ -707,6 +709,7 @@ process.on('unhandledRejection', (err) => {
 })
 
 const thumbnailLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 30 * 1000, // 30 seconds
   max: 50,
   standardHeaders: true,
@@ -857,6 +860,7 @@ function verifySignedLatestThumbUrl(
 }
 
 const generateSignedLatestThumbUrlLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 5 * 60 * 1000, // 5 minutes
   max: 100,
   standardHeaders: true,
@@ -1034,6 +1038,7 @@ app.get(
 )
 
 const streamThumbnailLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 1000, // 1 second
   max: 4,
   standardHeaders: true,
@@ -1185,6 +1190,7 @@ app.get(
 )
 
 const streamThumbnailsLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 30 * 1000, // 30 seconds
   max: 50,
   standardHeaders: true,
@@ -1212,6 +1218,7 @@ app.use(
 )
 
 const streamSignedUrlLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 30 * 1000, // 30 seconds
   max: 8,
   standardHeaders: true,
@@ -1235,6 +1242,7 @@ app.get(
 )
 
 const videoAndThumbnailSignedUrlLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 2 * 1000, // 2 seconds
   max: 50,
   standardHeaders: true,
@@ -1266,6 +1274,7 @@ app.get(
 )
 
 const videosAndThumbnailsSignedUrlLimiter = rateLimit({
+  validate: { ip: false },
   windowMs: 2 * 1000, // 2 seconds
   max: 2,
   standardHeaders: true,
@@ -1280,7 +1289,6 @@ app.get(
     const { streamId } = req.params
     const { type } = req.query
     const filenames = String(req.query.filenames).split(',')
-    console.log('Typeof filenames: ' + typeof filenames)
 
     if (type !== 'video' && type !== 'thumbnail') {
       res.status(400).json({ error: 'Invalid parameters' })

@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit'
 
 export default function initializeNotificationRoutes(app: express.Application) {
   const subscribeLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 30 * 1000, // 30 seconds
     max: 20,
     standardHeaders: true,
@@ -15,6 +16,7 @@ export default function initializeNotificationRoutes(app: express.Application) {
   })
 
   const unsubscribeLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 30 * 1000, // 30 seconds
     max: 20,
     standardHeaders: true,

@@ -18,6 +18,7 @@ export default function initializeAuthRoutes(
   dynamicStreams: Record<string, StreamManager>,
 ) {
   const loginLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 2 * 60 * 1000, // 2 minutes
     max: 20,
     standardHeaders: true,
@@ -25,6 +26,7 @@ export default function initializeAuthRoutes(
   })
 
   const logoutLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 2 * 60 * 1000, // 2 minutes
     max: 20,
     standardHeaders: true,
@@ -32,6 +34,7 @@ export default function initializeAuthRoutes(
   })
 
   const refreshTokenLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 30 * 60 * 1000, // 30 minutes
     max: 200,
     standardHeaders: true,
@@ -39,6 +42,7 @@ export default function initializeAuthRoutes(
   })
 
   const sessionsLimiter = rateLimit({
+    validate: { ip: false },
     windowMs: 30000, // 30 seconds
     max: 20,
     standardHeaders: true,
