@@ -590,8 +590,8 @@ export default function App() {
     }
 
     // Call the global handler if it exists (for mobile logout button)
-    if ((window as any).handleSessionMonitorClose) {
-      ;(window as any).handleSessionMonitorClose()
+    if (window.handleSessionMonitorClose) {
+      window.handleSessionMonitorClose()
     }
   }
 

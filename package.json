@@ -27,7 +27,7 @@
     "db:migrate-resolve": "yarn pnpify prisma migrate resolve",
     "lint": "yarn lint:server && yarn lint:client",
     "lint:fix": "yarn lint:server --fix && yarn lint:client --fix",
-    "lint:server": "yarn eslint .",
+    "lint:server": "yarn eslint source",
     "lint:client": "yarn workspace web eslint .",
     "format:server": "prettier --check source/",
     "format:server:fix": "prettier --write source/",

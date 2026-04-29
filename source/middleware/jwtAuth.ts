@@ -1,6 +1,6 @@
-import { JWT_SECRET, RequestWithUser } from '../camera'
-import express from 'express'
 import jwt from 'jsonwebtoken'
+import express from 'express'
+import { JWT_SECRET, RequestWithUser } from '../camera'
 
 // --- JWT Middleware ---
 export async function jwtAuth(

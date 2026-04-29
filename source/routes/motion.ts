@@ -1,3 +1,11 @@
+import path from 'path'
+import * as fs from 'fs'
+import { exec } from 'child_process'
+import express, { Express } from 'express'
+import { StreamManager } from '../streamManager'
+import { clearMotionHistory } from '../motionDetector'
+import { jwtAuth } from '../middleware/jwtAuth'
+import { logMotion } from '../logMotion'
 import {
   persistStreamState,
   prisma,
@@ -5,17 +13,9 @@ import {
   StreamMotionState,
   saveMotionSegments as saveMotionSegmentsCamera,
 } from '../camera'
-import { logMotion } from '../logMotion'
-import { jwtAuth } from '../middleware/jwtAuth'
-import express, { Express } from 'express'
-import rateLimit from 'express-rate-limit'
-import { clearMotionHistory } from '../motionDetector'
-import { StreamManager } from '../streamManager'
-import * as fs from 'fs'
-import path from 'path'
 import { recordingsLowSpaceThresholdMb } from '../../config.json'
-import { exec } from 'child_process'
 import { notify } from './notifications'
+import { rateLimit } from 'express-rate-limit'
 
 export default function initializeMotionRoutes(
   app: Express,
@@ -499,6 +499,7 @@ async function flushMotionSegments(
         ) {
           return safeUnlinkWithRetry(segment)
         }
+        return Promise.resolve(void 0)
       })
       await Promise.all(promises)
       state.flushingSegments = []
@@ -663,10 +664,11 @@ async function saveMotionSegments(
         async () => {
           // Clean up segments and flushed files
           const promises = [
-            state.flushedSegments.concat(existingSegments).map((segment) => {
+            ...state.flushedSegments.concat(existingSegments).map((segment) => {
               if (!state.recentSegments.includes(segment)) {
                 return safeUnlinkWithRetry(segment)
               }
+              return Promise.resolve(void 0)
             }),
             ...existingFlushedFiles.map((f) => safeUnlinkWithRetry(f)),
             safeUnlinkWithRetry(listFile),

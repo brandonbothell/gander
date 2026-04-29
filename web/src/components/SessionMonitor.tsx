@@ -34,6 +34,7 @@ declare global {
     initGoogleMaps?: () => void
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     google?: { maps?: { [key: string]: any } }
+    handleSessionMonitorClose?: () => void
   }
 }
 

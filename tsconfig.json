@@ -109,8 +109,7 @@
     "web", // Exclude the frontend from backend compilation
     "node_modules",
     "hls*/", // Exclude the HLS folder
-    "./capacitor.config.ts",
-    "scripts"
+    "./capacitor.config.ts"
   ],
   "include": [
     "source/**/*.ts",

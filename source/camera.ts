@@ -1,35 +1,36 @@
 import '@dotenvx/dotenvx/config'
-import express from 'express'
-import jwt from 'jsonwebtoken'
-import cors from 'cors'
-import fs from 'fs'
 import path from 'path'
-import crypto from 'crypto'
 import http from 'http'
+import fs from 'fs'
+import crypto from 'crypto'
 import childProcess, { ChildProcess } from 'child_process'
-import open from 'open'
-import * as admin from 'firebase-admin'
 import webpush from 'web-push'
+import jwt from 'jsonwebtoken'
+import * as admin from 'firebase-admin'
+import express from 'express'
+import cors from 'cors'
+import consoleStamp from 'console-stamp'
 import * as chokidar from 'chokidar'
-import { PrismaClient } from './generated/prisma'
-import { StreamManager } from './streamManager'
-import { detectMotion, cleanFrameCache, debugLog } from './motionDetector'
-import { TrustedDevice } from './types/deviceInfo'
+import chalk from 'chalk'
 import config from '../config.json'
-import { jwtAuth } from './middleware/jwtAuth'
+import { TrustedDevice } from './types/deviceInfo'
+import { StreamManager } from './streamManager'
+import initializeStreamRoutes from './routes/streams'
+import initializeRecordingRoutes from './routes/recordings'
+import initializeNotificationRoutes, { notify } from './routes/notifications'
 import initializeMotionRoutes, {
   checkDiskSpaceAndPurge,
   flushMotionSegmentsWithRetry,
   saveMotionSegmentsWithRetry,
 } from './routes/motion'
-import initializeAuthRoutes from './routes/auth'
-import initializeNotificationRoutes, { notify } from './routes/notifications'
-import initializeRecordingRoutes from './routes/recordings'
 import initializeMaskRoutes from './routes/masks'
-import initializeStreamRoutes from './routes/streams'
-import { logMotion } from './logMotion'
-import consoleStamp from 'console-stamp'
-import chalk from 'chalk'
+import initializeAuthRoutes from './routes/auth'
+import { detectMotion, cleanFrameCache, debugLog } from './motionDetector'
+import { jwtAuth } from './middleware/jwtAuth'
+import { logAuth, logMotion } from './logMotion'
+import { PrismaClient } from './generated/prisma'
+import open from 'open'
+import { rateLimit } from 'express-rate-limit'
 
 consoleStamp(console, {
   format: ':date(yyyy-mm-dd HH:MM:ss.l).yellow.bgBlue :level() :msg',
@@ -73,8 +74,8 @@ export const prisma = new PrismaClient()
 
 // Motion logging setup
 const apiStartTime = new Date().toISOString().replace(/[:.]/g, '-')
-export const motionLogPath = path.join(__dirname, '..', 'logs', `motion`)
-export const authLogPath = path.join(__dirname, '..', 'logs', `auth`)
+export const motionLogPath = path.join(__dirname, '..', 'logs', 'motion')
+export const authLogPath = path.join(__dirname, '..', 'logs', 'auth')
 
 // Ensure logs directory exists
 const logsDir = path.dirname(motionLogPath)
@@ -228,8 +229,12 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
           }
           setTimeout(async () => {
             if (state.motionPaused) return
-            if ((Date.now() - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD)
+            if (
+              (Date.now() - state.startupTime) / 1000 <
+              STARTUP_GRACE_PERIOD
+            ) {
               return
+            }
             const motionStatus = await detectMotion(
               streamStates,
               streamId,
@@ -258,8 +263,9 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
 
                 state.motionRecordingActive = true
                 state.recentSegments.forEach((recentPath) => {
-                  if (!state.motionSegments.includes(recentPath))
+                  if (!state.motionSegments.includes(recentPath)) {
                     state.motionSegments.push(recentPath)
+                  }
                 })
 
                 if (state.flushTimer) clearInterval(state.flushTimer)
@@ -274,8 +280,9 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
               }
 
               // --- If motion is detected, add the segment to motion segments ---
-              if (!state.motionSegments.includes(segmentPath))
+              if (!state.motionSegments.includes(segmentPath)) {
                 state.motionSegments.push(segmentPath)
+              }
 
               // Log motion event
               logMotion(
@@ -329,8 +336,9 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
               state.motionRecordingTimeoutAt =
                 Date.now() + motionRecordingTimeoutMs
             } else if (state.motionRecordingActive) {
-              if (!state.motionSegments.includes(segmentPath))
+              if (!state.motionSegments.includes(segmentPath)) {
                 state.motionSegments.push(segmentPath)
+              }
             }
           }, 300)
         }),
@@ -600,7 +608,12 @@ async function cleanupExpiredTokensAndDevices() {
             trustedIps: JSON.stringify(filteredDevices),
           },
         })
-        .catch(() => {})
+        .catch(() => {
+          logAuth(
+            `[Cleanup] Failed to update valid JWTs of '${user.username}'.`,
+            'warn',
+          )
+        })
 
       console.log(
         `[Cleanup] Updated user ${user.username} - removed ${
@@ -636,8 +649,6 @@ app.use(
 app.use(express.json())
 
 app.set('trust proxy', () => true)
-
-import rateLimit from 'express-rate-limit'
 
 const hlsStreamLimiter = rateLimit({
   validate: { ip: false },
@@ -1396,13 +1407,14 @@ app.get('/signed/stream/:streamId/stream.m3u8', (req, res) => {
       return
     }
     let lines = data.split('\n')
-    if (!lines.some((line) => line.startsWith('#EXT-X-PLAYLIST-TYPE')))
+    if (!lines.some((line) => line.startsWith('#EXT-X-PLAYLIST-TYPE'))) {
       lines.splice(
         lines.findIndex((line) => line.startsWith('#EXTM3U')) + 1,
         0,
         '#EXT-X-PLAYLIST-TYPE:LIVE',
       )
-    if (!lines.some((line) => line.startsWith('#EXT-X-ALLOW-CACHE')))
+    }
+    if (!lines.some((line) => line.startsWith('#EXT-X-ALLOW-CACHE'))) {
       lines.splice(
         lines.findIndex((line) =>
           line.startsWith('#EXT-X-PLAYLIST-TYPE:LIVE'),
@@ -1410,6 +1422,7 @@ app.get('/signed/stream/:streamId/stream.m3u8', (req, res) => {
         0,
         '#EXT-X-ALLOW-CACHE:NO',
       )
+    }
     lines = lines.filter((line) => !line.startsWith('#EXT-X-ENDLIST'))
     // Rewrite segment URLs to signed segment URLs for this stream
     const rewritten = lines
@@ -1710,12 +1723,12 @@ async function cleanExit() {
           force: true,
         })
         console.log(
-          `[Cleanup] Deleted HLS directory:`,
+          '[Cleanup] Deleted HLS directory:',
           dynamicStreams[streamId].config.hlsDir,
         )
       }
     } catch (e) {
-      console.warn(`[Cleanup] Failed to delete HLS directory:`, e)
+      console.warn('[Cleanup] Failed to delete HLS directory:', e)
     }
   }
 

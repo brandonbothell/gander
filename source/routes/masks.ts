@@ -1,7 +1,7 @@
-import { prisma } from '../camera'
-import { jwtAuth } from '../middleware/jwtAuth'
 import express from 'express'
-import rateLimit from 'express-rate-limit'
+import { jwtAuth } from '../middleware/jwtAuth'
+import { prisma } from '../camera'
+import { rateLimit } from 'express-rate-limit'
 
 export default function initializeMaskRoutes(app: express.Application) {
   const getMasksLimiter = rateLimit({

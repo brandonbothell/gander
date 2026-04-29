@@ -1,23 +1,23 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { defineConfig, globalIgnores } from 'eslint/config';
-import tsParser from '@typescript-eslint/parser';
-import typescriptEslint from '@typescript-eslint/eslint-plugin';
-import globals from 'globals';
-import unusedImports from 'eslint-plugin-unused-imports';
-import stylistic from '@stylistic/eslint-plugin';
-import js from '@eslint/js';
-import { FlatCompat } from '@eslint/eslintrc';
-import { fixupConfigRules } from '@eslint/compat';
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+import { defineConfig, globalIgnores } from 'eslint/config'
+import tsParser from '@typescript-eslint/parser'
+import typescriptEslint from '@typescript-eslint/eslint-plugin'
+import globals from 'globals'
+import unusedImports from 'eslint-plugin-unused-imports'
+import stylistic from '@stylistic/eslint-plugin'
+import js from '@eslint/js'
+import { FlatCompat } from '@eslint/eslintrc'
+import { fixupConfigRules } from '@eslint/compat'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 const compat = new FlatCompat({
   baseDirectory: __dirname,
   recommendedConfig: js.configs.recommended,
   allConfig: js.configs.all,
-});
+})
 
 export default defineConfig([
   globalIgnores([
@@ -29,11 +29,13 @@ export default defineConfig([
     '.yarn/**/*',
     'out/src/**/*',
     'eslint.config.mts',
+    'android/**/*',
+    'source/generated/**/*',
   ]),
   {
     extends: fixupConfigRules(compat.extends('plugin:import/recommended')),
     files: [
-      'src/**/*.ts',
+      'source/**/*.ts',
       'tests/**/*.ts',
       'docusaurus/**/*.ts',
       'docusaurus/**/*.tsx',
@@ -58,7 +60,7 @@ export default defineConfig([
       sourceType: 'module',
 
       parserOptions: {
-        project: ['tsconfig.json'],
+        project: ['tsconfig.json', 'tsconfig.util.json'],
       },
     },
 
@@ -87,12 +89,33 @@ export default defineConfig([
           trailingUnderscore: 'allow',
         },
         {
+          selector: 'variable',
+          modifiers: ['const'],
+          format: ['PascalCase', 'UPPER_CASE', 'camelCase'],
+          leadingUnderscore: 'allow',
+          trailingUnderscore: 'allow',
+        },
+        {
+          selector: 'objectLiteralProperty',
+          format: [],
+          custom: { match: true, regex: '[a-zA-Z]*_*[a-zA-Z]+' },
+          leadingUnderscore: 'allow',
+          trailingUnderscore: 'allow',
+        },
+        {
+          selector: 'classProperty',
+          modifiers: ['static'],
+          format: ['UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+          trailingUnderscore: 'allow',
+        },
+        {
           selector: 'function',
           format: ['camelCase', 'PascalCase'],
         },
         {
           selector: 'variable',
-          format: ['camelCase', 'UPPER_CASE'],
+          format: ['camelCase'],
           leadingUnderscore: 'allow',
           trailingUnderscore: 'allow',
         },
@@ -128,7 +151,6 @@ export default defineConfig([
       ],
 
       '@typescript-eslint/no-empty-function': 'error',
-      '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-new': 'error',
       '@typescript-eslint/no-unnecessary-qualifier': 'error',
       '@typescript-eslint/no-unused-expressions': 'error',
@@ -158,7 +180,6 @@ export default defineConfig([
       'arrow-spacing': 'error',
       'brace-style': ['error', '1tbs'],
       'block-spacing': ['error', 'always'],
-      'comma-dangle': 'error',
       curly: ['error', 'multi-line'],
       'eol-last': 'error',
       eqeqeq: ['error', 'smart'],
@@ -178,14 +199,7 @@ export default defineConfig([
       ],
 
       'id-match': 'error',
-
-      indent: [
-        'error',
-        2,
-        {
-          SwitchCase: 1,
-        },
-      ],
+      'comma-dangle': 'off',
 
       'jsdoc/check-alignment': 'off',
       'jsdoc/check-indentation': 'off',
@@ -234,7 +248,6 @@ export default defineConfig([
       'object-curly-spacing': ['error', 'always'],
       'one-var': ['error', 'never'],
       radix: 'off',
-      'space-before-function-paren': 'error',
       'space-in-parens': ['error', 'never'],
 
       'spaced-comment': [
@@ -249,4 +262,4 @@ export default defineConfig([
       'valid-typeof': 'error',
     },
   },
-]);
+])

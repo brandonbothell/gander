@@ -1,8 +1,8 @@
-import { createStreamManager, prisma } from '../camera'
-import { jwtAuth } from '../middleware/jwtAuth'
-import { StreamManager } from '../streamManager'
 import express from 'express'
-import rateLimit from 'express-rate-limit'
+import { StreamManager } from '../streamManager'
+import { jwtAuth } from '../middleware/jwtAuth'
+import { createStreamManager, prisma } from '../camera'
+import { rateLimit } from 'express-rate-limit'
 
 export default function initializeStreamRoutes(
   app: express.Application,
@@ -109,7 +109,7 @@ export default function initializeStreamRoutes(
         }
         res.status(201).json(stream)
       } catch (e) {
-        console.error(`[StreamManager] Failed to create stream:`, e)
+        console.error('[StreamManager] Failed to create stream:', e)
         res.status(500).json({ error: 'Failed to create stream.' })
       }
     },
@@ -183,7 +183,7 @@ export default function initializeStreamRoutes(
         }
         res.json(updated)
       } catch (e) {
-        console.error(`[StreamManager] Failed to update stream:`, e)
+        console.error('[StreamManager] Failed to update stream:', e)
         res.status(500).json({ error: 'Failed to update stream.' })
       }
     },
@@ -239,7 +239,7 @@ export default function initializeStreamRoutes(
         }
         res.json({ success: true })
       } catch (e) {
-        console.error(`[StreamManager] Failed to delete stream:`, e)
+        console.error('[StreamManager] Failed to delete stream:', e)
         res.status(500).json({ error: 'Failed to delete stream.' })
       }
     },

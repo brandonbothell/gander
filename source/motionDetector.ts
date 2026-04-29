@@ -3,13 +3,13 @@
  * Heavily optimized for Raspberry Pi 4 with FFmpeg 5.1.6
  */
 
-import { Jimp, diff as getDiff } from 'jimp'
-import fs from 'fs'
 import path from 'path'
+import fs from 'fs'
 import { spawn } from 'child_process'
-import { prisma, StreamMotionState } from './camera'
-import { logMotion } from './logMotion'
+import { Jimp, diff as getDiff } from 'jimp'
 import { StreamManager } from './streamManager'
+import { logMotion } from './logMotion'
+import { prisma, StreamMotionState } from './camera'
 
 const STANDARD_WIDTH = 160 // Much smaller for performance
 const STANDARD_HEIGHT = 90
@@ -216,26 +216,26 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
                             try {
                               await fs.promises.rename(pngPath, outputPath)
                               debugLog(
-                                `[Motion] PNG extraction successful, renamed to JPG`,
+                                '[Motion] PNG extraction successful, renamed to JPG',
                               )
                               resolve()
                             } catch (_) {
                               logMotion(
-                                `[Motion] PNG extraction successful but rename failed`,
+                                '[Motion] PNG extraction successful but rename failed',
                                 'error',
                               )
                               reject(new Error('Rename failed'))
                             }
                           } else {
                             logMotion(
-                              `Both JPG and PNG extraction failed`,
+                              'Both JPG and PNG extraction failed',
                               'error',
                             )
                             reject(new Error('Both formats failed'))
                           }
                         } catch {
                           logMotion(
-                            `Both JPG and PNG extraction failed`,
+                            'Both JPG and PNG extraction failed',
                             'error',
                           )
                           reject(new Error('Both formats failed'))
@@ -437,8 +437,9 @@ export async function detectMotion(
         }
 
         // Movement history logic
-        if (!streamMovementHistory[streamId])
-          streamMovementHistory[streamId] = []
+        if (!streamMovementHistory[streamId]) {
+streamMovementHistory[streamId] = []
+}
         streamMovementHistory[streamId].push(isAboveDiffThreshold)
         if (
           streamMovementHistory[streamId].length >

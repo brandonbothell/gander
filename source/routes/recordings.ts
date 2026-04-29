@@ -1,11 +1,11 @@
-import express from 'express'
-import { jwtAuth } from '../middleware/jwtAuth'
-import { prisma, RequestWithUser } from '../camera'
-import { StreamManager } from '../streamManager'
 import path from 'path'
 import fs from 'fs/promises'
+import express from 'express'
+import { StreamManager } from '../streamManager'
+import { jwtAuth } from '../middleware/jwtAuth'
 import { MotionRecording, Prisma } from '../generated/prisma'
-import rateLimit from 'express-rate-limit'
+import { prisma, RequestWithUser } from '../camera'
+import { rateLimit } from 'express-rate-limit'
 
 export default function initializeRecordingRoutes(
   app: express.Application,

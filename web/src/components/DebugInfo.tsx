@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getDebugLogs } from '../utils/debugLog'
+import type { CustomWindow } from '../main'
 
 // Add this debug component somewhere in your app (maybe accessible via a hidden button)
 export const DebugInfo = ({ onClose }: { onClose: () => void }) => {
@@ -30,7 +31,7 @@ export const DebugInfo = ({ onClose }: { onClose: () => void }) => {
         </button>
         <button
           onClick={() => {
-            ;(window as any).clearDebugLogs()
+            ;(window as unknown as CustomWindow).clearDebugLogs()
             setLogs('')
           }}
         >

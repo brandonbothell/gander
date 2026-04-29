@@ -1,17 +1,17 @@
-import { prisma, RequestWithUser, JWT_SECRET } from '../camera'
-import { logAuth } from '../logMotion'
-import { jwtAuth } from '../middleware/jwtAuth'
-import { StreamManager } from '../streamManager'
+import jwt from 'jsonwebtoken'
+import express from 'express'
 import {
   DeviceInfo,
   TrustedDevice,
   getDeviceDisplayName,
 } from '../types/deviceInfo'
+import { StreamManager } from '../streamManager'
+import { jwtAuth } from '../middleware/jwtAuth'
+import { logAuth } from '../logMotion'
+import { prisma, RequestWithUser, JWT_SECRET } from '../camera'
 import config from '../../config.json'
-import express from 'express'
-import jwt from 'jsonwebtoken'
-import rateLimit from 'express-rate-limit'
 import { notify } from './notifications'
+import { rateLimit } from 'express-rate-limit'
 
 export default function initializeAuthRoutes(
   app: express.Express,
@@ -180,7 +180,7 @@ export default function initializeAuthRoutes(
             {
               title: 'New Device Detected',
               body: `A login from a new ${getDeviceDisplayName(safeDeviceInfo)} device was detected from IP: ${ip}`,
-              group: `security_event`,
+              group: 'security_event',
             },
             user.username,
           )
@@ -218,7 +218,7 @@ export default function initializeAuthRoutes(
         {
           title: 'Login Detected',
           body: `New log in from IP: ${ip}`,
-          group: `security_event`,
+          group: 'security_event',
         },
         username,
       )
@@ -390,7 +390,7 @@ export default function initializeAuthRoutes(
         {
           title: 'Suspicious Activity Detected',
           body: `Unauthorized activity detected from IP: ${ip}`,
-          group: `security_event`,
+          group: 'security_event',
         },
         user.username,
       )

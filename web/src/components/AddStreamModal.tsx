@@ -5,7 +5,7 @@ interface AddStreamModalProps {
   showModal: boolean
   onClose: () => void
   onStreamCreated: (stream: Stream) => void
-  authFetch: (url: string, options?: any) => Promise<any>
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>
   API_BASE: string
 }
 
@@ -77,8 +77,10 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
       const data = await res.json()
       onStreamCreated(data)
       handleClose()
-    } catch (err: any) {
-      setCreateError(err.message || 'Failed to create stream.')
+    } catch (err) {
+      setCreateError(
+        (err as { message?: string })?.message || 'Failed to create stream.',
+      )
     }
     setCreatingStream(false)
   }

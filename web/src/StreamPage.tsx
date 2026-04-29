@@ -2589,15 +2589,11 @@ export default function StreamPage({
       }
 
       // Store the handler globally so it can be called from App.tsx
-      ;(
-        window as typeof window & { handleSessionMonitorClose?: () => void }
-      ).handleSessionMonitorClose = handleSessionMonitorClose
+      window.handleSessionMonitorClose = handleSessionMonitorClose
     }
 
     return () => {
-      delete (
-        window as typeof window & { handleSessionMonitorClose?: () => void }
-      ).handleSessionMonitorClose
+      delete window.handleSessionMonitorClose
     }
   }, [onSessionMonitorClosed, isMobileWidth])
 

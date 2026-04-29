@@ -1,10 +1,10 @@
-import { prisma, RequestWithUser } from '../camera'
-import express from 'express'
-import { jwtAuth } from '../middleware/jwtAuth'
-import { StreamManager } from '../streamManager'
-import * as admin from 'firebase-admin'
 import webpush from 'web-push'
-import rateLimit from 'express-rate-limit'
+import * as admin from 'firebase-admin'
+import express from 'express'
+import { StreamManager } from '../streamManager'
+import { jwtAuth } from '../middleware/jwtAuth'
+import { prisma, RequestWithUser } from '../camera'
+import { rateLimit } from 'express-rate-limit'
 
 export default function initializeNotificationRoutes(app: express.Application) {
   const subscribeLimiter = rateLimit({
@@ -87,7 +87,9 @@ export default function initializeNotificationRoutes(app: express.Application) {
             where: { sid },
             data: { fcmToken: null },
           })
-          .catch(() => {})
+          .catch(() =>
+            console.warn('[FCM] Failed to unsubscribe user from push.'),
+          )
       } else {
         // Unsubscribe from Web Push only
         await prisma.pushSubscription
@@ -100,7 +102,9 @@ export default function initializeNotificationRoutes(app: express.Application) {
               auth: null,
             },
           })
-          .catch(() => {})
+          .catch(() =>
+            console.warn('[WebPush] Failed to unsubscribe user from push.'),
+          )
       }
 
       // After update, check if both FCM and Web Push are now null
@@ -113,7 +117,13 @@ export default function initializeNotificationRoutes(app: express.Application) {
         !updated?.p256dh &&
         !updated?.auth
       ) {
-        await prisma.pushSubscription.delete({ where: { sid } }).catch(() => {})
+        await prisma.pushSubscription
+          .delete({ where: { sid } })
+          .catch(() =>
+            console.warn(
+              '[PushNotifications] Failed to delete unused push subscription.',
+            ),
+          )
       }
 
       res.json({ success: true })
@@ -143,11 +153,12 @@ export async function notify(
   username?: string,
 ) {
   let nickname
-  if (!custom?.body)
-    ({ nickname } = (await prisma.stream.findUnique({
+  if (!custom?.body) {
+    ;({ nickname } = (await prisma.stream.findUnique({
       where: { id: streamId },
       select: { nickname: true },
     })) ?? { nickname: dynamicStreams[streamId]?.config.ffmpegInput })
+  }
   const title = custom?.title ?? 'Motion Detected!'
   const body = custom?.body ?? `Motion was detected by ${nickname}.`
   const icon = custom?.icon ?? 'push_icon'
@@ -199,7 +210,11 @@ export async function notify(
               where: { sid: sub.sid },
               data: { endpoint: null, p256dh: null, auth: null },
             })
-            .catch(() => {})
+            .catch(() =>
+              console.warn(
+                '[WebPush] Failed to delete unused push subscription.',
+              ),
+            )
         }
       }
     }
@@ -239,10 +254,11 @@ export async function notify(
           },
         })
       } catch (err) {
-        if (!err || typeof err !== 'object' || !('code' in err))
+        if (!err || typeof err !== 'object' || !('code' in err)) {
           throw new Error(
             'FCM notification error: No/invalid error object provided',
           )
+        }
 
         if (err.code === 'messaging/server-unavailable') {
           console.warn('FCM server unavailable, retrying...')
@@ -258,7 +274,9 @@ export async function notify(
               where: { sid: sub.sid },
               data: { fcmToken: null },
             })
-            .catch(() => {})
+            .catch(() =>
+              console.warn('[FCM] Failed to remove invalid token from user.'),
+            )
         }
 
         console.error('FCM notification error:', err)
