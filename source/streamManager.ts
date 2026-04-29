@@ -479,7 +479,7 @@ export class StreamManager {
         return
       }
       if (
-        code !== 0 &&
+        ((code === 0 && signal === null) || code !== 0) &&
         code !== 255 &&
         signal !== 'SIGTERM' &&
         signal !== 'SIGKILL' &&
