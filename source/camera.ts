@@ -1265,7 +1265,8 @@ app.get(
   (req, res) => {
     const { streamId } = req.params
     const { type } = req.query
-    const filenames = req.query.filenames as string | string[]
+    const filenames = String(req.query.filenames).split(',')
+    console.log('Typeof filenames: ' + typeof filenames)
 
     if (type !== 'video' && type !== 'thumbnail') {
       res.status(400).json({ error: 'Invalid parameters' })
@@ -1274,7 +1275,7 @@ app.get(
 
     const urls = createSignedUrl(
       streamId,
-      Array.isArray(filenames) ? filenames : [filenames],
+      filenames,
       type as 'video' | 'thumbnail',
     )
     res.json(urls)

@@ -85,9 +85,14 @@ export function useSignedUrl(
   useEffect(() => {
     let isMounted = true
 
-    const signedUrl = signedUrls[streamId]?.[type][filename]
-    if (signedUrl && signedUrl !== url && isMounted) {
-      setUrl(signedUrl)
+    const cache = loadCache()
+    const cacheKey = getCacheKey(filename, type, streamId)
+    const cached = cache.urls[cacheKey]
+    const now = Math.floor(Date.now() / 1000)
+
+    if (isMounted && cached && cached.expiresAt > now + 10) {
+      setUrl(cached.url)
+      cached.lastAccessed = now // update in memory only
     }
 
     return () => {
@@ -155,7 +160,7 @@ export function useSignedUrl(
             }
 
             for (const signedUrl of urls) {
-              signedUrls[streamId][type][filename] = signedUrl.url
+              signedUrls[streamId][type][signedUrl.filename] = signedUrl.url
               if (signedUrl.expiresAt) {
                 const entry: SignedUrlEntry = {
                   url: signedUrl.url,
@@ -165,6 +170,7 @@ export function useSignedUrl(
                   type,
                   lastAccessed: now,
                 }
+                const cacheKey = getCacheKey(signedUrl.filename, type, streamId)
                 cache.urls[cacheKey] = entry
               }
             }
