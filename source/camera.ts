@@ -635,6 +635,8 @@ app.use(
 
 app.use(express.json())
 
+app.set('trust proxy', true)
+
 app.get('/hls/:streamId/stream.m3u8', jwtAuth, (req, res) => {
   const { streamId } = req.params
   const stream = dynamicStreams[streamId]
