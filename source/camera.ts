@@ -1297,6 +1297,11 @@ app.get('/signed/video/:streamId/:filename', (req, res) => {
     dynamicStreams[streamId].config.recordDir,
     filename,
   )
+  if (!filePath.startsWith(dynamicStreams[streamId].config.recordDir)) {
+    res.status(403).send('Forbidden')
+    return
+  }
+
   res.sendFile(filePath, (err) => {
     if (res.headersSent) return
     // @ts-expect-error types
@@ -1325,6 +1330,10 @@ app.get('/signed/thumbnail/:streamId/:filename', (req, res) => {
     dynamicStreams[streamId].config.thumbDir,
     filename,
   )
+  if (!thumbPath.startsWith(dynamicStreams[streamId].config.thumbDir)) {
+    res.status(403).send('Forbidden')
+    return
+  }
 
   if (!req.url.endsWith('latest.jpg')) {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')

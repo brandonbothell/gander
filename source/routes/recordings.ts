@@ -287,6 +287,11 @@ export default function initializeRecordingRoutes(
         return
       }
       const filePath = path.join(stream.config.recordDir, filename)
+      if (!filePath.startsWith(stream.config.recordDir)) {
+        res.status(403).send('Forbidden')
+        return
+      }
+
       res.sendFile(filePath, (err) => {
         if (res.headersSent) return
         if (
@@ -376,6 +381,14 @@ export default function initializeRecordingRoutes(
         stream.config.thumbDir,
         filename.replace(/\.mp4$/, '.jpg'),
       )
+      if (
+        !filePath.startsWith(stream.config.recordDir) ||
+        !thumbPath.startsWith(stream.config.thumbDir)
+      ) {
+        res.status(403).send('Forbidden')
+        return
+      }
+
       try {
         await Promise.all([
           fs.rm(filePath, { force: true, recursive: true }),
@@ -433,6 +446,14 @@ export default function initializeRecordingRoutes(
           stream.config.thumbDir,
           filename.replace(/\.mp4$/, '.jpg'),
         )
+        if (
+          !filePath.startsWith(stream.config.recordDir) ||
+          !thumbPath.startsWith(stream.config.thumbDir)
+        ) {
+          res.status(403).send('Forbidden')
+          return
+        }
+
         try {
           await Promise.all([
             fs.rm(filePath, { force: true, recursive: true }),
