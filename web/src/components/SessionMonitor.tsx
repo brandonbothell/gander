@@ -1,272 +1,289 @@
 // Update the SessionMonitor.tsx
-import React, { useEffect, useState } from 'react';
-import { FiChevronLeft, FiChevronRight, FiMapPin, FiClock, FiGlobe } from 'react-icons/fi';
-import { useLocalStorageState } from '../hooks/useLocalStorageState';
-import { type TrustedDevice, type DeviceInfo, getDeviceDisplayName } from '../../../source/types/deviceInfo';
-import { fetchWithRetry } from '../main';
-
-export interface Session {
-  ip: string;
-  location?: {
-    country: string;
-    region: string;
-    city: string;
-    lat: number;
-    lon: number;
-    isp?: string;
-    timezone?: string;
-    postal?: string;
-    country_code?: string;
-    asn?: string;
-  };
-  firstSeen: string;
-  lastSeen: string;
-  isNew?: boolean;
-  isGeolocating?: boolean;
-  geolocated?: boolean;
-}
+import React, { useEffect, useState } from 'react'
+import {
+  FiChevronLeft,
+  FiChevronRight,
+  FiMapPin,
+  FiClock,
+  FiGlobe,
+} from 'react-icons/fi'
+import { useLocalStorageState } from '../hooks/useLocalStorageState'
+import {
+  type TrustedDevice,
+  type Session,
+  getDeviceDisplayName,
+} from '../../../source/types/deviceInfo'
+import { geolocateIP, getSessionId } from '../utils/session'
 
 interface SessionMonitorProps {
-  onClose: () => void;
-  sessions?: (Session & TrustedDevice)[]; // Pre-fetched sessions
-  knownSessions?: string[];
-  setKnownSessions?: (sessions: string[] | ((prev: string[]) => string[])) => void;
-  setSessions?: (sessions: (Session & TrustedDevice)[] | ((prev: (Session & TrustedDevice)[]) => (Session & TrustedDevice)[])) => void;
+  onClose: () => void
+  sessions?: (Session & TrustedDevice)[] // Pre-fetched sessions
+  knownSessions?: string[]
+  setKnownSessions?: (
+    sessions: string[] | ((prev: string[]) => string[]),
+  ) => void
+  setSessions?: (
+    sessions:
+      | (Session & TrustedDevice)[]
+      | ((prev: (Session & TrustedDevice)[]) => (Session & TrustedDevice)[]),
+  ) => void
 }
 
 declare global {
   interface Window {
-    initGoogleMaps?: () => void;
+    initGoogleMaps?: () => void
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    google?: { maps?: { [key: string]: any } }
   }
 }
-
-// Helper function to create a unique session identifier
-export const getSessionId = (_: string, deviceInfo: DeviceInfo): string => {
-  return deviceInfo.clientId;
-};
 
 export const SessionMonitor: React.FC<SessionMonitorProps> = ({
   onClose,
   sessions: propSessions,
   knownSessions: propKnownSessions,
   setKnownSessions: propSetKnownSessions,
-  setSessions: propSetSessions
+  setSessions: propSetSessions,
 }) => {
-  const [localSessions, setLocalSessions] = useState<(Session & TrustedDevice)[]>([]);
-  const [localKnownSessions, setLocalKnownSessions] = useLocalStorageState<string[]>('knownSessionIds', []);
+  const [localSessions, setLocalSessions] = useState<
+    (Session & TrustedDevice)[]
+  >([])
+  const [localKnownSessions, setLocalKnownSessions] = useLocalStorageState<
+    string[]
+  >('knownSessionIds', [])
 
-  const sessions = propSessions ?? localSessions;
-  const knownSessions = propKnownSessions ?? localKnownSessions;
-  const setSessions = propSetSessions ?? setLocalSessions;
-  const setKnownSessions = propSetKnownSessions ?? setLocalKnownSessions;
-  const [currentSessionIndex, setCurrentSessionIndex] = useState(0);
-  const [loading, setLoading] = useState(!propSessions); // Don't show loading if sessions provided
-  const [error, setError] = useState<string | null>(null);
-  const [mapsLoaded, setMapsLoaded] = useState(false);
-  const [hasLoadedSessions, setHasLoadedSessions] = useState(!!propSessions); // Mark as loaded if sessions provided
+  const sessions = propSessions ?? localSessions
+  const knownSessions = propKnownSessions ?? localKnownSessions
+  const setSessions = propSetSessions ?? setLocalSessions
+  const setKnownSessions = propSetKnownSessions ?? setLocalKnownSessions
+  const [currentSessionIndex, setCurrentSessionIndex] = useState(0)
+  const [loading, setLoading] = useState(!propSessions) // Don't show loading if sessions provided
+  const [error, setError] = useState<string | null>(null)
+  const [mapsLoaded, setMapsLoaded] = useState(false)
+  const [hasLoadedSessions, setHasLoadedSessions] = useState(!!propSessions) // Mark as loaded if sessions provided
 
   // Only fetch sessions if not provided via props
-  const shouldFetchSessions = !propSessions;
+  const shouldFetchSessions = !propSessions
 
   // Prevent document scroll when modal is open
   useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
 
     return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
+      document.body.style.overflow = originalOverflow
+    }
+  }, [])
 
   // Skip initial loading if sessions are provided
   useEffect(() => {
     if (propSessions && propSessions.length > 0) {
-      setLoading(false);
-      setHasLoadedSessions(true);
+      setLoading(false)
+      setHasLoadedSessions(true)
     }
-  }, [propSessions]);
+  }, [propSessions])
 
   // Load Google Maps API
   useEffect(() => {
-    if (window.google && window.google.maps && window.google.maps.Map) {
-      setMapsLoaded(true);
-      return;
+    if (window.google?.maps?.Map) {
+      setMapsLoaded(true)
+      return
     }
 
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-      }&loading=async&libraries=geometry,marker&callback=initGoogleMaps`;
-    script.async = true;
-    script.defer = true;
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${
+      import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    }&loading=async&libraries=geometry,marker&callback=initGoogleMaps`
+    script.async = true
+    script.defer = true
 
     // Add a global callback function
     window.initGoogleMaps = () => {
-      console.log('Google Maps API loaded successfully');
-      setMapsLoaded(true);
+      console.log('Google Maps API loaded successfully')
+      setMapsLoaded(true)
       // Clean up the global callback
-      delete window.initGoogleMaps;
-    };
+      delete window.initGoogleMaps
+    }
 
     script.onerror = () => {
-      console.error('Failed to load Google Maps API');
-      setError('Failed to load maps. Please check your internet connection.');
+      console.error('Failed to load Google Maps API')
+      setError('Failed to load maps. Please check your internet connection.')
       // Clean up the global callback
-      delete window.initGoogleMaps;
-    };
+      delete window.initGoogleMaps
+    }
 
-    document.head.appendChild(script);
+    document.head.appendChild(script)
 
     return () => {
       if (script.parentNode) {
-        script.parentNode.removeChild(script);
+        script.parentNode.removeChild(script)
       }
       // Clean up the global callback if component unmounts
       if (window.initGoogleMaps) {
-        delete window.initGoogleMaps;
+        delete window.initGoogleMaps
       }
-    };
-  }, []);
+    }
+  }, [])
 
   // Fetch sessions (without geolocation)
   useEffect(() => {
-    if (hasLoadedSessions || !shouldFetchSessions) return;
-    console.warn('Missing session details from main thread, please contact the developer to fix this bug')
-  }, [hasLoadedSessions, shouldFetchSessions]);
+    if (hasLoadedSessions || !shouldFetchSessions) return
+    console.warn(
+      'Missing session details from main thread, please contact the developer to fix this bug',
+    )
+  }, [hasLoadedSessions, shouldFetchSessions])
 
   // Geolocate current session
   useEffect(() => {
-    if (!sessions.length || currentSessionIndex >= sessions.length) return;
+    if (!sessions.length || currentSessionIndex >= sessions.length) return
 
-    const currentSession = sessions[currentSessionIndex];
+    const currentSession = sessions[currentSessionIndex]
 
     // Skip if already geolocated or currently geolocating
-    if (currentSession.geolocated || currentSession.isGeolocating) return;
+    if (currentSession.geolocated || currentSession.isGeolocating) return
 
     const geolocateCurrentSession = async () => {
-      console.log(`Geolocating current session: ${currentSession.ip}`);
+      console.log(`Geolocating current session: ${currentSession.ip}`)
 
       // Mark as geolocating
-      setSessions(prev => prev.map((session, index) =>
-        index === currentSessionIndex
-          ? { ...session, isGeolocating: true }
-          : session
-      ));
+      setSessions((prev) =>
+        prev.map((session, index) =>
+          index === currentSessionIndex
+            ? { ...session, isGeolocating: true }
+            : session,
+        ),
+      )
 
       try {
-        const updatedSession = await geolocateIP(knownSessions, currentSession);
+        const updatedSession = await geolocateIP(knownSessions, currentSession)
 
         // Update the session with geolocation data
-        setSessions(prev => prev.map((session, index) =>
-          index === currentSessionIndex
-            ? {
-              ...session,
-              ...updatedSession,
-              geolocated: true,
-              isGeolocating: false
-            }
-            : session
-        ));
-
+        setSessions((prev) =>
+          prev.map((session, index) =>
+            index === currentSessionIndex
+              ? {
+                  ...session,
+                  ...updatedSession,
+                  geolocated: true,
+                  isGeolocating: false,
+                }
+              : session,
+          ),
+        )
       } catch (error) {
-        console.error(`Failed to geolocate session ${currentSession.ip}:`, error);
+        console.error(
+          `Failed to geolocate session ${currentSession.ip}:`,
+          error,
+        )
 
         // Mark as failed geolocation
-        setSessions(prev => prev.map((session, index) =>
-          index === currentSessionIndex
-            ? {
-              ...session,
-              geolocated: true,
-              isGeolocating: false
-            }
-            : session
-        ));
+        setSessions((prev) =>
+          prev.map((session, index) =>
+            index === currentSessionIndex
+              ? {
+                  ...session,
+                  geolocated: true,
+                  isGeolocating: false,
+                }
+              : session,
+          ),
+        )
       }
-    };
+    }
 
-    geolocateCurrentSession();
-  }, [sessions, currentSessionIndex, knownSessions]);
+    geolocateCurrentSession()
+  }, [sessions, currentSessionIndex, knownSessions])
 
   // Add a new effect to handle marking sessions as known when navigating away
   useEffect(() => {
     // When currentSessionIndex changes, mark the PREVIOUS session as known
     // (not the current one we're navigating to)
     const markPreviousSessionAsKnown = () => {
-      if (sessions.length === 0) return;
+      if (sessions.length === 0) return
 
       // Find sessions that are currently "new" but not the current session
       const sessionsToMarkAsKnown = sessions
         .map((session, index) => ({ session, index }))
-        .filter(({ session, index }) =>
-          session.isNew && index !== currentSessionIndex
+        .filter(
+          ({ session, index }) =>
+            session.isNew && index !== currentSessionIndex,
         )
-        .map(({ session }) => getSessionId(session.ip, session.deviceInfo));
+        .map(({ session }) => getSessionId(session.ip, session.deviceInfo))
 
       if (sessionsToMarkAsKnown.length > 0) {
-        console.log('Marking sessions as known:', sessionsToMarkAsKnown);
-        setKnownSessions(prev => Array.from(new Set([...prev, ...sessionsToMarkAsKnown])));
+        console.log('Marking sessions as known:', sessionsToMarkAsKnown)
+        setKnownSessions((prev) =>
+          Array.from(new Set([...prev, ...sessionsToMarkAsKnown])),
+        )
 
         // Update the sessions state to reflect the change
-        setSessions(prevSessions =>
-          prevSessions.map(session => {
-            const sessionId = getSessionId(session.ip, session.deviceInfo);
+        setSessions((prevSessions) =>
+          prevSessions.map((session) => {
+            const sessionId = getSessionId(session.ip, session.deviceInfo)
             if (sessionsToMarkAsKnown.includes(sessionId)) {
-              return { ...session, isNew: false };
+              return { ...session, isNew: false }
             }
-            return session;
-          })
-        );
+            return session
+          }),
+        )
       }
-    };
+    }
 
     // Only run this after initial load and when user actually changes sessions
     if (hasLoadedSessions && sessions.length > 0) {
-      markPreviousSessionAsKnown();
+      markPreviousSessionAsKnown()
     }
-  }, [currentSessionIndex, hasLoadedSessions]);
+  }, [currentSessionIndex, hasLoadedSessions])
 
   // Initialize map when both maps API and current session location are loaded
   useEffect(() => {
-    if (!mapsLoaded ||
+    if (
+      !mapsLoaded ||
       !window.google ||
       !window.google.maps ||
       !window.google.maps.Map ||
       !window.google.maps.marker ||
       !window.google.maps.marker.AdvancedMarkerElement ||
       sessions.length === 0 ||
-      currentSessionIndex >= sessions.length) {
-      return;
+      currentSessionIndex >= sessions.length
+    ) {
+      return
     }
 
-    const currentSession = sessions[currentSessionIndex];
+    const currentSession = sessions[currentSessionIndex]
     if (!currentSession.location) {
-      return;
+      return
     }
 
-    const mapContainer = document.getElementById('session-map');
-    if (!mapContainer) return;
+    const mapContainer = document.getElementById('session-map')
+    if (!mapContainer) return
 
     try {
       const map = new window.google.maps.Map(mapContainer, {
-        center: { lat: currentSession.location.lat, lng: currentSession.location.lon },
+        center: {
+          lat: currentSession.location.lat,
+          lng: currentSession.location.lon,
+        },
         zoom: 10,
         mapTypeId: 'roadmap',
-        mapId: 'f07b9b94ba34907f16488778'
-      });
+        mapId: 'f07b9b94ba34907f16488778',
+      })
 
       new window.google.maps.marker.AdvancedMarkerElement({
-        position: { lat: currentSession.location.lat, lng: currentSession.location.lon },
+        position: {
+          lat: currentSession.location.lat,
+          lng: currentSession.location.lon,
+        },
         map: map,
         title: `${currentSession.location.city}, ${currentSession.location.region}`,
-      });
+      })
     } catch (error) {
-      console.error('Error initializing Google Maps:', error);
-      setError('Failed to initialize map. Please refresh the page.');
+      console.error('Error initializing Google Maps:', error)
+      setError('Failed to initialize map. Please refresh the page.')
     }
+  }, [mapsLoaded, sessions, currentSessionIndex])
 
-  }, [mapsLoaded, sessions, currentSessionIndex]);
-
-  const currentSession = sessions[currentSessionIndex];
-  const newSessions = sessions.filter(s => s.isNew);
+  const currentSession = sessions[currentSessionIndex]
+  const newSessions = sessions.filter((s) => s.isNew)
 
   // Rest of the component remains the same...
   // (keeping all the existing JSX and render logic)
@@ -313,7 +330,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
           <div>Loading session data...</div>
         </div>
       </div>
-    );
+    )
   }
 
   if (error || sessions.length === 0) {
@@ -344,7 +361,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
             color: '#fff',
             textAlign: 'center',
           }}
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <h2 style={{ marginTop: 0, color: error ? '#ff6b6b' : '#fff' }}>
             {error ? 'Error' : 'No Sessions'}
@@ -354,7 +371,8 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
           </p>
           {error && (
             <p style={{ color: '#999', fontSize: '0.8em', marginTop: 8 }}>
-              This could be due to rate limiting or network issues. Please try again in a few minutes.
+              This could be due to rate limiting or network issues. Please try
+              again in a few minutes.
             </p>
           )}
           <button
@@ -374,7 +392,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -409,59 +427,73 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
           flexDirection: 'column',
           overflow: 'hidden',
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{
-          padding: '20px 24px',
-          borderBottom: '1px solid #444',
-          display: 'flex',
-          alignItems: 'center',
-        }}>
+        <div
+          style={{
+            padding: '20px 24px',
+            borderBottom: '1px solid #444',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h2 style={{
-              margin: 0,
-              fontSize: '1.5em',
-              wordWrap: 'break-word',
-              wordBreak: 'break-word'
-            }}>
-              Login History {newSessions.length > 0 && (
-                <span style={{
-                  background: '#ff6b6b',
-                  color: '#fff',
-                  borderRadius: '12px',
-                  padding: '2px 8px',
-                  fontSize: '0.7em',
-                  marginLeft: 8,
-                  whiteSpace: 'nowrap'
-                }}>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: '1.5em',
+                wordWrap: 'break-word',
+                wordBreak: 'break-word',
+              }}
+            >
+              Login History{' '}
+              {newSessions.length > 0 && (
+                <span
+                  style={{
+                    background: '#ff6b6b',
+                    color: '#fff',
+                    borderRadius: '12px',
+                    padding: '2px 8px',
+                    fontSize: '0.7em',
+                    marginLeft: 8,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {newSessions.length} new
                 </span>
               )}
             </h2>
-            <p style={{
-              margin: '4px 0 0',
-              color: '#ccc',
-              fontSize: '0.9em',
-              wordWrap: 'break-word'
-            }}>
-              {sessions.length} session{sessions.length !== 1 ? 's' : ''} detected
+            <p
+              style={{
+                margin: '4px 0 0',
+                color: '#ccc',
+                fontSize: '0.9em',
+                wordWrap: 'break-word',
+              }}
+            >
+              {sessions.length} session{sessions.length !== 1 ? 's' : ''}{' '}
+              detected
             </p>
           </div>
         </div>
 
         {/* Session Navigation */}
-        <div style={{
-          padding: '16px 24px',
-          borderBottom: '1px solid #444',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: '#1a1f35',
-          flexShrink: 0,
-        }}>
+        <div
+          style={{
+            padding: '16px 24px',
+            borderBottom: '1px solid #444',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#1a1f35',
+            flexShrink: 0,
+          }}
+        >
           <button
-            onClick={() => setCurrentSessionIndex(Math.max(0, currentSessionIndex - 1))}
+            onClick={() =>
+              setCurrentSessionIndex(Math.max(0, currentSessionIndex - 1))
+            }
             disabled={currentSessionIndex === 0}
             style={{
               background: currentSessionIndex === 0 ? '#444' : '#1976d2',
@@ -480,66 +512,93 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
             <FiChevronLeft size={currentSessionIndex === 0 ? 14 : 28} />
           </button>
 
-          <div style={{ textAlign: 'center', minWidth: 0, flex: 1, margin: '0 12px' }}>
-            {window.innerWidth > 600 && <div style={{
-              fontWeight: 600,
-              fontSize: '1.1em',
-              wordBreak: 'break-all',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-            }}>
-              <span style={{
-                color: '#1cf1d1',
-                fontFamily: 'monospace',
-                letterSpacing: '0.5px',
-              }}>
-                {currentSession.ip}
-              </span>
-              {/* Show NEW indicator for current session if it's new */}
-              {currentSession.isNew && (
-                <span style={{
-                  background: '#ff6b6b',
-                  color: '#fff',
-                  borderRadius: '8px',
-                  padding: '2px 6px',
-                  fontSize: '0.7em',
-                  marginLeft: 8,
-                  whiteSpace: 'nowrap'
-                }}>
-                  NEW
+          <div
+            style={{
+              textAlign: 'center',
+              minWidth: 0,
+              flex: 1,
+              margin: '0 12px',
+            }}
+          >
+            {window.innerWidth > 600 && (
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: '1.1em',
+                  wordBreak: 'break-all',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    color: '#1cf1d1',
+                    fontFamily: 'monospace',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  {currentSession.ip}
                 </span>
-              )}
-              {currentSession.isGeolocating && (
-                <div style={{
-                  width: 16,
-                  height: 16,
-                  border: '2px solid rgba(28, 241, 209, 0.3)',
-                  borderTop: '2px solid #1cf1d1',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                  marginLeft: 8,
-                }} />
-              )}
-            </div>}
+                {/* Show NEW indicator for current session if it's new */}
+                {currentSession.isNew && (
+                  <span
+                    style={{
+                      background: '#ff6b6b',
+                      color: '#fff',
+                      borderRadius: '8px',
+                      padding: '2px 6px',
+                      fontSize: '0.7em',
+                      marginLeft: 8,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    NEW
+                  </span>
+                )}
+                {currentSession.isGeolocating && (
+                  <div
+                    style={{
+                      width: 16,
+                      height: 16,
+                      border: '2px solid rgba(28, 241, 209, 0.3)',
+                      borderTop: '2px solid #1cf1d1',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                      marginLeft: 8,
+                    }}
+                  />
+                )}
+              </div>
+            )}
             <div style={{ color: '#ccc', fontSize: '0.9em' }}>
               {currentSessionIndex + 1} of {sessions.length}
             </div>
           </div>
 
           <button
-            onClick={() => setCurrentSessionIndex(Math.min(sessions.length - 1, currentSessionIndex + 1))}
+            onClick={() =>
+              setCurrentSessionIndex(
+                Math.min(sessions.length - 1, currentSessionIndex + 1),
+              )
+            }
             disabled={currentSessionIndex === sessions.length - 1}
             style={{
-              background: currentSessionIndex === sessions.length - 1 ? '#444' : '#1976d2',
+              background:
+                currentSessionIndex === sessions.length - 1
+                  ? '#444'
+                  : '#1976d2',
               color: '#fff',
               border: 'none',
               borderRadius: 6,
               padding: '8px 12px',
-              cursor: currentSessionIndex === sessions.length - 1 ? 'not-allowed' : 'pointer',
+              cursor:
+                currentSessionIndex === sessions.length - 1
+                  ? 'not-allowed'
+                  : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: 4,
@@ -547,306 +606,374 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
               flexShrink: 0,
             }}
           >
-            <FiChevronRight size={currentSessionIndex === sessions.length - 1 ? 14 : 28} />
+            <FiChevronRight
+              size={currentSessionIndex === sessions.length - 1 ? 14 : 28}
+            />
           </button>
         </div>
 
-        {window.innerWidth <= 600 && <div style={{
-          fontWeight: 700,
-          fontSize: '1.3em',
-          wordBreak: 'break-all',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          background: '#1a1f35',
-          padding: '16px 24px',
-          borderTop: '1px solid #444',
-          borderBottom: '1px solid #444',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          marginBottom: 0,
-          flexShrink: 0,
-        }}>
-          <span style={{
-            color: '#1cf1d1',
-            fontFamily: 'monospace',
-            letterSpacing: '0.5px',
-          }}>
-            {currentSession.ip}
-          </span>
-          {currentSession.isNew && (
-            <span style={{
-              background: '#ff6b6b',
-              color: '#fff',
-              borderRadius: '12px',
-              padding: '6px 12px',
-              fontSize: '0.7em',
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 4px rgba(255,107,107,0.3)',
-              animation: 'pulse 2s infinite',
-            }}>
-              NEW
+        {window.innerWidth <= 600 && (
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: '1.3em',
+              wordBreak: 'break-all',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              background: '#1a1f35',
+              padding: '16px 24px',
+              borderTop: '1px solid #444',
+              borderBottom: '1px solid #444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              marginBottom: 0,
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                color: '#1cf1d1',
+                fontFamily: 'monospace',
+                letterSpacing: '0.5px',
+              }}
+            >
+              {currentSession.ip}
             </span>
-          )}
-          {currentSession.isGeolocating && (
-            <div style={{
-              width: 20,
-              height: 20,
-              border: '3px solid rgba(28, 241, 209, 0.3)',
-              borderTop: '3px solid #1cf1d1',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-            }} />
-          )}
-        </div>}
+            {currentSession.isNew && (
+              <span
+                style={{
+                  background: '#ff6b6b',
+                  color: '#fff',
+                  borderRadius: '12px',
+                  padding: '6px 12px',
+                  fontSize: '0.7em',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 4px rgba(255,107,107,0.3)',
+                  animation: 'pulse 2s infinite',
+                }}
+              >
+                NEW
+              </span>
+            )}
+            {currentSession.isGeolocating && (
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  border: '3px solid rgba(28, 241, 209, 0.3)',
+                  borderTop: '3px solid #1cf1d1',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }}
+              />
+            )}
+          </div>
+        )}
 
         {/* Content - Scrollable */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          marginTop: window.innerWidth <= 600 ? 0 : 0,
-        }}>
+        <div
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            marginTop: window.innerWidth <= 600 ? 0 : 0,
+          }}
+        >
           {/* Session Details and Map */}
-          <div style={{
-            display: 'flex',
-            flexDirection: window.innerWidth <= 600 ? 'column' : 'row',
-            minHeight: '100%',
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: window.innerWidth <= 600 ? 'column' : 'row',
+              minHeight: '100%',
+            }}
+          >
             {/* Session Info */}
-            <div style={{
-              width: window.innerWidth <= 600 ? '100%' : '40%',
-              padding: 24,
-              borderRight: window.innerWidth <= 600 ? 'none' : '1px solid #444',
-              borderBottom: window.innerWidth <= 600 ? '1px solid #444' : 'none',
-              minHeight: window.innerWidth <= 600 ? 'auto' : '100%',
-              minWidth: 0,
-              boxSizing: 'border-box',
-              background: '#232b4a',
-            }}>
+            <div
+              style={{
+                width: window.innerWidth <= 600 ? '100%' : '40%',
+                padding: 24,
+                borderRight:
+                  window.innerWidth <= 600 ? 'none' : '1px solid #444',
+                borderBottom:
+                  window.innerWidth <= 600 ? '1px solid #444' : 'none',
+                minHeight: window.innerWidth <= 600 ? 'auto' : '100%',
+                minWidth: 0,
+                boxSizing: 'border-box',
+                background: '#232b4a',
+              }}
+            >
               {/* Device Information Section */}
-              <h3 style={{
-                margin: '0 0 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                wordWrap: 'break-word'
-              }}>
+              <h3
+                style={{
+                  margin: '0 0 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  wordWrap: 'break-word',
+                }}
+              >
                 <FiGlobe /> Device Information
               </h3>
 
               <div style={{ marginBottom: 24, minWidth: 0 }}>
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{
-                    color: '#1cf1d1',
-                    fontWeight: 600,
-                    marginBottom: 4,
-                    wordWrap: 'break-word',
-                    wordBreak: 'break-word'
-                  }}>
+                  <div
+                    style={{
+                      color: '#1cf1d1',
+                      fontWeight: 600,
+                      marginBottom: 4,
+                      wordWrap: 'break-word',
+                      wordBreak: 'break-word',
+                    }}
+                  >
                     {getDeviceDisplayName(currentSession.deviceInfo)}
                   </div>
-                  <div style={{
-                    color: '#ccc',
-                    fontSize: '0.9em',
-                    wordWrap: 'break-word',
-                    wordBreak: 'break-word'
-                  }}>
+                  <div
+                    style={{
+                      color: '#ccc',
+                      fontSize: '0.9em',
+                      wordWrap: 'break-word',
+                      wordBreak: 'break-word',
+                    }}
+                  >
                     {currentSession.deviceInfo.platform}
                   </div>
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{
-                    color: '#fff',
-                    fontSize: '0.9em',
-                    marginBottom: 2,
-                    wordWrap: 'break-word'
-                  }}>
+                  <div
+                    style={{
+                      color: '#fff',
+                      fontSize: '0.9em',
+                      marginBottom: 2,
+                      wordWrap: 'break-word',
+                    }}
+                  >
                     Browser Details
                   </div>
-                  <div style={{
-                    color: '#ccc',
-                    fontSize: '0.8em',
-                    wordWrap: 'break-word',
-                    wordBreak: 'break-word',
-                    overflowWrap: 'break-word'
-                  }}>
+                  <div
+                    style={{
+                      color: '#ccc',
+                      fontSize: '0.8em',
+                      wordWrap: 'break-word',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                    }}
+                  >
                     {currentSession.deviceInfo.userAgent}
                   </div>
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{
-                    color: '#fff',
-                    fontSize: '0.9em',
-                    marginBottom: 2,
-                    wordWrap: 'break-word'
-                  }}>
+                  <div
+                    style={{
+                      color: '#fff',
+                      fontSize: '0.9em',
+                      marginBottom: 2,
+                      wordWrap: 'break-word',
+                    }}
+                  >
                     Screen Resolution
                   </div>
-                  <div style={{
-                    color: '#ccc',
-                    fontSize: '0.8em',
-                    wordBreak: 'break-all',
-                    fontFamily: 'monospace'
-                  }}>
+                  <div
+                    style={{
+                      color: '#ccc',
+                      fontSize: '0.8em',
+                      wordBreak: 'break-all',
+                      fontFamily: 'monospace',
+                    }}
+                  >
                     {currentSession.deviceInfo.screen}
                   </div>
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{
-                    color: '#fff',
-                    fontSize: '0.9em',
-                    marginBottom: 2,
-                    wordWrap: 'break-word'
-                  }}>
+                  <div
+                    style={{
+                      color: '#fff',
+                      fontSize: '0.9em',
+                      marginBottom: 2,
+                      wordWrap: 'break-word',
+                    }}
+                  >
                     Language & Timezone
                   </div>
-                  <div style={{
-                    color: '#ccc',
-                    fontSize: '0.8em',
-                    wordWrap: 'break-word',
-                    wordBreak: 'break-word'
-                  }}>
-                    {currentSession.deviceInfo.language} • {currentSession.deviceInfo.timezone}
+                  <div
+                    style={{
+                      color: '#ccc',
+                      fontSize: '0.8em',
+                      wordWrap: 'break-word',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {currentSession.deviceInfo.language} •{' '}
+                    {currentSession.deviceInfo.timezone}
                   </div>
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{
-                    color: '#fff',
-                    fontSize: '0.9em',
-                    marginBottom: 2,
-                    wordWrap: 'break-word'
-                  }}>
+                  <div
+                    style={{
+                      color: '#fff',
+                      fontSize: '0.9em',
+                      marginBottom: 2,
+                      wordWrap: 'break-word',
+                    }}
+                  >
                     Login Count
                   </div>
-                  <div style={{
-                    color: '#ccc',
-                    fontSize: '0.8em'
-                  }}>
-                    {currentSession.loginCount} time{currentSession.loginCount !== 1 ? 's' : ''}
+                  <div
+                    style={{
+                      color: '#ccc',
+                      fontSize: '0.8em',
+                    }}
+                  >
+                    {currentSession.loginCount} time
+                    {currentSession.loginCount !== 1 ? 's' : ''}
                   </div>
                 </div>
               </div>
 
               {/* Location Details Section */}
-              <h3 style={{
-                margin: '0 0 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                wordWrap: 'break-word'
-              }}>
+              <h3
+                style={{
+                  margin: '0 0 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  wordWrap: 'break-word',
+                }}
+              >
                 <FiMapPin /> Location Details
                 {currentSession.isGeolocating && (
-                  <div style={{
-                    width: 16,
-                    height: 16,
-                    border: '2px solid rgba(28, 241, 209, 0.3)',
-                    borderTop: '2px solid #1cf1d1',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                    marginLeft: 'auto',
-                  }} />
+                  <div
+                    style={{
+                      width: 16,
+                      height: 16,
+                      border: '2px solid rgba(28, 241, 209, 0.3)',
+                      borderTop: '2px solid #1cf1d1',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                      marginLeft: 'auto',
+                    }}
+                  />
                 )}
               </h3>
 
               {currentSession.isGeolocating ? (
-                <div style={{
-                  color: '#ccc',
-                  fontStyle: 'italic',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 24,
-                }}>
-                  <div style={{
-                    width: 16,
-                    height: 16,
-                    border: '2px solid rgba(28, 241, 209, 0.3)',
-                    borderTop: '2px solid #1cf1d1',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                  }} />
+                <div
+                  style={{
+                    color: '#ccc',
+                    fontStyle: 'italic',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginBottom: 24,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 16,
+                      height: 16,
+                      border: '2px solid rgba(28, 241, 209, 0.3)',
+                      borderTop: '2px solid #1cf1d1',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                    }}
+                  />
                   Loading location data...
                 </div>
               ) : currentSession.location ? (
                 <div style={{ minWidth: 0, marginBottom: 24 }}>
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{
-                      color: '#1cf1d1',
-                      fontWeight: 600,
-                      marginBottom: 4,
-                      wordWrap: 'break-word',
-                      wordBreak: 'break-word'
-                    }}>
+                    <div
+                      style={{
+                        color: '#1cf1d1',
+                        fontWeight: 600,
+                        marginBottom: 4,
+                        wordWrap: 'break-word',
+                        wordBreak: 'break-word',
+                      }}
+                    >
                       {currentSession.location.city}
                     </div>
-                    <div style={{
-                      color: '#ccc',
-                      fontSize: '0.9em',
-                      wordWrap: 'break-word',
-                      wordBreak: 'break-word'
-                    }}>
-                      {currentSession.location.region}, {currentSession.location.country}
+                    <div
+                      style={{
+                        color: '#ccc',
+                        fontSize: '0.9em',
+                        wordWrap: 'break-word',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {currentSession.location.region},{' '}
+                      {currentSession.location.country}
                     </div>
                     {currentSession.location.postal && (
-                      <div style={{
-                        color: '#999',
-                        fontSize: '0.8em',
-                        wordWrap: 'break-word'
-                      }}>
+                      <div
+                        style={{
+                          color: '#999',
+                          fontSize: '0.8em',
+                          wordWrap: 'break-word',
+                        }}
+                      >
                         {currentSession.location.postal}
                       </div>
                     )}
                   </div>
 
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{
-                      color: '#fff',
-                      fontSize: '0.9em',
-                      marginBottom: 2,
-                      wordWrap: 'break-word'
-                    }}>
+                    <div
+                      style={{
+                        color: '#fff',
+                        fontSize: '0.9em',
+                        marginBottom: 2,
+                        wordWrap: 'break-word',
+                      }}
+                    >
                       <FiGlobe style={{ display: 'inline', marginRight: 6 }} />
                       Coordinates
                     </div>
-                    <div style={{
-                      color: '#ccc',
-                      fontSize: '0.8em',
-                      wordBreak: 'break-all',
-                      fontFamily: 'monospace'
-                    }}>
-                      {currentSession.location.lat.toFixed(4)}, {currentSession.location.lon.toFixed(4)}
+                    <div
+                      style={{
+                        color: '#ccc',
+                        fontSize: '0.8em',
+                        wordBreak: 'break-all',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {currentSession.location.lat.toFixed(4)},{' '}
+                      {currentSession.location.lon.toFixed(4)}
                     </div>
                   </div>
 
                   {currentSession.location.isp && (
                     <div style={{ marginBottom: 12 }}>
-                      <div style={{
-                        color: '#fff',
-                        fontSize: '0.9em',
-                        marginBottom: 2,
-                        wordWrap: 'break-word'
-                      }}>
+                      <div
+                        style={{
+                          color: '#fff',
+                          fontSize: '0.9em',
+                          marginBottom: 2,
+                          wordWrap: 'break-word',
+                        }}
+                      >
                         Organization
                       </div>
-                      <div style={{
-                        color: '#ccc',
-                        fontSize: '0.8em',
-                        wordWrap: 'break-word',
-                        wordBreak: 'break-word',
-                        overflowWrap: 'break-word'
-                      }}>
+                      <div
+                        style={{
+                          color: '#ccc',
+                          fontSize: '0.8em',
+                          wordWrap: 'break-word',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'break-word',
+                        }}
+                      >
                         {currentSession.location.isp}
                       </div>
                     </div>
@@ -854,99 +981,125 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
 
                   {currentSession.location.timezone && (
                     <div style={{ marginBottom: 12 }}>
-                      <div style={{
-                        color: '#fff',
-                        fontSize: '0.9em',
-                        marginBottom: 2,
-                        wordWrap: 'break-word'
-                      }}>
-                        <FiClock style={{ display: 'inline', marginRight: 6 }} />
+                      <div
+                        style={{
+                          color: '#fff',
+                          fontSize: '0.9em',
+                          marginBottom: 2,
+                          wordWrap: 'break-word',
+                        }}
+                      >
+                        <FiClock
+                          style={{ display: 'inline', marginRight: 6 }}
+                        />
                         Timezone
                       </div>
-                      <div style={{
-                        color: '#ccc',
-                        fontSize: '0.8em',
-                        wordWrap: 'break-word',
-                        wordBreak: 'break-word'
-                      }}>
+                      <div
+                        style={{
+                          color: '#ccc',
+                          fontSize: '0.8em',
+                          wordWrap: 'break-word',
+                          wordBreak: 'break-word',
+                        }}
+                      >
                         {currentSession.location.timezone}
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                <div style={{
-                  color: '#ccc',
-                  fontStyle: 'italic',
-                  wordWrap: 'break-word',
-                  marginBottom: 24,
-                }}>
+                <div
+                  style={{
+                    color: '#ccc',
+                    fontStyle: 'italic',
+                    wordWrap: 'break-word',
+                    marginBottom: 24,
+                  }}
+                >
                   Location information unavailable
                 </div>
               )}
 
-              <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid #444' }}>
-                <div style={{
-                  color: '#fff',
-                  fontSize: '0.9em',
-                  marginBottom: 8,
-                  wordWrap: 'break-word'
-                }}>
+              <div
+                style={{
+                  marginTop: 'auto',
+                  paddingTop: 16,
+                  borderTop: '1px solid #444',
+                }}
+              >
+                <div
+                  style={{
+                    color: '#fff',
+                    fontSize: '0.9em',
+                    marginBottom: 8,
+                    wordWrap: 'break-word',
+                  }}
+                >
                   Session Status
                 </div>
-                <div style={{
-                  display: 'inline-block',
-                  background: currentSession.isNew ? '#ff6b6b' : '#1cf1d1',
-                  color: currentSession.isNew ? '#fff' : '#232b4a',
-                  padding: '4px 12px',
-                  borderRadius: 12,
-                  fontSize: '0.8em',
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap'
-                }}>
+                <div
+                  style={{
+                    display: 'inline-block',
+                    background: currentSession.isNew ? '#ff6b6b' : '#1cf1d1',
+                    color: currentSession.isNew ? '#fff' : '#232b4a',
+                    padding: '4px 12px',
+                    borderRadius: 12,
+                    fontSize: '0.8em',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {currentSession.isNew ? 'New Session' : 'Known Session'}
                 </div>
               </div>
             </div>
 
             {/* Map */}
-            <div style={{
-              flex: 1,
-              position: 'relative',
-              minHeight: window.innerWidth <= 600 ? '300px' : '400px',
-              maxHeight: 'calc(90vh - 180px)', // Ensures map fits modal without scrolling
-              minWidth: 0,
-            }}>
+            <div
+              style={{
+                flex: 1,
+                position: 'relative',
+                minHeight: window.innerWidth <= 600 ? '300px' : '400px',
+                maxHeight: 'calc(90vh - 180px)', // Ensures map fits modal without scrolling
+                minWidth: 0,
+              }}
+            >
               {currentSession.isGeolocating ? (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  minHeight: window.innerWidth <= 600 ? '300px' : '400px',
-                  maxHeight: 'calc(90vh - 180px)',
-                  background: '#1a1f35',
-                  color: '#ccc',
-                  fontSize: '1.1em',
-                  padding: 20,
-                  boxSizing: 'border-box'
-                }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    minHeight: window.innerWidth <= 600 ? '300px' : '400px',
+                    maxHeight: 'calc(90vh - 180px)',
+                    background: '#1a1f35',
+                    color: '#ccc',
+                    fontSize: '1.1em',
+                    padding: 20,
+                    boxSizing: 'border-box',
+                  }}
+                >
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{
-                      width: 48,
-                      height: 48,
-                      border: '4px solid rgba(28, 241, 209, 0.3)',
-                      borderTop: '4px solid #1cf1d1',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite',
-                      margin: '0 auto 16px',
-                    }} />
+                    <div
+                      style={{
+                        width: 48,
+                        height: 48,
+                        border: '4px solid rgba(28, 241, 209, 0.3)',
+                        borderTop: '4px solid #1cf1d1',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                        margin: '0 auto 16px',
+                      }}
+                    />
                     <div style={{ wordWrap: 'break-word' }}>Loading map...</div>
-                    <div style={{
-                      fontSize: '0.8em',
-                      marginTop: 4,
-                      wordWrap: 'break-word'
-                    }}>
+                    <div
+                      style={{
+                        fontSize: '0.8em',
+                        marginTop: 4,
+                        wordWrap: 'break-word',
+                      }}
+                    >
                       Fetching location data
                     </div>
                   </div>
@@ -963,27 +1116,36 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
                   }}
                 />
               ) : (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  minHeight: window.innerWidth <= 600 ? '300px' : '400px',
-                  maxHeight: 'calc(90vh - 180px)',
-                  background: '#1a1f35',
-                  color: '#ccc',
-                  fontSize: '1.1em',
-                  padding: 20,
-                  boxSizing: 'border-box'
-                }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    minHeight: window.innerWidth <= 600 ? '300px' : '400px',
+                    maxHeight: 'calc(90vh - 180px)',
+                    background: '#1a1f35',
+                    color: '#ccc',
+                    fontSize: '1.1em',
+                    padding: 20,
+                    boxSizing: 'border-box',
+                  }}
+                >
                   <div style={{ textAlign: 'center' }}>
-                    <FiMapPin size={48} style={{ marginBottom: 16, opacity: 0.5 }} />
-                    <div style={{ wordWrap: 'break-word' }}>Map unavailable</div>
-                    <div style={{
-                      fontSize: '0.8em',
-                      marginTop: 4,
-                      wordWrap: 'break-word'
-                    }}>
+                    <FiMapPin
+                      size={48}
+                      style={{ marginBottom: 16, opacity: 0.5 }}
+                    />
+                    <div style={{ wordWrap: 'break-word' }}>
+                      Map unavailable
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.8em',
+                        marginTop: 4,
+                        wordWrap: 'break-word',
+                      }}
+                    >
                       Location data not found for this IP
                     </div>
                   </div>
@@ -994,14 +1156,16 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '16px 24px',
-          borderTop: '1px solid #444',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: 12,
-          flexShrink: 0,
-        }}>
+        <div
+          style={{
+            padding: '16px 24px',
+            borderTop: '1px solid #444',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
           <button
             onClick={onClose}
             style={{
@@ -1019,74 +1183,5 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
         </div>
       </div>
     </div>
-  );
-};
-
-export const geolocateIP = async (knownSessions?: string[], device?: TrustedDevice) => {
-  const ip = device?.ip || null;
-  try {
-    // console.log(`Geolocating IP ${ip || 'local'}...`);
-    const geoResponse = await fetchWithRetry(() => fetch(`https://ipinfo.io/${ip ? ip + '/' : ''}json`));
-    const geoData = await geoResponse.json();
-
-    // console.log(`Geolocation data for ${ip || 'local'}:`, geoData);
-
-    if (geoData.error) {
-      throw new Error(`API Error: ${geoData.error.message || 'Unknown error'}`);
-    }
-
-    const { ip: geoIp }: { ip: string } = geoData;
-    const [lat, lon] = geoData.loc ? geoData.loc.split(',').map(Number) : [null, null];
-
-    if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
-      const session: Session = {
-        ip: geoIp,
-        location: {
-          country: geoData.country ?? 'Unknown',
-          region: geoData.region ?? 'Unknown',
-          city: geoData.city ?? 'Unknown',
-          lat,
-          lon,
-          isp: geoData.org ?? undefined,
-          timezone: geoData.timezone ?? undefined,
-          postal: geoData.postal ?? undefined,
-          country_code: geoData.country ?? undefined,
-          asn: geoData.org?.split(' ')[0] ?? undefined,
-        },
-        firstSeen: new Date().toISOString(),
-        lastSeen: new Date().toISOString(),
-        isNew: knownSessions
-          ? device ? !knownSessions.includes(getSessionId(device.ip, device.deviceInfo)) : false
-          : true,
-        geolocated: true,
-        isGeolocating: false,
-      };
-      // console.log(`Successfully created session for ${ip}`);
-      return session;
-    } else {
-      console.warn(`No valid coordinates found for IP ${ip}`);
-      return {
-        ip: geoIp,
-        firstSeen: new Date().toISOString(),
-        lastSeen: new Date().toISOString(),
-        isNew: knownSessions
-          ? device ? !knownSessions.includes(getSessionId(device.ip, device.deviceInfo)) : false
-          : true,
-        geolocated: true,
-        isGeolocating: false,
-      };
-    }
-  } catch (error) {
-    console.error(`Failed to geolocate IP ${ip || 'local'}:`, error);
-    return {
-      ip: ip || 'local',
-      firstSeen: new Date().toISOString(),
-      lastSeen: new Date().toISOString(),
-      isNew: knownSessions
-        ? device ? !knownSessions.includes(getSessionId(device.ip, device.deviceInfo)) : false
-        : false,
-      geolocated: true,
-      isGeolocating: false,
-    };
-  }
+  )
 }

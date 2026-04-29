@@ -1,7 +1,7 @@
-import { useLoading } from '../hooks/useLoading';
+import { useLoading } from '../hooks/useLoading'
 
 export function LoadingBar() {
-  const { loading } = useLoading();
+  const { loading } = useLoading()
   return (
     <div
       style={{
@@ -16,5 +16,5 @@ export function LoadingBar() {
         pointerEvents: 'none',
       }}
     />
-  );
+  )
 }

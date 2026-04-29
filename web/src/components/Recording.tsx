@@ -1,35 +1,43 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { API_BASE, authFetch } from '../main';
-import { useSignedUrl } from '../hooks/useSignedUrl';
-import { FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize } from 'react-icons/fi';
-import { Capacitor } from '@capacitor/core';
-import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { API_BASE, authFetch } from '../main'
+import { useSignedUrl } from '../hooks/useSignedUrl'
+import {
+  FiPlay,
+  FiPause,
+  FiVolume2,
+  FiVolumeX,
+  FiMaximize,
+} from 'react-icons/fi'
+import { Capacitor } from '@capacitor/core'
+import { ScreenOrientation } from '@capacitor/screen-orientation'
 
-export type Recording = { streamId: string, filename: string };
+export type Recording = { streamId: string; filename: string }
 
 interface RecordingProps {
-  open: boolean;
-  streamId: string;
-  filename: string;
-  onClose: () => void;
-  cachedRecordings: Recording[];
-  onNavigate: (filename: string) => void;
-  setNicknames: React.Dispatch<React.SetStateAction<{
-    [filename: string]: string;
-  }>>;
-  setAutoScrollUntilRef?: (until: number) => void;
-  setOpeningRecording: (opening: boolean) => void;
+  open: boolean
+  streamId: string
+  filename: string
+  onClose: () => void
+  cachedRecordings: Recording[]
+  onNavigate: (filename: string) => void
+  setNicknames: React.Dispatch<
+    React.SetStateAction<{
+      [filename: string]: string
+    }>
+  >
+  setAutoScrollUntilRef?: (until: number) => void
+  setOpeningRecording: (opening: boolean) => void
 }
 
 function formatTimestamp(filename: string) {
-  const match = filename.match(/motion_(.+)\.mp4/);
-  if (!match) return filename;
+  const match = filename.match(/motion_(.+)\.mp4/)
+  if (!match) return filename
   const iso = match[1].replace(
     /T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/,
-    (_m, h, m2, s, ms) => `T${h}:${m2}:${s}.${ms}Z`
-  );
-  const date = new Date(iso);
-  return isNaN(date.getTime()) ? match[1] : date.toLocaleString();
+    (_m, h, m2, s, ms) => `T${h}:${m2}:${s}.${ms}Z`,
+  )
+  const date = new Date(iso)
+  return isNaN(date.getTime()) ? match[1] : date.toLocaleString()
 }
 
 export function Recording({
@@ -41,93 +49,118 @@ export function Recording({
   onNavigate,
   setNicknames,
   videoRef: externalVideoRef,
-  setAutoScrollUntilRef
+  setAutoScrollUntilRef,
 }: RecordingProps & { videoRef?: React.RefObject<HTMLVideoElement | null> }) {
-  const [nickname, setNickname] = useState('');
-  const [hover, setHover] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(externalVideoRef?.current || null);
+  const [nickname, setNickname] = useState('')
+  const [hover, setHover] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(externalVideoRef?.current || null)
   // Controls fade-away logic
-  const [isControlBarVisible, setIsControlBarVisible] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const isPausedRef = useRef(isPaused);
-  const [isMuted, setIsMuted] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [videoHeight, setVideoHeight] = useState(0);
-  const [isSeeking, setIsSeeking] = useState(false);
-  const hideTimeoutRef = useRef<number | null>(null);
-  const isSeekingRef = useRef(isSeeking);
-  const filenameRef = useRef(filename);
-  const lastFilenameRef = useRef(filename);
-  const videoUrl = useSignedUrl(filename, 'video', streamId);
-  const lastPlaybackTimeRef = useRef<number>(0);
-  const thumbUrl = useSignedUrl(filename.replace(/\.mp4$/, '.jpg'), 'thumbnail', streamId);
+  const [isControlBarVisible, setIsControlBarVisible] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const isPausedRef = useRef(isPaused)
+  const [isMuted, setIsMuted] = useState(true)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [videoHeight, setVideoHeight] = useState(0)
+  const [isSeeking, setIsSeeking] = useState(false)
+  const hideTimeoutRef = useRef<number | null>(null)
+  const isSeekingRef = useRef(isSeeking)
+  const filenameRef = useRef(filename)
+  const lastFilenameRef = useRef(filename)
+  const videoUrl = useSignedUrl(filename, 'video', streamId)
+  const lastPlaybackTimeRef = useRef<number>(0)
+  const thumbUrl = useSignedUrl(
+    filename.replace(/\.mp4$/, '.jpg'),
+    'thumbnail',
+    streamId,
+  )
 
   useEffect(() => {
-    isPausedRef.current = isPaused;
-  }, [isPaused]);
+    isPausedRef.current = isPaused
+  }, [isPaused])
 
   useEffect(() => {
-    isSeekingRef.current = isSeeking;
-  }, [isSeeking]);
+    isSeekingRef.current = isSeeking
+  }, [isSeeking])
 
   useEffect(() => {
-    lastFilenameRef.current = filenameRef.current;
-    filenameRef.current = filename;
-  }, [filename]);
+    lastFilenameRef.current = filenameRef.current
+    filenameRef.current = filename
+  }, [filename])
 
   const scheduleHide = useCallback(() => {
     if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
+      clearTimeout(hideTimeoutRef.current)
     }
     hideTimeoutRef.current = window.setTimeout(() => {
       if (isSeekingRef.current) {
         // While seeking, keep controls visible and reschedule
-        scheduleHide();
+        scheduleHide()
       } else {
-        if (!isPausedRef.current) setIsControlBarVisible(false);
+        if (!isPausedRef.current) setIsControlBarVisible(false)
       }
-    }, 3000);
-  }, []);
+    }, 3000)
+  }, [])
   const handleShowControls = () => {
-    setIsControlBarVisible(true);
-    scheduleHide();
-  };
+    setIsControlBarVisible(true)
+    scheduleHide()
+  }
 
   function isIOS() {
-  return (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
-  );
-}
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
+    )
+  }
 
   const handleFullscreen = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (isIOS() && typeof (video as typeof video & { webkitEnterFullscreen: () => void }).webkitEnterFullscreen === 'function') {
+    const video = videoRef.current
+    if (!video) return
+    if (
+      isIOS() &&
+      typeof (video as typeof video & { webkitEnterFullscreen: () => void })
+        .webkitEnterFullscreen === 'function'
+    ) {
       // iOS Safari/PWA: use webkitEnterFullscreen
-      (video as typeof video & { webkitEnterFullscreen: () => void }).webkitEnterFullscreen();
+      ;(
+        video as typeof video & { webkitEnterFullscreen: () => void }
+      ).webkitEnterFullscreen()
     } else if (video.requestFullscreen) {
-      video.requestFullscreen();
-    } else if ((video as typeof video & { webkitRequestFullscreen: () => void }).webkitRequestFullscreen) {
-      (video as typeof video & { webkitRequestFullscreen: () => void }).webkitRequestFullscreen();
+      video.requestFullscreen()
+    } else if (
+      (video as typeof video & { webkitRequestFullscreen: () => void })
+        .webkitRequestFullscreen
+    ) {
+      ;(
+        video as typeof video & { webkitRequestFullscreen: () => void }
+      ).webkitRequestFullscreen()
     }
     if (Capacitor.isNativePlatform()) {
       ScreenOrientation.lock({ orientation: 'landscape' })
     } else if (
       'orientation' in screen &&
-      typeof (screen.orientation as typeof screen.orientation & { lock: (orientation: string) => Promise<void> }).lock === 'function'
+      typeof (
+        screen.orientation as typeof screen.orientation & {
+          lock: (orientation: string) => Promise<void>
+        }
+      ).lock === 'function'
     ) {
       try {
-        (screen.orientation as typeof screen.orientation & { lock: (orientation: string) => Promise<void> }).lock('landscape').catch();
+        ;(
+          screen.orientation as typeof screen.orientation & {
+            lock: (orientation: string) => Promise<void>
+          }
+        )
+          .lock('landscape')
+          .catch()
       } catch (_) {
         // Ignore errors
       }
     }
-    handleShowControls();
-  };
+    handleShowControls()
+  }
   const handleExitFullscreen = () => {
     if (Capacitor.isNativePlatform()) {
       ScreenOrientation.unlock()
@@ -136,261 +169,290 @@ export function Recording({
       typeof screen.orientation.unlock === 'function'
     ) {
       try {
-        const result = screen.orientation.unlock() as unknown;
-        if (result && typeof result === 'object' && 'catch' in result && typeof result.catch === 'function') {
-          result.catch(() => { });
+        const result = screen.orientation.unlock() as unknown
+        if (
+          result &&
+          typeof result === 'object' &&
+          'catch' in result &&
+          typeof result.catch === 'function'
+        ) {
+          result.catch(() => {})
         }
       } catch (error) {
-        console.error('Failed to exit fullscreen orientation lock:', error);
+        console.error('Failed to exit fullscreen orientation lock:', error)
       }
     }
   }
 
   // Add fullscreenchange event listener to video
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     function onFullscreenChange() {
       console.warn('Fullscreen change detected:')
       // Check if fullscreen is exited
       if (
         !document.fullscreenElement &&
-        !((document as typeof document & { webkitFullscreenElement: Element | null }).webkitFullscreenElement) &&
-        !((document as typeof document & { mozFullScreenElement: Element | null }).mozFullScreenElement) &&
-        !((document as typeof document & { msFullscreenElement: Element | null }).msFullscreenElement)
+        !(
+          document as typeof document & {
+            webkitFullscreenElement: Element | null
+          }
+        ).webkitFullscreenElement &&
+        !(
+          document as typeof document & { mozFullScreenElement: Element | null }
+        ).mozFullScreenElement &&
+        !(document as typeof document & { msFullscreenElement: Element | null })
+          .msFullscreenElement
       ) {
-        handleExitFullscreen();
+        handleExitFullscreen()
       }
     }
 
-    video.addEventListener('fullscreenchange', onFullscreenChange);
-    video.addEventListener('webkitfullscreenchange', onFullscreenChange);
-    video.addEventListener('mozfullscreenchange', onFullscreenChange);
-    video.addEventListener('MSFullscreenChange', onFullscreenChange);
+    video.addEventListener('fullscreenchange', onFullscreenChange)
+    video.addEventListener('webkitfullscreenchange', onFullscreenChange)
+    video.addEventListener('mozfullscreenchange', onFullscreenChange)
+    video.addEventListener('MSFullscreenChange', onFullscreenChange)
 
     return () => {
-      video.removeEventListener('fullscreenchange', onFullscreenChange);
-      video.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-      video.removeEventListener('mozfullscreenchange', onFullscreenChange);
-      video.removeEventListener('MSFullscreenChange', onFullscreenChange);
-    };
-  }, [videoRef]);
+      video.removeEventListener('fullscreenchange', onFullscreenChange)
+      video.removeEventListener('webkitfullscreenchange', onFullscreenChange)
+      video.removeEventListener('mozfullscreenchange', onFullscreenChange)
+      video.removeEventListener('MSFullscreenChange', onFullscreenChange)
+    }
+  }, [videoRef])
 
   // Sync video state for controls/seek bar
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const getElementHeight = () => video.getBoundingClientRect().height;
+    const video = videoRef.current
+    if (!video) return
+    const getElementHeight = () => video.getBoundingClientRect().height
     const handlePlay = () => {
-      setIsPaused(false);
-      setVideoHeight(getElementHeight());
-      if (!isControlBarVisible) handleShowControls();
-      else scheduleHide();
-    };
+      setIsPaused(false)
+      setVideoHeight(getElementHeight())
+      if (!isControlBarVisible) handleShowControls()
+      else scheduleHide()
+    }
     const handlePause = () => {
-      setIsPaused(true);
-      setVideoHeight(getElementHeight());
-    };
+      setIsPaused(true)
+      setVideoHeight(getElementHeight())
+    }
     const handleVolumeChange = () => {
-      setIsMuted(video.muted);
-      setVideoHeight(getElementHeight());
-    };
+      setIsMuted(video.muted)
+      setVideoHeight(getElementHeight())
+    }
     const update = () => {
-      setCurrentTime(video.currentTime);
-      setDuration(video.duration || 0);
-      setVideoHeight(getElementHeight());
-    };
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('volumechange', handleVolumeChange);
-    video.addEventListener('timeupdate', update);
-    video.addEventListener('durationchange', update);
-    video.addEventListener('loadedmetadata', update);
-    setIsPaused(video.paused);
-    setIsMuted(video.muted);
-    update();
+      setCurrentTime(video.currentTime)
+      setDuration(video.duration || 0)
+      setVideoHeight(getElementHeight())
+    }
+    video.addEventListener('play', handlePlay)
+    video.addEventListener('pause', handlePause)
+    video.addEventListener('volumechange', handleVolumeChange)
+    video.addEventListener('timeupdate', update)
+    video.addEventListener('durationchange', update)
+    video.addEventListener('loadedmetadata', update)
+    setIsPaused(video.paused)
+    setIsMuted(video.muted)
+    update()
     return () => {
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('volumechange', handleVolumeChange);
-      video.removeEventListener('timeupdate', update);
-      video.removeEventListener('durationchange', update);
-      video.removeEventListener('loadedmetadata', update);
-    };
-  }, [videoRef, filename]);
+      video.removeEventListener('play', handlePlay)
+      video.removeEventListener('pause', handlePause)
+      video.removeEventListener('volumechange', handleVolumeChange)
+      video.removeEventListener('timeupdate', update)
+      video.removeEventListener('durationchange', update)
+      video.removeEventListener('loadedmetadata', update)
+    }
+  }, [videoRef, filename])
 
   // Control handlers
   const handlePlayPause = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
     if (video.paused) {
-      video.play().catch(() => { setTimeout(handlePlayPause, 100); });
+      video.play().catch(() => {
+        setTimeout(handlePlayPause, 100)
+      })
     } else {
-      video.pause();
+      video.pause()
     }
-    handleShowControls();
-  };
+    handleShowControls()
+  }
   const handleMuteToggle = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
-    handleShowControls();
-  };
+    const video = videoRef.current
+    if (!video) return
+    video.muted = !video.muted
+    setIsMuted(video.muted)
+    handleShowControls()
+  }
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
-    const value = Number(e.target.value);
-    if (!isSeeking) setIsSeeking(true);
-    setCurrentTime(value);
-    video.currentTime = value;
-    setIsSeeking(false);
-  };
+    const value = Number(e.target.value)
+    if (!isSeeking) setIsSeeking(true)
+    setCurrentTime(value)
+    video.currentTime = value
+    setIsSeeking(false)
+  }
 
   const handleSeekPointerDown = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
-    setIsSeeking(true);
-    video.pause();
-    setIsPaused(true);
-  };
+    setIsSeeking(true)
+    video.pause()
+    setIsPaused(true)
+  }
 
   const handleSeekPointerUp = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    setIsSeeking(false);
-    video.play();
-    setIsPaused(false);
+    const video = videoRef.current
+    if (!video) return
+    setIsSeeking(false)
+    video.play()
+    setIsPaused(false)
     // When seeking ends, immediately reschedule hiding controls
-    scheduleHide();
-  };
+    scheduleHide()
+  }
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     const handleTimeUpdate = () => {
       // Only update playback time if not reset by reload
       if (video.currentTime !== 0 || isSeekingRef.current) {
-        lastPlaybackTimeRef.current = video.currentTime;
+        lastPlaybackTimeRef.current = video.currentTime
       }
-    };
+    }
 
-    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('timeupdate', handleTimeUpdate)
 
     return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, [videoRef]);
+      video.removeEventListener('timeupdate', handleTimeUpdate)
+    }
+  }, [videoRef])
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !videoUrl) return;
+    const video = videoRef.current
+    if (!video || !videoUrl) return
 
     // Restore playback position after video loads new URL
     const handleLoaded = () => {
       console.log(
-        'Video loaded:', video.src,
-        'Last playback position:', lastPlaybackTimeRef.current + 's',
-        'Video duration:', video.duration + 's'
-      );
+        'Video loaded:',
+        video.src,
+        'Last playback position:',
+        lastPlaybackTimeRef.current + 's',
+        'Video duration:',
+        video.duration + 's',
+      )
       if (
         lastPlaybackTimeRef.current > 0 &&
         video.duration > lastPlaybackTimeRef.current
       ) {
-        video.currentTime = lastPlaybackTimeRef.current;
+        video.currentTime = lastPlaybackTimeRef.current
       }
       // Optionally play if not paused
       if (!video.paused) {
-        video.play().catch(() => { });
+        video.play().catch(() => {})
       }
-    };
+    }
 
     if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
+      clearTimeout(hideTimeoutRef.current)
+      hideTimeoutRef.current = null
     }
     if (!open && videoRef.current) {
-      setAutoScrollUntilRef?.(Date.now() + 1000);
-      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 450);
-      videoRef.current.pause();
-      videoRef.current.src = '';
+      setAutoScrollUntilRef?.(Date.now() + 1000)
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 450)
+      videoRef.current.pause()
+      videoRef.current.src = ''
     } else if (open && videoUrl && videoRef.current) {
-      videoRef.current.src = videoUrl;
-      videoRef.current.load();
+      videoRef.current.src = videoUrl
+      videoRef.current.load()
 
       if (filenameRef.current !== lastFilenameRef.current) {
-        videoRef.current.play().catch(() => { setTimeout(() => videoRef.current?.play(), 1000); });
+        videoRef.current.play().catch(() => {
+          setTimeout(() => videoRef.current?.play(), 1000)
+        })
       } else {
-        videoRef.current.addEventListener('loadedmetadata', handleLoaded);
+        videoRef.current.addEventListener('loadedmetadata', handleLoaded)
       }
     }
 
     return () => {
       if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-        hideTimeoutRef.current = null;
+        clearTimeout(hideTimeoutRef.current)
+        hideTimeoutRef.current = null
       }
       if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.src = '';
+        videoRef.current.pause()
+        videoRef.current.src = ''
       }
-      video.removeEventListener('loadedmetadata', handleLoaded);
-    };
-  }, [open, videoUrl, videoRef, filenameRef.current]);
+      video.removeEventListener('loadedmetadata', handleLoaded)
+    }
+  }, [open, videoUrl, videoRef, filenameRef.current])
 
   // Fetch nickname from server
   useEffect(() => {
-    if (!filename) return;
-    authFetch(`${API_BASE}/api/recordings/${streamId}/${encodeURIComponent(filename)}/nickname`)
-      .then(res => res.json())
-      .then(data => setNickname(data.nickname || ''))
-      .catch(() => setNickname(''));
-  }, [filename, streamId]);
+    if (!filename) return
+    authFetch(
+      `${API_BASE}/api/recordings/${streamId}/${encodeURIComponent(filename)}/nickname`,
+    )
+      .then((res) => res.json())
+      .then((data) => setNickname(data.nickname || ''))
+      .catch(() => setNickname(''))
+  }, [filename, streamId])
 
   // Save nickname to server
   const saveNickname = (newName: string) => {
-    setNickname(newName);
-    authFetch(`${API_BASE}/api/recordings/${streamId}/${encodeURIComponent(filename)}/nickname`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nickname: newName }),
-    }).then(res => {
+    setNickname(newName)
+    authFetch(
+      `${API_BASE}/api/recordings/${streamId}/${encodeURIComponent(filename)}/nickname`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: newName }),
+      },
+    ).then((res) => {
       if (!res.ok) {
-        console.error('Failed to save nickname:', res.statusText);
-        return setNickname(''); // Reset on error
+        console.error('Failed to save nickname:', res.statusText)
+        return setNickname('') // Reset on error
       }
-      setNicknames(prev => ({ ...prev, [filename]: newName })); // Update local nicknames cache
+      setNicknames((prev) => ({ ...prev, [filename]: newName })) // Update local nicknames cache
     })
-  };
+  }
 
   useEffect(() => {
     if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+      inputRef.current.focus()
+      inputRef.current.select()
     }
-  }, [editing]);
+  }, [editing])
 
-  const idx = cachedRecordings.findIndex(r => r.filename === filename);
-  const prev = idx > 0 ? cachedRecordings[idx - 1] : null;
-  const next = idx >= 0 && idx < cachedRecordings.length - 1 ? cachedRecordings[idx + 1] : null;
+  const idx = cachedRecordings.findIndex((r) => r.filename === filename)
+  const prev = idx > 0 ? cachedRecordings[idx - 1] : null
+  const next =
+    idx >= 0 && idx < cachedRecordings.length - 1
+      ? cachedRecordings[idx + 1]
+      : null
 
   return (
-    <div style={{
-      width: '100%',
-      maxWidth: 900,
-      margin: '0 auto',
-      padding: 0,
-      background: 'transparent',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      position: 'relative',
-    }}>
+    <div
+      style={{
+        width: '100%',
+        maxWidth: 900,
+        margin: '0 auto',
+        padding: 0,
+        background: 'transparent',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        position: 'relative',
+      }}
+    >
       {/* Video + Seek Bar Container */}
       <div
         style={{
@@ -470,8 +532,12 @@ export function Recording({
               justifyContent: 'center',
               transition: 'background 0.2s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = 'transparent')
+            }
             aria-label={isPaused ? 'Play' : 'Pause'}
           >
             {isPaused ? <FiPlay size={24} /> : <FiPause size={24} />}
@@ -490,8 +556,12 @@ export function Recording({
               justifyContent: 'center',
               transition: 'background 0.2s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = 'transparent')
+            }
             aria-label={isMuted ? 'Unmute' : 'Mute'}
           >
             {isMuted ? <FiVolumeX size={24} /> : <FiVolume2 size={24} />}
@@ -510,42 +580,52 @@ export function Recording({
               justifyContent: 'center',
               transition: 'background 0.2s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = 'transparent')
+            }
             aria-label="Fullscreen"
           >
             <FiMaximize size={24} />
           </button>
         </div>
         {/* Seek Bar + Timestamp */}
-        <div style={{
-          width: '100%',
-          maxWidth: 900,
-          margin: '0 auto',
-          marginTop: isControlBarVisible ? 12 : 0,
-          marginBottom: isControlBarVisible ? 12 : 0,
-          display: 'flex',
-          alignItems: 'center',
-          background: 'linear-gradient(180deg, transparent 60%, #232b4a 100%)',
-          opacity: isControlBarVisible ? 1 : 0,
-          height: isControlBarVisible ? 44 : 0, // 44px when visible, 0 when hidden
-          padding: isControlBarVisible ? '8px 18px' : '0px 18px',
-          boxSizing: 'border-box',
-          borderRadius: 8,
-          position: 'relative',
-          overflow: 'hidden',
-          transition: 'opacity 0.3s, height 0.5s cubic-bezier(.4,2,.6,1), padding 0.5s cubic-bezier(.4,2,.6,1), margin 0.5s cubic-bezier(.4,2,.6,1)',
-        }}>
-          <span style={{
-            color: '#8ef',
-            fontSize: '0.95em',
-            fontFamily: 'Orbitron, Roboto, Arial, sans-serif',
-            minWidth: 60,
-            textAlign: 'left',
-            marginRight: 12,
-            transition: 'opacity 0.3s',
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 900,
+            margin: '0 auto',
+            marginTop: isControlBarVisible ? 12 : 0,
+            marginBottom: isControlBarVisible ? 12 : 0,
+            display: 'flex',
+            alignItems: 'center',
+            background:
+              'linear-gradient(180deg, transparent 60%, #232b4a 100%)',
             opacity: isControlBarVisible ? 1 : 0,
-          }}>
+            height: isControlBarVisible ? 44 : 0, // 44px when visible, 0 when hidden
+            padding: isControlBarVisible ? '8px 18px' : '0px 18px',
+            boxSizing: 'border-box',
+            borderRadius: 8,
+            position: 'relative',
+            overflow: 'hidden',
+            transition:
+              'opacity 0.3s, height 0.5s cubic-bezier(.4,2,.6,1), padding 0.5s cubic-bezier(.4,2,.6,1), margin 0.5s cubic-bezier(.4,2,.6,1)',
+          }}
+        >
+          <span
+            style={{
+              color: '#8ef',
+              fontSize: '0.95em',
+              fontFamily: 'Orbitron, Roboto, Arial, sans-serif',
+              minWidth: 60,
+              textAlign: 'left',
+              marginRight: 12,
+              transition: 'opacity 0.3s',
+              opacity: isControlBarVisible ? 1 : 0,
+            }}
+          >
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
           {/* Overlay for seek bar input to allow pointer events only on input */}
@@ -585,16 +665,18 @@ export function Recording({
             }}
             aria-label="Seek"
           />
-          <span style={{
-            marginLeft: 12,
-            color: '#8ef',
-            fontSize: '0.95em',
-            fontFamily: 'Orbitron, Roboto, Arial, sans-serif',
-            minWidth: 60,
-            textAlign: 'right',
-            transition: 'opacity 0.3s',
-            opacity: isControlBarVisible ? 1 : 0,
-          }}>
+          <span
+            style={{
+              marginLeft: 12,
+              color: '#8ef',
+              fontSize: '0.95em',
+              fontFamily: 'Orbitron, Roboto, Arial, sans-serif',
+              minWidth: 60,
+              textAlign: 'right',
+              transition: 'opacity 0.3s',
+              opacity: isControlBarVisible ? 1 : 0,
+            }}
+          >
             {formatTimestamp(filename)}
           </span>
         </div>
@@ -622,8 +704,12 @@ export function Recording({
           transition: 'background 0.2s',
           boxShadow: '0 2px 8px #1a2980aa',
         }}
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.6)'}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.background = 'rgba(0,0,0,0.5)')
+        }
+        onMouseLeave={(e) =>
+          (e.currentTarget.style.background = 'rgba(0,0,0,0.6)')
+        }
       >
         ×
       </button>
@@ -652,20 +738,20 @@ export function Recording({
       >
         {editing ? (
           <form
-            onSubmit={e => {
-              e.preventDefault();
-              setEditing(false);
-              saveNickname(nickname.trim());
+            onSubmit={(e) => {
+              e.preventDefault()
+              setEditing(false)
+              saveNickname(nickname.trim())
             }}
             style={{ display: 'flex', alignItems: 'center', gap: 10 }}
           >
             <input
               ref={inputRef}
               value={nickname}
-              onChange={e => setNickname(e.target.value)}
+              onChange={(e) => setNickname(e.target.value)}
               onBlur={() => {
-                setEditing(false);
-                saveNickname(nickname.trim());
+                setEditing(false)
+                saveNickname(nickname.trim())
               }}
               style={{
                 fontSize: '1.1em',
@@ -715,7 +801,7 @@ export function Recording({
                 fontFamily: "'Orbitron', 'Roboto', Arial, sans-serif",
                 textShadow: nickname ? '0 1px 8px #1a2980' : 'none',
                 cursor: 'pointer',
-                userSelect: 'none'
+                userSelect: 'none',
               }}
               onClick={() => setEditing(true)}
               tabIndex={0}
@@ -742,8 +828,12 @@ export function Recording({
               aria-label="Edit nickname"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="#8ef">
-                <path d="M14.7 3.29a1 1 0 0 1 1.41 0l.6.6a1 1 0 0 1 0 1.41l-9.1 9.1-2.12.7.7-2.12 9.1-9.1z"
-                  stroke="#8ef" strokeWidth="1.5" fill="#8ef" />
+                <path
+                  d="M14.7 3.29a1 1 0 0 1 1.41 0l.6.6a1 1 0 0 1 0 1.41l-9.1 9.1-2.12.7.7-2.12 9.1-9.1z"
+                  stroke="#8ef"
+                  strokeWidth="1.5"
+                  fill="#8ef"
+                />
               </svg>
             </span>
           </>
@@ -755,16 +845,19 @@ export function Recording({
         </span>
       </div>
       {/* Navigation */}
-      <div className="recording-actions" style={{
-        display: 'flex',
-        marginBottom: 12,
-        flexWrap: 'wrap',
-        gap: '12px',
-        justifyContent: 'center',
-        alignItems: 'center',
-        width: '100%',
-        maxWidth: '600px',
-      }}>
+      <div
+        className="recording-actions"
+        style={{
+          display: 'flex',
+          marginBottom: 12,
+          flexWrap: 'wrap',
+          gap: '12px',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: '100%',
+          maxWidth: '600px',
+        }}
+      >
         {prev && (
           <button
             onClick={() => onNavigate(prev.filename)}
@@ -782,12 +875,12 @@ export function Recording({
               boxShadow: 'inset 0 -3px 0 0 #fff',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-              e.currentTarget.style.color = '#1cf1d1';
+              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+              e.currentTarget.style.color = '#1cf1d1'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+              e.currentTarget.style.color = '#fff'
             }}
           >
             ← Previous
@@ -809,12 +902,12 @@ export function Recording({
             boxShadow: 'inset 0 -3px 0 0 #fff',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-            e.currentTarget.style.color = '#1cf1d1';
+            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+            e.currentTarget.style.color = '#1cf1d1'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+            e.currentTarget.style.color = '#fff'
           }}
         >
           Close
@@ -837,12 +930,12 @@ export function Recording({
               boxShadow: 'inset 0 -3px 0 0 #fff',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-              e.currentTarget.style.color = '#1cf1d1';
+              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+              e.currentTarget.style.color = '#1cf1d1'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+              e.currentTarget.style.color = '#fff'
             }}
           >
             Next →
@@ -850,12 +943,12 @@ export function Recording({
         )}
       </div>
     </div>
-  );
+  )
 }
 
 function formatTime(sec: number) {
-  if (!isFinite(sec)) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
+  if (!isFinite(sec)) return '0:00'
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
 }

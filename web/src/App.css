@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Roboto:wght@400;700&display=swap');
 
-html, body {
+html,
+body {
   width: 100vw;
   min-height: 100vh;
   margin: 0;
@@ -9,7 +10,8 @@ html, body {
   background: linear-gradient(135deg, #0f2027 0%, #2c5364 40%, #1a2980 100%);
 }
 
-.ios html, .ios body {
+.ios html,
+.ios body {
   overscroll-behavior: none;
 }
 
@@ -52,9 +54,15 @@ html, body {
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -109,11 +117,11 @@ body {
   justify-content: center;
   height: 10vh;
   transition:
-    background .3s .5s,
-    transform 0.5s cubic-bezier(.4,2,.6,1) .5s,
-    opacity 0.5s cubic-bezier(.4,2,.6,1) .5s,
-    left 0.5s cubic-bezier(.4,2,.6,1) .5s,
-    top 0.5s cubic-bezier(.4,2,.6,1) .5s;
+    background 0.3s 0.5s,
+    transform 0.5s cubic-bezier(0.4, 2, 0.6, 1) 0.5s,
+    opacity 0.5s cubic-bezier(0.4, 2, 0.6, 1) 0.5s,
+    left 0.5s cubic-bezier(0.4, 2, 0.6, 1) 0.5s,
+    top 0.5s cubic-bezier(0.4, 2, 0.6, 1) 0.5s;
   z-index: 20;
   will-change: transform, opacity, top, left, width, background, box-shadow;
   transform: none;
@@ -137,18 +145,18 @@ body {
   max-width: 900px;
   background-color: rgb(28, 241, 209, 0.25);
   transform: translateX(-50%) translateY(0);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   padding: 8px 0 4px 0; /* Remove the calc() padding */
   border-radius: 0 0 16px 16px;
   backdrop-filter: blur(16px) saturate(1.5);
   -webkit-backdrop-filter: blur(16px) saturate(1.5);
   user-select: none;
   transition:
-    background .3s .5s,
-    transform 0.5s cubic-bezier(.4,2,.6,1) .5s,
-    opacity 0.5s cubic-bezier(.4,2,.6,1) .5s,
-    left 0.5s cubic-bezier(.4,2,.6,1) .5s,
-    top 0.5s cubic-bezier(.4,2,.6,1) .5s;
+    background 0.3s 0.5s,
+    transform 0.5s cubic-bezier(0.4, 2, 0.6, 1) 0.5s,
+    opacity 0.5s cubic-bezier(0.4, 2, 0.6, 1) 0.5s,
+    left 0.5s cubic-bezier(0.4, 2, 0.6, 1) 0.5s,
+    top 0.5s cubic-bezier(0.4, 2, 0.6, 1) 0.5s;
   z-index: 20;
   opacity: 1;
 }
@@ -172,20 +180,27 @@ h2 {
   color: #fff;
   letter-spacing: 2px;
   margin-bottom: 3rem;
-  text-shadow: 0 2px 16px #1a2980, 0 1px 0 #fff;
+  text-shadow:
+    0 2px 16px #1a2980,
+    0 1px 0 #fff;
 }
 
 video {
   border-radius: 24px;
-  box-shadow: 0 8px 32px 0 rgba(26,41,128,0.4), 0 1.5px 8px 0 #000;
+  box-shadow:
+    0 8px 32px 0 rgba(26, 41, 128, 0.4),
+    0 1.5px 8px 0 #000;
   border: 2px solid #5f7fff;
   background: #000;
   margin-bottom: 2rem;
   transition: box-shadow 0.3s;
 }
 
-video:focus, video:hover {
-  box-shadow: 0 12px 48px 0 rgba(26,41,128,0.7), 0 2px 12px 0 #000;
+video:focus,
+video:hover {
+  box-shadow:
+    0 12px 48px 0 rgba(26, 41, 128, 0.7),
+    0 2px 12px 0 #000;
   outline: none;
 }
 
@@ -197,12 +212,14 @@ video:focus, video:hover {
   width: 90vw;
   max-width: 900px;
   z-index: 1001;
-  box-shadow: 0 2px 16px #1a2980, 0 1px 0 #fff1;
+  box-shadow:
+    0 2px 16px #1a2980,
+    0 1px 0 #fff1;
   border-radius: 18px 18px 0 0;
-  background: rgba(20,30,60,0.97);
+  background: rgba(20, 30, 60, 0.97);
   transition:
-    bottom 0.7s cubic-bezier(.4,2,.6,1),
-    transform 0.7s cubic-bezier(.4,2,.6,1);
+    bottom 0.7s cubic-bezier(0.4, 2, 0.6, 1),
+    transform 0.7s cubic-bezier(0.4, 2, 0.6, 1);
   will-change: bottom, transform;
   overflow: hidden;
   /* Remove margin and padding that would push it down */
@@ -222,19 +239,25 @@ video:focus, video:hover {
 /* App.css */
 .recordings-list-handle-floating {
   /* Already styled inline, but you can add more here if needed */
-  animation: handle-peek 0.7s cubic-bezier(.4,2,.6,1);
+  animation: handle-peek 0.7s cubic-bezier(0.4, 2, 0.6, 1);
 }
 
 .recordings-list-handle-parent {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: rgba(20,30,60,0.97);
+  background: rgba(20, 30, 60, 0.97);
 }
 
 @keyframes handle-peek {
-  from { opacity: 0; transform: translateX(-50%) translateY(32px);}
-  to   { opacity: 1; transform: translateX(-50%) translateY(0);}
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 /* ...existing code... */
@@ -244,15 +267,17 @@ video:focus, video:hover {
   max-width: 900px;
   max-height: 60vh; /* Limit height for scrolling */
   width: 90vw;
-  background: rgba(20,30,60,0.7);
+  background: rgba(20, 30, 60, 0.7);
   border-radius: 18px;
   overflow-y: auto;
   padding: 1.5em 1em;
-  box-shadow: 0 2px 16px #1a2980, 0 1px 0 #fff1;
+  box-shadow:
+    0 2px 16px #1a2980,
+    0 1px 0 #fff1;
   transition:
-    box-shadow 0.5s cubic-bezier(.4,2,.6,1),
-    background 0.5s cubic-bezier(.4,2,.6,1),
-    transform 0.7s cubic-bezier(.4,2,.6,1);
+    box-shadow 0.5s cubic-bezier(0.4, 2, 0.6, 1),
+    background 0.5s cubic-bezier(0.4, 2, 0.6, 1),
+    transform 0.7s cubic-bezier(0.4, 2, 0.6, 1);
   /* Add translateY for unfocused state */
   transform: translateY(10vh);
 }
@@ -284,14 +309,24 @@ video:focus, video:hover {
 }
 
 @keyframes record-blink {
-        0% { opacity: 1; }
-        50% { opacity: 0.2; }
-        100% { opacity: 1; }
-      }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 1;
+  }
+}
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .timestamp {
@@ -313,7 +348,10 @@ video:focus, video:hover {
 
 .recordings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%/2, max(180px, 100%/5)), 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%/2, max(180px, 100%/5)), 1fr)
+  );
   gap: 1.2em;
   margin-top: 1em;
 }
@@ -354,7 +392,7 @@ video:focus, video:hover {
 .recording-thumb-link img {
   pointer-events: none;
   -webkit-user-drag: none;
-/*   user-drag: none; */
+  /*   user-drag: none; */
 }
 
 .recording-thumb-link:hover {
@@ -394,14 +432,14 @@ video:focus, video:hover {
   }
 }
 
-  .recordings-list {
-    width: 100vw;
-    max-width: 100vw;
-    margin: 1em 0 !important;
-    border-radius: 0;
-    padding-left: 0.5em;
-    padding-right: 0.5em;
-  }
+.recordings-list {
+  width: 100vw;
+  max-width: 100vw;
+  margin: 1em 0 !important;
+  border-radius: 0;
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+}
 
 @media (max-width: 1280px) {
   /* Hide fixed toggles on mobile */
@@ -488,7 +526,7 @@ video:focus, video:hover {
   gap: 10px;
   font-weight: bold;
   font-size: 1.1em;
-  background: rgba(30,30,30,0.85);
+  background: rgba(30, 30, 30, 0.85);
   border-radius: 12px;
   padding: 6px 18px;
 }
@@ -509,7 +547,7 @@ video:focus, video:hover {
 }
 
 /* Also for floating toggles (if used) */
-label[style*="align-items: center"] {
+label[style*='align-items: center'] {
   color: #fff !important;
 }
 
@@ -519,7 +557,7 @@ label[style*="align-items: center"] {
   bottom: 24px;
   right: 32px;
   z-index: 2000;
-  background: rgba(30,30,30,0.85);
+  background: rgba(30, 30, 30, 0.85);
   border-radius: 12px;
   padding: 6px 18px;
   display: flex;
@@ -572,12 +610,14 @@ label[style*="align-items: center"] {
   bottom: 90px;
   left: 32px;
   z-index: 2000;
-  background: rgba(30,30,30,0.97);
+  background: rgba(30, 30, 30, 0.97);
   border-radius: 16px;
   padding: 18px 22px;
   box-shadow: 0 4px 24px #1a2980cc;
   min-width: 220px;
-  transition: transform 0.25s cubic-bezier(.4,2,.6,1), opacity 0.25s;
+  transition:
+    transform 0.25s cubic-bezier(0.4, 2, 0.6, 1),
+    opacity 0.25s;
   transform: translateY(30px);
   opacity: 0;
   display: none;
@@ -637,14 +677,16 @@ label[style*="align-items: center"] {
   top: 100%;
   margin-top: 8px;
   z-index: 1000;
-  background: rgba(30,30,30,0.97);
+  background: rgba(30, 30, 30, 0.97);
   border-radius: 16px;
   padding: 18px 22px;
   box-shadow: 0 4px 24px #1a2980cc;
   color: #fff;
   font-family: 'Orbitron', 'Roboto', Arial, sans-serif;
   font-size: 1.08em;
-  transition: transform 0.25s cubic-bezier(.4,2,.6,1), opacity 0.25s;
+  transition:
+    transform 0.25s cubic-bezier(0.4, 2, 0.6, 1),
+    opacity 0.25s;
   transform: translateY(0);
   opacity: 1;
   box-sizing: border-box;
@@ -690,7 +732,7 @@ label[style*="align-items: center"] {
     gap: 8px;
   }
   .recordings-list .desktop-only h3 {
-    margin-left: 10px !important;   /* Add left margin for "Motion Recordings" */
+    margin-left: 10px !important; /* Add left margin for "Motion Recordings" */
   }
 }
 
@@ -734,7 +776,7 @@ label[style*="align-items: center"] {
   width: auto !important;
   flex-direction: row;
   gap: 16px;
-  background: rgba(30,30,30,0.97);
+  background: rgba(30, 30, 30, 0.97);
   border-radius: 12px;
   padding: 12px 18px;
   box-shadow: 0 4px 24px #1a2980cc;
@@ -807,7 +849,9 @@ label[style*="align-items: center"] {
   flex-direction: column;
   justify-content: flex-end;
   cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.15s;
+  transition:
+    box-shadow 0.2s,
+    transform 0.15s;
   max-width: 100%;
   width: 100%;
   box-sizing: border-box;
@@ -828,7 +872,8 @@ label[style*="align-items: center"] {
   position: relative;
 }
 
-.stream-tile:hover, .stream-tile:focus-within {
+.stream-tile:hover,
+.stream-tile:focus-within {
   box-shadow: 0 4px 24px #1a2980cc;
   transform: translateY(-2px) scale(1.02);
 }
@@ -847,7 +892,7 @@ label[style*="align-items: center"] {
 .stream-tile-overlay {
   position: relative;
   z-index: 2;
-  background: rgba(20,30,60,0.35);
+  background: rgba(20, 30, 60, 0.35);
   padding: 1.2em 1em 1em 1em;
   border-radius: 0 0 16px 16px;
   display: flex;
@@ -904,7 +949,8 @@ label[style*="align-items: center"] {
   margin-right: 0;
 }
 
-.stream-tile-btn:hover, .stream-tile-btn:focus {
+.stream-tile-btn:hover,
+.stream-tile-btn:focus {
   background: #1cf1d1;
   color: #232b4a;
 }
@@ -919,7 +965,8 @@ label[style*="align-items: center"] {
   transition: color 0.15s;
 }
 
-.stream-tile-settings-btn:hover, .stream-tile-settings-btn:focus {
+.stream-tile-settings-btn:hover,
+.stream-tile-settings-btn:focus {
   color: #1cf1d1;
 }
 
@@ -928,16 +975,19 @@ label[style*="align-items: center"] {
   align-items: center;
   justify-content: center;
   border: 2px dashed #1976d2;
-  background: rgba(30,30,60,0.25);
+  background: rgba(30, 30, 60, 0.25);
   color: #1976d2;
   font-size: 2.2em;
   border-radius: 16px;
   min-height: 180px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
-.stream-tile-add:hover, .stream-tile-add:focus {
+.stream-tile-add:hover,
+.stream-tile-add:focus {
   background: #1cf1d1;
   color: #232b4a;
   border-color: #1cf1d1;
@@ -1042,7 +1092,7 @@ label[style*="align-items: center"] {
   background: #000;
 }
 .bg-opacity-50 {
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
 }
 .p-2 {
   padding: 0.5em;
@@ -1119,7 +1169,9 @@ label[style*="align-items: center"] {
   background: #f3f4f6;
 }
 .transition-colors {
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 .text-gray-500 {
   color: #6b7280;
@@ -1146,7 +1198,7 @@ label[style*="align-items: center"] {
   max-width: 98vw;
   width: min(900px, 98vw);
   opacity: 1;
-  transition: opacity 0.7s cubic-bezier(.4,2,.6,1);
+  transition: opacity 0.7s cubic-bezier(0.4, 2, 0.6, 1);
   overflow: hidden;
   pointer-events: auto;
 }
@@ -1159,8 +1211,8 @@ label[style*="align-items: center"] {
 .recording-bar-collapse {
   overflow: hidden;
   transition:
-    max-height 0.7s cubic-bezier(.4,2,.6,1),
-    opacity 0.7s cubic-bezier(.4,2,.6,1);
+    max-height 0.7s cubic-bezier(0.4, 2, 0.6, 1),
+    opacity 0.7s cubic-bezier(0.4, 2, 0.6, 1);
   max-height: 2000px; /* Should be slightly larger than your bar's max height */
   opacity: 1;
 }
@@ -1172,8 +1224,11 @@ label[style*="align-items: center"] {
 
 .error-modal-backdrop {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(20,30,60,0.85);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(20, 30, 60, 0.85);
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -1212,7 +1267,8 @@ label[style*="align-items: center"] {
   transition: background 0.2s;
 }
 
-.error-modal-btn:hover, .error-modal-btn:focus {
+.error-modal-btn:hover,
+.error-modal-btn:focus {
   background: #1cf1d1;
   color: #232b4a;
 }

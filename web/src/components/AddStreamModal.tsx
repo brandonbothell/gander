@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { type Stream } from '../../../source/types/shared';
+import React, { useState } from 'react'
+import { type Stream } from '../../../source/types/shared'
 
 interface AddStreamModalProps {
-  showModal: boolean;
-  onClose: () => void;
-  onStreamCreated: (stream: Stream) => void;
-  authFetch: (url: string, options?: any) => Promise<any>;
-  API_BASE: string;
+  showModal: boolean
+  onClose: () => void
+  onStreamCreated: (stream: Stream) => void
+  authFetch: (url: string, options?: any) => Promise<any>
+  API_BASE: string
 }
 
 const AddStreamModal: React.FC<AddStreamModalProps> = ({
@@ -21,26 +21,26 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
     ffmpegInput: '',
     rtspUser: '',
     rtspPass: '',
-  });
-  const [creatingStream, setCreatingStream] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  })
+  const [creatingStream, setCreatingStream] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   const handleClose = () => {
-    onClose();
-    setNewStream({ nickname: '', ffmpegInput: '', rtspUser: '', rtspPass: '' });
-    setCreateError(null);
-  };
+    onClose()
+    setNewStream({ nickname: '', ffmpegInput: '', rtspUser: '', rtspPass: '' })
+    setCreateError(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreatingStream(true);
-    setCreateError(null);
+    e.preventDefault()
+    setCreatingStream(true)
+    setCreateError(null)
 
     // Basic client validation
     if (!newStream.nickname.trim() || !newStream.ffmpegInput.trim()) {
-      setCreateError('Nickname and Stream URL are required.');
-      setCreatingStream(false);
-      return;
+      setCreateError('Nickname and Stream URL are required.')
+      setCreatingStream(false)
+      return
     }
 
     // Only allow RTSP or video=...:audio=... for ffmpegInput
@@ -48,9 +48,11 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
       !/^rtsp:\/\//i.test(newStream.ffmpegInput.trim()) &&
       !/^video=.+:audio=.+/i.test(newStream.ffmpegInput.trim())
     ) {
-      setCreateError('Stream URL must be an RTSP URL or a video=...:audio=... string.');
-      setCreatingStream(false);
-      return;
+      setCreateError(
+        'Stream URL must be an RTSP URL or a video=...:audio=... string.',
+      )
+      setCreatingStream(false)
+      return
     }
 
     try {
@@ -63,25 +65,25 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
           rtspUser: newStream.rtspUser.trim() || undefined,
           rtspPass: newStream.rtspPass.trim() || undefined,
         }),
-      });
+      })
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setCreateError(data.error || 'Failed to create stream.');
-        setCreatingStream(false);
-        return;
+        const data = await res.json().catch(() => ({}))
+        setCreateError(data.error || 'Failed to create stream.')
+        setCreatingStream(false)
+        return
       }
 
-      const data = await res.json();
-      onStreamCreated(data);
-      handleClose();
+      const data = await res.json()
+      onStreamCreated(data)
+      handleClose()
     } catch (err: any) {
-      setCreateError(err.message || 'Failed to create stream.');
+      setCreateError(err.message || 'Failed to create stream.')
     }
-    setCreatingStream(false);
-  };
+    setCreatingStream(false)
+  }
 
-  if (!showModal) return null;
+  if (!showModal) return null
 
   return (
     <div
@@ -110,7 +112,7 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
           color: '#fff',
           position: 'relative',
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <h2 style={{ marginTop: 0 }}>Add New Stream</h2>
         <form onSubmit={handleSubmit}>
@@ -119,7 +121,9 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
             <input
               type="text"
               value={newStream.nickname}
-              onChange={e => setNewStream(s => ({ ...s, nickname: e.target.value }))}
+              onChange={(e) =>
+                setNewStream((s) => ({ ...s, nickname: e.target.value }))
+              }
               style={{
                 width: '100%',
                 padding: 8,
@@ -137,7 +141,9 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
             <input
               type="text"
               value={newStream.ffmpegInput}
-              onChange={e => setNewStream(s => ({ ...s, ffmpegInput: e.target.value }))}
+              onChange={(e) =>
+                setNewStream((s) => ({ ...s, ffmpegInput: e.target.value }))
+              }
               style={{
                 width: '100%',
                 padding: 8,
@@ -156,7 +162,9 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
                 <input
                   type="text"
                   value={newStream.rtspUser}
-                  onChange={e => setNewStream(s => ({ ...s, rtspUser: e.target.value }))}
+                  onChange={(e) =>
+                    setNewStream((s) => ({ ...s, rtspUser: e.target.value }))
+                  }
                   style={{
                     width: '100%',
                     padding: 8,
@@ -172,7 +180,9 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
                 <input
                   type="password"
                   value={newStream.rtspPass}
-                  onChange={e => setNewStream(s => ({ ...s, rtspPass: e.target.value }))}
+                  onChange={(e) =>
+                    setNewStream((s) => ({ ...s, rtspPass: e.target.value }))
+                  }
                   style={{
                     width: '100%',
                     padding: 8,
@@ -186,7 +196,9 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
             </>
           )}
           {createError && (
-            <div style={{ color: '#ff6b6b', marginBottom: 12 }}>{createError}</div>
+            <div style={{ color: '#ff6b6b', marginBottom: 12 }}>
+              {createError}
+            </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
             <button
@@ -225,7 +237,7 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
         </form>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AddStreamModal;
+export default AddStreamModal

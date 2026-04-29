@@ -1,35 +1,35 @@
-import '@dotenvx/dotenvx/config';
-import express from 'express';
-import jwt from 'jsonwebtoken';
-import cors from 'cors';
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import http from 'http';
-import childProcess, { ChildProcess } from 'child_process';
-import open from 'open';
-import * as admin from 'firebase-admin';
-import webpush from 'web-push';
-import * as chokidar from 'chokidar';
-import { PrismaClient } from './generated/prisma';
-import { StreamManager } from './streamManager';
-import { detectMotion, cleanFrameCache, debugLog } from './motionDetector';
-import { TrustedDevice } from './types/deviceInfo';
-import config from '../config.json';
-import { jwtAuth } from './middleware/jwtAuth';
+import '@dotenvx/dotenvx/config'
+import express from 'express'
+import jwt from 'jsonwebtoken'
+import cors from 'cors'
+import fs from 'fs'
+import path from 'path'
+import crypto from 'crypto'
+import http from 'http'
+import childProcess, { ChildProcess } from 'child_process'
+import open from 'open'
+import * as admin from 'firebase-admin'
+import webpush from 'web-push'
+import * as chokidar from 'chokidar'
+import { PrismaClient } from './generated/prisma'
+import { StreamManager } from './streamManager'
+import { detectMotion, cleanFrameCache, debugLog } from './motionDetector'
+import { TrustedDevice } from './types/deviceInfo'
+import config from '../config.json'
+import { jwtAuth } from './middleware/jwtAuth'
 import initializeMotionRoutes, {
   checkDiskSpaceAndPurge,
   flushMotionSegmentsWithRetry,
   saveMotionSegmentsWithRetry,
-} from './routes/motion';
-import initializeAuthRoutes from './routes/auth';
-import initializeNotificationRoutes, { notify } from './routes/notifications';
-import initializeRecordingRoutes from './routes/recordings';
-import initializeMaskRoutes from './routes/masks';
-import initializeStreamRoutes from './routes/streams';
-import { logMotion } from './logMotion';
-import consoleStamp from 'console-stamp';
-import chalk from 'chalk';
+} from './routes/motion'
+import initializeAuthRoutes from './routes/auth'
+import initializeNotificationRoutes, { notify } from './routes/notifications'
+import initializeRecordingRoutes from './routes/recordings'
+import initializeMaskRoutes from './routes/masks'
+import initializeStreamRoutes from './routes/streams'
+import { logMotion } from './logMotion'
+import consoleStamp from 'console-stamp'
+import chalk from 'chalk'
 
 consoleStamp(console, {
   format: ':date(yyyy-mm-dd HH:MM:ss.l).yellow.bgBlue :level() :msg',
@@ -38,71 +38,71 @@ consoleStamp(console, {
   tokens: {
     level: (opts) => {
       // opts.method is the log level (e.g., 'info', 'warn', etc.)
-      const level = opts.method;
-      let colorFn = (s: string) => s; // default: no color
+      const level = opts.method
+      let colorFn = (s: string) => s // default: no color
       switch (level) {
         case 'info':
-          colorFn = chalk.cyan;
-          break;
+          colorFn = chalk.cyan
+          break
         case 'debug':
-          colorFn = chalk.gray;
-          break;
+          colorFn = chalk.gray
+          break
         case 'warn':
-          colorFn = chalk.yellow;
-          break;
+          colorFn = chalk.yellow
+          break
         case 'error':
-          colorFn = chalk.red;
-          break;
+          colorFn = chalk.red
+          break
         default:
-          colorFn = chalk.white;
+          colorFn = chalk.white
       }
       // Default label format: [LEVEL]
-      const label = `[${level.toUpperCase()}]`.padEnd(7, ' ');
-      return colorFn(label);
+      const label = `[${level.toUpperCase()}]`.padEnd(7, ' ')
+      return colorFn(label)
     },
   },
-});
+})
 
 process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(
   __dirname,
   '..',
   'security-cam-credentials.json',
-);
+)
 
-export const prisma = new PrismaClient();
+export const prisma = new PrismaClient()
 
 // Motion logging setup
-const apiStartTime = new Date().toISOString().replace(/[:.]/g, '-');
-export const motionLogPath = path.join(__dirname, '..', 'logs', `motion`);
-export const authLogPath = path.join(__dirname, '..', 'logs', `auth`);
+const apiStartTime = new Date().toISOString().replace(/[:.]/g, '-')
+export const motionLogPath = path.join(__dirname, '..', 'logs', `motion`)
+export const authLogPath = path.join(__dirname, '..', 'logs', `auth`)
 
 // Ensure logs directory exists
-const logsDir = path.dirname(motionLogPath);
+const logsDir = path.dirname(motionLogPath)
 if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
+  fs.mkdirSync(logsDir, { recursive: true })
 }
 
-export const JWT_SECRET = process.env.JWT_SECRET as string;
+export const JWT_SECRET = process.env.JWT_SECRET as string
 
 if (!JWT_SECRET) {
-  console.error('JWT_SECRET environment variable is not set!');
-  process.exit(1);
+  console.error('JWT_SECRET environment variable is not set!')
+  process.exit(1)
 }
 
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.applicationDefault(),
-  });
+  })
 }
 
 // --- Configuration ---
-const app = express();
+const app = express()
 
 // --- Constants ---
 const MOTION_RECORDING_TIMEOUT_SECONDS = {
   normal: 45,
   cameraMovement: 30, // shorter timeout for camera movement to avoid long recordings
-};
+}
 
 /**
  * Number of recent video segments to buffer.
@@ -111,59 +111,59 @@ const MOTION_RECORDING_TIMEOUT_SECONDS = {
  * should be kept in memory or storage for quick access or processing.
  * Adjust this value based on memory constraints and application requirements.
  */
-const RECENT_SEGMENT_BUFFER = 6;
-const STARTUP_GRACE_PERIOD = 10; // seconds
+const RECENT_SEGMENT_BUFFER = 6
+const STARTUP_GRACE_PERIOD = 10 // seconds
 
 const streamThumbnailPromises: Record<
   string,
   Promise<{ success: boolean }> | null
-> = {};
+> = {}
 
 // In-memory map of StreamManagers
-const dynamicStreams: Record<string, StreamManager> = {};
+const dynamicStreams: Record<string, StreamManager> = {}
 
 export interface RequestWithUser extends express.Request {
-  user?: { username: string };
+  user?: { username: string }
 }
 
 // --- Per-stream motion state ---
 export interface StreamMotionState {
-  notificationSent: boolean;
-  motionRecordingActive: boolean;
-  motionTimeout?: NodeJS.Timeout;
-  motionRecordingTimeoutAt: number;
-  motionSegments: string[];
-  flushingSegments: string[]; // Segments currently being flushed
-  recentSegments: string[];
-  motionPaused: boolean;
-  startupTime: number;
-  savingInProgress: boolean;
-  currentSaveProcess: ChildProcess | null;
-  saveRetryCount: number;
-  startedRecordingAt: number;
-  lastSegmentProcessAt?: number;
-  flushTimer?: NodeJS.Timeout; // Timer for flushing segments
-  flushedSegments: string[]; // Segments that have been flushed
-  flushRecordings: string[]; // Filenames of that have been flushed
-  nextFlushNumber: number; // Next flush number to use for segment naming
-  recordingTitle: string; // Title for the current recording
-  cleaningUp: boolean; // Whether HLS/flush directory cleanup is in progress
-  cancelFlush: boolean; // Whether to cancel the current flush operation
-  lowSpaceNotified: boolean; // new flag to avoid spamming notifications
+  notificationSent: boolean
+  motionRecordingActive: boolean
+  motionTimeout?: NodeJS.Timeout
+  motionRecordingTimeoutAt: number
+  motionSegments: string[]
+  flushingSegments: string[] // Segments currently being flushed
+  recentSegments: string[]
+  motionPaused: boolean
+  startupTime: number
+  savingInProgress: boolean
+  currentSaveProcess: ChildProcess | null
+  saveRetryCount: number
+  startedRecordingAt: number
+  lastSegmentProcessAt?: number
+  flushTimer?: NodeJS.Timeout // Timer for flushing segments
+  flushedSegments: string[] // Segments that have been flushed
+  flushRecordings: string[] // Filenames of that have been flushed
+  nextFlushNumber: number // Next flush number to use for segment naming
+  recordingTitle: string // Title for the current recording
+  cleaningUp: boolean // Whether HLS/flush directory cleanup is in progress
+  cancelFlush: boolean // Whether to cancel the current flush operation
+  lowSpaceNotified: boolean // new flag to avoid spamming notifications
 }
 
-const streamStates: Record<string, StreamMotionState> = {};
+const streamStates: Record<string, StreamMotionState> = {}
 
-const watchers = new Map<string, chokidar.FSWatcher>();
+const watchers = new Map<string, chokidar.FSWatcher>()
 
 export async function setupStreamMotionMonitoring(streamId?: string) {
   const setupMotionMonitoring = async (streamId: string) => {
     logMotion(
       `[${streamId}] Monitoring started at ${new Date().toLocaleString()}`,
-    );
+    )
 
     if (!streamStates[streamId]) {
-      const persistedStates = await loadPersistedStreamStates();
+      const persistedStates = await loadPersistedStreamStates()
       streamStates[streamId] = {
         notificationSent: false,
         motionRecordingActive: false,
@@ -185,7 +185,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         cleaningUp: false,
         cancelFlush: false,
         lowSpaceNotified: false,
-      };
+      }
     }
 
     // --- Motion Detection Watcher ---
@@ -194,12 +194,12 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       chokidar
         .watch(dynamicStreams[streamId].config.hlsDir, { ignoreInitial: true })
         .on('add', (segmentPath) => {
-          if (!/segment_\d+\.ts$/.test(path.basename(segmentPath))) return;
-          const state = streamStates[streamId];
+          if (!/segment_\d+\.ts$/.test(path.basename(segmentPath))) return
+          const state = streamStates[streamId]
 
           // --- Throttle segment processing to avoid busy loop ---
-          const now = Date.now();
-          const MIN_SEGMENT_PROCESS_INTERVAL = 300; // ms
+          const now = Date.now()
+          const MIN_SEGMENT_PROCESS_INTERVAL = 300 // ms
           if (
             state.lastSegmentProcessAt &&
             now - state.lastSegmentProcessAt < MIN_SEGMENT_PROCESS_INTERVAL
@@ -207,15 +207,15 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
             if (now - state.lastSegmentProcessAt > 0) {
               debugLog(
                 `[${streamId}] Throttling segment processing: last at ${now - state.lastSegmentProcessAt}ms ago`,
-              );
+              )
             }
-            return;
+            return
           }
-          state.lastSegmentProcessAt = now;
+          state.lastSegmentProcessAt = now
 
-          state.recentSegments.push(segmentPath);
+          state.recentSegments.push(segmentPath)
           if (state.recentSegments.length > RECENT_SEGMENT_BUFFER) {
-            const expiredSegment = state.recentSegments.shift();
+            const expiredSegment = state.recentSegments.shift()
             if (
               expiredSegment &&
               ((!state.motionRecordingActive &&
@@ -223,18 +223,18 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                 expiredSegment) ||
                 state.flushedSegments.includes(expiredSegment))
             ) {
-              safeUnlinkWithRetry(expiredSegment);
+              safeUnlinkWithRetry(expiredSegment)
             }
           }
           setTimeout(async () => {
-            if (state.motionPaused) return;
+            if (state.motionPaused) return
             if ((Date.now() - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD)
-              return;
+              return
             const motionStatus = await detectMotion(
               streamStates,
               streamId,
               segmentPath,
-            );
+            )
             if (motionStatus.motion) {
               // --- If motion is detected and we're not currently recording ---
               if (!state.motionRecordingActive) {
@@ -242,45 +242,45 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                 if (state.savingInProgress && state.currentSaveProcess) {
                   logMotion(
                     `[${streamId}] New motion detected while saving, canceling save operation`,
-                  );
-                  state.currentSaveProcess.kill('SIGTERM');
-                  state.savingInProgress = false;
-                  state.currentSaveProcess = null;
-                  state.saveRetryCount = 0;
+                  )
+                  state.currentSaveProcess.kill('SIGTERM')
+                  state.savingInProgress = false
+                  state.currentSaveProcess = null
+                  state.saveRetryCount = 0
                 } else {
                   // Motion was detected and we're not currently recording/saving
                   // Start a new recording
-                  state.nextFlushNumber = 1;
-                  state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
-                  state.startedRecordingAt = Date.now();
-                  state.notificationSent = false;
+                  state.nextFlushNumber = 1
+                  state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`
+                  state.startedRecordingAt = Date.now()
+                  state.notificationSent = false
                 }
 
-                state.motionRecordingActive = true;
+                state.motionRecordingActive = true
                 state.recentSegments.forEach((recentPath) => {
                   if (!state.motionSegments.includes(recentPath))
-                    state.motionSegments.push(recentPath);
-                });
+                    state.motionSegments.push(recentPath)
+                })
 
-                if (state.flushTimer) clearInterval(state.flushTimer);
+                if (state.flushTimer) clearInterval(state.flushTimer)
                 // Start periodic flush
                 state.flushTimer = setInterval(() => {
                   flushMotionSegmentsWithRetry(
                     streamStates,
                     dynamicStreams,
                     streamId,
-                  );
-                }, 10000); // flush every 10 seconds
+                  )
+                }, 10000) // flush every 10 seconds
               }
 
               // --- If motion is detected, add the segment to motion segments ---
               if (!state.motionSegments.includes(segmentPath))
-                state.motionSegments.push(segmentPath);
+                state.motionSegments.push(segmentPath)
 
               // Log motion event
               logMotion(
                 `[${streamId}] Detected at ${new Date().toLocaleString()} in segment: ${path.basename(segmentPath)}`,
-              );
+              )
 
               // --- Notify only once per motion event ---
               if (!state.notificationSent) {
@@ -288,8 +288,8 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                   channelId: 'motion_event_channel',
                   sound: 'motion_alert',
                   group: `motion_event_${streamId}`,
-                });
-                state.notificationSent = true;
+                })
+                state.notificationSent = true
               }
 
               // --- Set motion recording timeout ---
@@ -298,7 +298,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                   motionStatus.aboveCameraMovementThreshold
                     ? 'cameraMovement'
                     : 'normal'
-                ] * 1000;
+                ] * 1000
 
               if (
                 state.motionRecordingTimeoutAt > 0 &&
@@ -307,96 +307,97 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
               ) {
                 // If the new timeout is shorter than the current one, keep the current timeout
                 motionRecordingTimeoutMs =
-                  state.motionRecordingTimeoutAt - Date.now();
+                  state.motionRecordingTimeoutAt - Date.now()
               }
 
-              if (state.motionTimeout) clearTimeout(state.motionTimeout);
+              if (state.motionTimeout) clearTimeout(state.motionTimeout)
               state.motionTimeout = setTimeout(() => {
                 // --- Save motion segments and reset state (segment and save state is reset in saveMotionSegments) ---
                 saveMotionSegmentsWithRetry(
                   streamStates,
                   dynamicStreams,
                   streamId,
-                );
-                state.motionRecordingActive = false;
-                state.motionRecordingTimeoutAt = 0;
+                )
+                state.motionRecordingActive = false
+                state.motionRecordingTimeoutAt = 0
                 if (state.flushTimer) {
-                  clearInterval(state.flushTimer);
-                  state.flushTimer = undefined;
+                  clearInterval(state.flushTimer)
+                  state.flushTimer = undefined
                 }
-                state.motionTimeout = undefined;
-              }, motionRecordingTimeoutMs);
+                state.motionTimeout = undefined
+              }, motionRecordingTimeoutMs)
               state.motionRecordingTimeoutAt =
-                Date.now() + motionRecordingTimeoutMs;
+                Date.now() + motionRecordingTimeoutMs
             } else if (state.motionRecordingActive) {
               if (!state.motionSegments.includes(segmentPath))
-                state.motionSegments.push(segmentPath);
+                state.motionSegments.push(segmentPath)
             }
-          }, 300);
+          }, 300)
         }),
-    );
+    )
 
     console.log(
       `[${streamId}] Watcher set up for ${dynamicStreams[streamId].config.hlsDir}`,
-    );
-  };
-
-  if (streamId) {
-    await setupMotionMonitoring(streamId);
-  } else {
-    const promises = [];
-    for (const streamId in dynamicStreams) {
-      promises.push(setupMotionMonitoring(streamId));
-    }
-    await Promise.all(promises);
+    )
   }
 
-  setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000);
+  if (streamId) {
+    await setupMotionMonitoring(streamId)
+  } else {
+    const promises = []
+    for (const streamId in dynamicStreams) {
+      promises.push(setupMotionMonitoring(streamId))
+    }
+    await Promise.all(promises)
+  }
+
+  setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000)
 }
 
 export function stopStreamMotionMonitoring(streamId?: string) {
   const stopMotionMonitoring = (streamId: string) => {
     logMotion(
       `[${streamId}] Stopping motion monitoring at ${new Date().toLocaleString()}`,
-    );
+    )
     if (watchers.has(streamId)) {
-      watchers.get(streamId)?.close();
-      watchers.delete(streamId);
+      watchers.get(streamId)?.close()
+      watchers.delete(streamId)
     }
     if (streamStates[streamId]) {
-      const state = streamStates[streamId];
-      if (state.flushTimer) clearInterval(state.flushTimer);
-      if (state.motionTimeout) clearTimeout(state.motionTimeout);
+      const state = streamStates[streamId]
+      if (state.flushTimer) clearInterval(state.flushTimer)
+      if (state.motionTimeout) clearTimeout(state.motionTimeout)
       persistStreamState(streamId).finally(() => {
-        delete streamStates[streamId];
-      });
+        delete streamStates[streamId]
+      })
     }
-  };
+  }
 
   if (streamId && dynamicStreams[streamId]) {
-    stopMotionMonitoring(streamId);
+    stopMotionMonitoring(streamId)
   } else {
     for (const streamId in dynamicStreams) {
-      stopMotionMonitoring(streamId);
+      stopMotionMonitoring(streamId)
     }
   }
 }
 
+export function saveMotionSegments(streamId: string) {
+  return saveMotionSegmentsWithRetry(streamStates, dynamicStreams, streamId)
+}
+
 // Load streams from DB on startup
 async function loadStreamsFromDb() {
-  const dbStreams = await prisma.stream.findMany();
+  const dbStreams = await prisma.stream.findMany()
   for (const s of dbStreams) {
     if (!dynamicStreams[s.id]) {
-      dynamicStreams[s.id] = await createStreamManager(s);
+      dynamicStreams[s.id] = await createStreamManager(s)
       try {
         dynamicStreams[s.id].startFFmpeg().catch((err) => {
-          console.warn(
-            `[${s.id}] FFmpeg failed to start:`,
-            err?.message || err,
-          );
-        });
+          console.warn(`[${s.id}] FFmpeg failed to start:`, err?.message || err)
+        })
       } catch (err) {
-        console.error(`[${s.id}] Error starting FFmpeg:`, err);
+        console.error(`[${s.id}] Error starting FFmpeg:`, err)
       }
     }
   }
@@ -404,7 +405,7 @@ async function loadStreamsFromDb() {
   // --- Monitor for FFmpeg cooldowns and alert ---
   setInterval(() => {
     for (const streamId in dynamicStreams) {
-      const stream = dynamicStreams[streamId];
+      const stream = dynamicStreams[streamId]
       if (
         stream &&
         stream.getFFmpegCooldownUntil() &&
@@ -413,77 +414,77 @@ async function loadStreamsFromDb() {
         logMotion(
           `[${streamId}] FFmpeg restart cooldown active until ${new Date(stream.getFFmpegCooldownUntil()).toLocaleTimeString()}`,
           'warn',
-        );
+        )
         notify(dynamicStreams, streamId, {
           title: 'Stream Restart Cooldown',
           body: `Stream ${streamId} is in FFmpeg restart cooldown due to repeated failures.`,
           tag: `server_event_${streamId}`,
           group: `stream_event_${streamId}`,
-        });
+        })
       }
     }
-  }, 60000); // Check every minute
+  }, 60000) // Check every minute
 
   // Periodic disk-space check: run every 60 seconds
   const diskSpaceCheck = () => {
     for (const sId in dynamicStreams) {
-      if (!dynamicStreams[sId]) continue;
+      if (!dynamicStreams[sId]) continue
       checkDiskSpaceAndPurge(streamStates, dynamicStreams, sId).catch((err) => {
-        console.error(`[DiskCheck] Error checking disk for ${sId}:`, err);
-      });
+        console.error(`[DiskCheck] Error checking disk for ${sId}:`, err)
+      })
     }
-  };
-  diskSpaceCheck(); // Initial check on startup
+  }
+  diskSpaceCheck() // Initial check on startup
   setInterval(() => {
-    diskSpaceCheck();
-  }, 60 * 1000);
+    diskSpaceCheck()
+  }, 60 * 1000)
 
   // Periodically remove old HLS segments (runs independent of motion monitoring)
-  const SEGMENT_RETENTION_SECONDS = 300; // 5 minutes
+  const SEGMENT_RETENTION_SECONDS = 300 // 5 minutes
   async function cleanupOldStreamSegments() {
-    const retentionMs = SEGMENT_RETENTION_SECONDS * 1000;
-    const now = Date.now();
+    const retentionMs = SEGMENT_RETENTION_SECONDS * 1000
+    const now = Date.now()
 
     for (const streamId of Object.keys(dynamicStreams)) {
-      const stream = dynamicStreams[streamId];
-      if (!stream) continue;
-      const dir = stream.config.hlsDir;
-      let files: string[] = [];
+      const stream = dynamicStreams[streamId]
+      if (!stream) continue
+      const dir = stream.config.hlsDir
+      let files: string[] = []
       try {
-        files = await fs.promises.readdir(dir);
+        files = await fs.promises.readdir(dir)
       } catch {
-        continue;
+        continue
       }
 
-      const segmentFiles = files.filter((f) => /^segment_\d+\.ts$/.test(f));
+      const segmentFiles = files.filter((f) => /^segment_\d+\.ts$/.test(f))
       for (const fname of segmentFiles) {
-        const fullPath = path.join(dir, fname);
+        const fullPath = path.join(dir, fname)
 
         try {
-          const stat = await fs.promises.stat(fullPath);
-          const age = now - stat.mtimeMs;
+          const stat = await fs.promises.stat(fullPath)
+          const age = now - stat.mtimeMs
 
           // Skip files that are still recent enough
-          if (age <= retentionMs) continue;
+          if (age <= retentionMs) continue
 
           // Avoid deleting files that are currently referenced by motion state
-          const state = streamStates[streamId];
+          const state = streamStates[streamId]
           const isReferenced =
             state &&
             ((state.recentSegments || []).includes(fullPath) ||
               (state.motionSegments || []).includes(fullPath) ||
-              (state.flushingSegments || []).includes(fullPath));
-          if (isReferenced) continue;
+              (state.flushingSegments || []).includes(fullPath))
+          if (isReferenced) continue
 
           // Delete the segment and its associated motion thumbnail if present
-          await safeUnlinkWithRetry(fullPath);
+          await safeUnlinkWithRetry(fullPath)
 
-          const motionJpg = fullPath.replace(/\.ts$/, '_motion.jpg');
+          const motionJpg = fullPath.replace(/\.ts$/, '_motion.jpg')
           try {
-            await fs.promises.access(motionJpg);
-            const mjStat = await fs.promises.stat(motionJpg);
+            await fs.promises.access(motionJpg)
+            const mjStat = await fs.promises.stat(motionJpg)
             if (now - mjStat.mtimeMs > retentionMs) {
-              await safeUnlinkWithRetry(motionJpg);
+              await safeUnlinkWithRetry(motionJpg)
             }
           } catch {
             // not present — ignore
@@ -498,16 +499,16 @@ async function loadStreamsFromDb() {
   // Run immediately and then every minute
   cleanupOldStreamSegments().catch(() => {
     /* ignore */
-  });
+  })
   setInterval(
     () =>
       cleanupOldStreamSegments().catch(() => {
         /* ignore */
       }),
     60 * 1000,
-  );
+  )
 
-  setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000);
+  setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000)
 }
 
 loadStreamsFromDb()
@@ -515,18 +516,18 @@ loadStreamsFromDb()
   .then(() => setupStreamMotionMonitoring())
   .then(() => {
     // --- Start server ---
-    setInterval(syncDeletedRecordings, 1000 * 60 * 60); // Sync deleted recordings every hour
+    setInterval(syncDeletedRecordings, 1000 * 60 * 60) // Sync deleted recordings every hour
 
     // Use HTTP with an nginx reverse proxy in production or plain HTTP for development
-    const port = process.env.PORT ?? 3000;
+    const port = process.env.PORT ?? 3000
     http.createServer(app).listen(port, () => {
-      console.debug(`HTTP server running on http://localhost:${port}`);
-      if (process.env.API_ENV === 'production') return;
+      console.debug(`HTTP server running on http://localhost:${port}`)
+      if (process.env.API_ENV === 'production') return
       setTimeout(() => {
-        open(`http://localhost:${port}`);
-      }, 1500);
-    });
-  });
+        open(`http://localhost:${port}`)
+      }, 1500)
+    })
+  })
 
 /**
  * Periodically clean up expired JWTs, refresh tokens, and old trusted devices.
@@ -535,59 +536,59 @@ loadStreamsFromDb()
  * - Removes trusted devices not seen in 7+ days.
  */
 async function cleanupExpiredTokensAndDevices() {
-  const now = Date.now();
-  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now()
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
 
-  const users = await prisma.user.findMany();
+  const users = await prisma.user.findMany()
   for (const user of users) {
-    let changed = false;
+    let changed = false
 
     // --- JWTs ---
-    let jwts: string[] = [];
+    let jwts: string[] = []
     try {
-      jwts = JSON.parse(user.jwts ?? '[]');
+      jwts = JSON.parse(user.jwts ?? '[]')
     } catch {
-      jwts = [];
+      jwts = []
     }
     const validJwts = jwts.filter((token) => {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
-        return decoded && decoded.exp && decoded.exp * 1000 > now;
+        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload
+        return decoded && decoded.exp && decoded.exp * 1000 > now
       } catch {
-        return false;
+        return false
       }
-    });
-    if (validJwts.length !== jwts.length) changed = true;
+    })
+    if (validJwts.length !== jwts.length) changed = true
 
     // --- Refresh Tokens ---
-    let refreshTokens: string[] = [];
+    let refreshTokens: string[] = []
     try {
-      refreshTokens = JSON.parse(user.refreshTokens ?? '[]');
+      refreshTokens = JSON.parse(user.refreshTokens ?? '[]')
     } catch {
-      refreshTokens = [];
+      refreshTokens = []
     }
     const validRefreshTokens = refreshTokens.filter((token) => {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
-        return decoded && decoded.exp && decoded.exp * 1000 > now;
+        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload
+        return decoded && decoded.exp && decoded.exp * 1000 > now
       } catch {
-        return false;
+        return false
       }
-    });
-    if (validRefreshTokens.length !== refreshTokens.length) changed = true;
+    })
+    if (validRefreshTokens.length !== refreshTokens.length) changed = true
 
     // --- Trusted Devices ---
-    let trustedDevices: TrustedDevice[] = [];
+    let trustedDevices: TrustedDevice[] = []
     try {
-      trustedDevices = JSON.parse(user.trustedIps ?? '[]');
+      trustedDevices = JSON.parse(user.trustedIps ?? '[]')
     } catch {
-      trustedDevices = [];
+      trustedDevices = []
     }
     const filteredDevices = trustedDevices.filter((device) => {
-      const lastSeen = new Date(device.lastSeen).getTime();
-      return !isNaN(lastSeen) && now - lastSeen < SEVEN_DAYS_MS;
-    });
-    if (filteredDevices.length !== trustedDevices.length) changed = true;
+      const lastSeen = new Date(device.lastSeen).getTime()
+      return !isNaN(lastSeen) && now - lastSeen < SEVEN_DAYS_MS
+    })
+    if (filteredDevices.length !== trustedDevices.length) changed = true
 
     if (changed) {
       await prisma.user
@@ -599,7 +600,7 @@ async function cleanupExpiredTokensAndDevices() {
             trustedIps: JSON.stringify(filteredDevices),
           },
         })
-        .catch(() => {});
+        .catch(() => {})
 
       console.log(
         `[Cleanup] Updated user ${user.username} - removed ${
@@ -607,12 +608,12 @@ async function cleanupExpiredTokensAndDevices() {
           validJwts.length +
           (refreshTokens.length - validRefreshTokens.length)
         } expired tokens and ${trustedDevices.length - filteredDevices.length} old devices.`,
-      );
+      )
     }
   }
 
   // Run every hour
-  setTimeout(cleanupExpiredTokensAndDevices, 60 * 60 * 1000);
+  setTimeout(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
 }
 
 // --- CORS ---
@@ -621,114 +622,169 @@ app.use(
     origin: (origin, callback) => {
       const allowedOrigins = (
         process.env.API_ENV === 'production' ? [] : ['http://localhost:3000']
-      ).concat(config.domains ?? []);
+      ).concat(config.domains ?? [])
       if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
+        callback(null, true)
       } else {
-        callback(new Error(`[CORS] Denied request from origin: ${origin}`));
+        callback(new Error(`[CORS] Denied request from origin: ${origin}`))
       }
     },
     credentials: true,
   }),
-);
+)
 
-app.use(express.json());
+app.use(express.json())
 
-app.get('/hls/:streamId/stream.m3u8', jwtAuth, (req, res) => {
-  const { streamId } = req.params;
-  const stream = dynamicStreams[streamId];
+app.set('trust proxy', true)
+
+import rateLimit from 'express-rate-limit'
+
+const hlsStreamLimiter = rateLimit({
+  windowMs: 10 * 1000, // 10 seconds
+  max: 4,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+app.get('/hls/:streamId/stream.m3u8', hlsStreamLimiter, jwtAuth, (req, res) => {
+  const { streamId } = req.params
+  const stream = dynamicStreams[streamId]
   if (!stream) {
-    res.status(404).send('Stream not found');
-    return;
+    res.status(404).send('Stream not found')
+    return
   }
   fs.readFile(stream.getPlaylistPath(), 'utf8', (err, data) => {
     if (err) {
-      res.status(404).send('Not found');
-      return;
+      res.status(404).send('Not found')
+      return
     }
-    res.type('application/vnd.apple.mpegurl').send(data);
-  });
-});
+    res.type('application/vnd.apple.mpegurl').send(data)
+  })
+})
 
-app.get('/hls/:streamId/:segment', jwtAuth, async (req, res) => {
-  const { streamId, segment } = req.params;
-  const stream = dynamicStreams[streamId];
-  if (!stream || !/^segment_\d+\.ts$/.test(segment)) {
-    res.status(404).send('Not found');
-    return;
-  }
+const hlsSegmentLimiter = rateLimit({
+  windowMs: 1000, // 1 second
+  max: 2,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
-  try {
-    const segmentPath = stream.getSegmentPath(segment);
-    fs.createReadStream(segmentPath)
-      .on('error', () => {
-        res.type('text/html').status(404).send('Segment not found');
-      })
-      .pipe(res.type('video/MP2T'));
-  } catch {
-    res.type('text/html').status(404).send('Segment not found');
-    return;
-  }
-});
+app.get(
+  '/hls/:streamId/:segment',
+  hlsSegmentLimiter,
+  jwtAuth,
+  async (req, res) => {
+    const { streamId, segment } = req.params
+    const stream = dynamicStreams[streamId]
+    if (!stream || !/^segment_\d+\.ts$/.test(segment)) {
+      res.status(404).send('Not found')
+      return
+    }
 
-process.on('SIGINT', () => cleanExit());
-process.on('SIGTERM', () => cleanExit());
+    try {
+      const segmentPath = stream.getSegmentPath(segment)
+      fs.createReadStream(segmentPath)
+        .on('error', () => {
+          res.type('text/html').status(404).send('Segment not found')
+        })
+        .pipe(res.type('video/MP2T'))
+    } catch {
+      res.type('text/html').status(404).send('Segment not found')
+      return
+    }
+  },
+)
+
+process.on('SIGINT', () => cleanExit())
+process.on('SIGTERM', () => cleanExit())
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  process.exit(1);
-});
+  console.error('Uncaught Exception:', err)
+  process.exit(1)
+})
 process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  process.exit(1);
-});
+  console.error('Unhandled Rejection:', err)
+  process.exit(1)
+})
+
+const thumbnailLimiter = rateLimit({
+  windowMs: 30 * 1000, // 30 seconds
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 // --- Static & API Routes ---
-app.use(express.static(path.join(__dirname, '..', 'web', 'dist')));
+app.use(express.static(path.join(__dirname, '..', 'web', 'dist')))
 app.use(
   '/recordings/thumbnails',
+  thumbnailLimiter,
   jwtAuth,
   express.static(path.join(config.recordingsDirectory, 'thumbnails')),
-);
+)
 app.get(/^\/(?!hls|api|recordings|signed|sounds).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'));
-});
+  res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'))
+})
 
 app.get(/^\/recordings(\/[^/]+)(\/[^/]+)?$/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'));
-});
+  res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'))
+})
 
 app.get('/api/vapid-public-key', (req, res) => {
-  res.json({ publicKey: config.vapid.publicKey });
-});
+  res.json({ publicKey: config.vapid.publicKey })
+})
 
 webpush.setVapidDetails(
   config.vapid.email,
   config.vapid.publicKey,
   config.vapid.privateKey,
-);
+)
 
-initializeMotionRoutes(app, streamStates, dynamicStreams);
-initializeAuthRoutes(app, dynamicStreams);
-initializeNotificationRoutes(app);
-initializeRecordingRoutes(app, dynamicStreams);
-initializeMaskRoutes(app);
-initializeStreamRoutes(app, dynamicStreams);
+initializeMotionRoutes(app, streamStates, dynamicStreams)
+initializeAuthRoutes(app, dynamicStreams)
+initializeNotificationRoutes(app)
+initializeRecordingRoutes(app, dynamicStreams)
+initializeMaskRoutes(app)
+initializeStreamRoutes(app, dynamicStreams)
+
+type SignedUrl = {
+  filename: string
+  url: string
+  expiresAt: number
+}
 
 // --- Helper to create a signed URL
-function createSignedUrl(
+function createSignedUrl<T extends string | string[]>(
   streamId: string,
-  filename: string,
+  filename: T,
   type: 'video' | 'thumbnail',
   expiresInSeconds = 300,
-) {
-  const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
-  const data = `${streamId}:${filename}:${type}:${expires}`;
-  const sig = crypto.createHmac('sha256', secret).update(data).digest('hex');
-  return {
-    url: `/signed/${type}/${streamId}/${encodeURIComponent(filename)}?expires=${expires}&sig=${sig}`,
-    expiresAt: expires,
-  };
+): T extends string[] ? SignedUrl[] : SignedUrl {
+  const isArray = Array.isArray(filename)
+  const filenames: string | string[] = isArray ? filename : [filename]
+  const result: SignedUrl[] = []
+
+  for (const filename of filenames) {
+    const expires = Math.floor(Date.now() / 1000) + expiresInSeconds
+    const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
+    const data = `${streamId}:${filename}:${type}:${expires}`
+    const sig = crypto.createHmac('sha256', secret).update(data).digest('hex')
+
+    if (!isArray) {
+      return {
+        filename,
+        url: `/signed/${type}/${streamId}/${encodeURIComponent(filename)}?expires=${expires}&sig=${sig}`,
+        expiresAt: expires,
+      } as T extends string[] ? SignedUrl[] : SignedUrl
+    }
+
+    result.push({
+      filename,
+      url: `/signed/${type}/${streamId}/${encodeURIComponent(filename)}?expires=${expires}&sig=${sig}`,
+      expiresAt: expires,
+    })
+  }
+
+  return result as T extends string[] ? SignedUrl[] : SignedUrl
 }
 
 // Function to verify signed URL
@@ -739,48 +795,48 @@ function verifySignedUrl(
   expires: string,
   sig: string,
 ) {
-  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
-  const data = `${streamId}:${filename}:${type}:${expires}`;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
+  const data = `${streamId}:${filename}:${type}:${expires}`
   const expectedSig = crypto
     .createHmac('sha256', secret)
     .update(data)
-    .digest('hex');
-  if (sig !== expectedSig) return false;
-  if (parseInt(expires) < Math.floor(Date.now() / 1000)) return false;
-  return true;
+    .digest('hex')
+  if (sig !== expectedSig) return false
+  if (parseInt(expires) < Math.floor(Date.now() / 1000)) return false
+  return true
 }
 
 // --- Helper to create a signed stream playlist URL for a specific stream ---
 function createSignedStreamUrl(streamId: string, expiresInSeconds = 300) {
-  const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
-  const data = `stream:${streamId}:${expires}`;
-  const sig = crypto.createHmac('sha256', secret).update(data).digest('hex');
-  return `/signed/stream/${streamId}/stream.m3u8?expires=${expires}&sig=${sig}`;
+  const expires = Math.floor(Date.now() / 1000) + expiresInSeconds
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
+  const data = `stream:${streamId}:${expires}`
+  const sig = crypto.createHmac('sha256', secret).update(data).digest('hex')
+  return `/signed/stream/${streamId}/stream.m3u8?expires=${expires}&sig=${sig}`
 }
 
 // --- Helper to verify a signed stream playlist/segment URL ---
 function verifySignedStreamUrl(streamId: string, expires: string, sig: string) {
-  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
-  const data = `stream:${streamId}:${expires}`;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
+  const data = `stream:${streamId}:${expires}`
   const expectedSig = crypto
     .createHmac('sha256', secret)
     .update(data)
-    .digest('hex');
-  if (sig !== expectedSig) return false;
-  if (parseInt(expires) < Math.floor(Date.now() / 1000)) return false;
-  return true;
+    .digest('hex')
+  if (sig !== expectedSig) return false
+  if (parseInt(expires) < Math.floor(Date.now() / 1000)) return false
+  return true
 }
 
 // --- Start New Multiple Stream Code ---
 
 // --- Helper to create a signed latest thumbnail URL for a stream ---
 function createSignedLatestThumbUrl(streamId: string, expiresInSeconds = 300) {
-  const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
-  const data = `latest-thumb:${streamId}:${expires}`;
-  const sig = crypto.createHmac('sha256', secret).update(data).digest('hex');
-  return `/signed/recordings/${streamId}/thumbnails/latest.jpg?expires=${expires}&sig=${sig}`;
+  const expires = Math.floor(Date.now() / 1000) + expiresInSeconds
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
+  const data = `latest-thumb:${streamId}:${expires}`
+  const sig = crypto.createHmac('sha256', secret).update(data).digest('hex')
+  return `/signed/recordings/${streamId}/thumbnails/latest.jpg?expires=${expires}&sig=${sig}`
 }
 
 // --- Helper to verify a signed latest thumbnail URL for a stream ---
@@ -789,34 +845,46 @@ function verifySignedLatestThumbUrl(
   expires: string,
   sig: string,
 ) {
-  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET;
-  const data = `latest-thumb:${streamId}:${expires}`;
+  const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
+  const data = `latest-thumb:${streamId}:${expires}`
   const expectedSig = crypto
     .createHmac('sha256', secret)
     .update(data)
-    .digest('hex');
-  if (sig !== expectedSig) return false;
-  if (parseInt(expires) < Math.floor(Date.now() / 1000)) return false;
-  return true;
+    .digest('hex')
+  if (sig !== expectedSig) return false
+  if (parseInt(expires) < Math.floor(Date.now() / 1000)) return false
+  return true
 }
 
+const generateSignedLatestThumbUrlLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // --- Endpoint to get a signed latest thumbnail URL for a stream ---
-app.get('/api/signed-latest-thumb-url/:streamId', jwtAuth, (req, res) => {
-  const { streamId } = req.params;
-  if (!dynamicStreams[streamId]) {
-    res.status(404).json({ error: 'Stream not found' });
-    return;
-  }
-  const url = createSignedLatestThumbUrl(streamId);
-  res.json({ url });
-});
+app.get(
+  '/api/signed-latest-thumb-url/:streamId',
+  generateSignedLatestThumbUrlLimiter,
+  jwtAuth,
+  (req, res) => {
+    const { streamId } = req.params
+    if (!dynamicStreams[streamId]) {
+      res.status(404).json({ error: 'Stream not found' })
+      return
+    }
+    const url = createSignedLatestThumbUrl(streamId)
+    res.json({ url })
+  },
+)
 
 // --- Serve signed latest thumbnail for a stream, generating it from the latest HLS segment ---
 app.get(
   '/signed/recordings/:streamId/thumbnails/latest.jpg',
   async (req, res) => {
-    const { streamId } = req.params;
-    const { expires, sig } = req.query;
+    const { streamId } = req.params
+    const { expires, sig } = req.query
     if (
       typeof streamId !== 'string' ||
       typeof expires !== 'string' ||
@@ -824,31 +892,31 @@ app.get(
       !dynamicStreams[streamId] ||
       !verifySignedLatestThumbUrl(streamId, expires, sig)
     ) {
-      res.status(403).send('Forbidden');
-      return;
+      res.status(403).send('Forbidden')
+      return
     }
 
-    const stream = dynamicStreams[streamId];
+    const stream = dynamicStreams[streamId]
 
     fs.readdir(stream.config.hlsDir, async (err, files) => {
       if (err) {
-        res.status(404).send('No segments');
-        return;
+        res.status(404).send('No segments')
+        return
       }
       const tsFiles = files
         .filter((f) => /^segment_(\d+)\.ts$/.test(f))
         .sort((a, b) => {
-          const aNum = parseInt(a.match(/^segment_(\d+)\.ts$/)![1], 10);
-          const bNum = parseInt(b.match(/^segment_(\d+)\.ts$/)![1], 10);
-          return bNum - aNum;
-        });
+          const aNum = parseInt(a.match(/^segment_(\d+)\.ts$/)![1], 10)
+          const bNum = parseInt(b.match(/^segment_(\d+)\.ts$/)![1], 10)
+          return bNum - aNum
+        })
 
       if (tsFiles.length === 0) {
-        res.status(404).send('No segments');
-        return;
+        res.status(404).send('No segments')
+        return
       }
 
-      const state = streamStates[streamId];
+      const state = streamStates[streamId]
 
       // --- If motion detection is active, serve the latest segment_*_motion.jpg if it exists ---
       if (!state?.motionPaused) {
@@ -859,65 +927,65 @@ app.get(
             const aNum = parseInt(
               a.match(/^segment_(\d+)_motion\.jpg$/)![1],
               10,
-            );
+            )
             const bNum = parseInt(
               b.match(/^segment_(\d+)_motion\.jpg$/)![1],
               10,
-            );
-            return bNum - aNum;
-          });
+            )
+            return bNum - aNum
+          })
         if (motionJpgs.length > 0) {
-          const latestMotionJpg = motionJpgs[0];
+          const latestMotionJpg = motionJpgs[0]
           const latestMotionJpgPath = path.join(
             stream.config.hlsDir,
             latestMotionJpg,
-          );
+          )
           // Serve the motion jpg directly
           res.setHeader(
             'Cache-Control',
             'no-store, no-cache, must-revalidate, proxy-revalidate',
-          );
-          res.setHeader('Pragma', 'no-cache');
-          res.setHeader('Expires', '0');
+          )
+          res.setHeader('Pragma', 'no-cache')
+          res.setHeader('Expires', '0')
           res.sendFile(latestMotionJpgPath, (err) => {
-            if (res.headersSent) return;
+            if (res.headersSent) return
             // @ts-expect-error types
             if (err && err.code !== 'ECONNABORTED') {
-              res.status(404).json({ error: 'File not found' });
+              res.status(404).json({ error: 'File not found' })
               console.error(
                 `[${streamId}] Failed to serve motion thumbnail file ${latestMotionJpg}:`,
                 JSON.stringify(err, null, 2),
-              );
+              )
             }
-          });
-          return;
+          })
+          return
         }
         // If no motion jpg exists, fall through to original logic
       }
 
       // --- Lock logic start ---
       // Only regenerate if thumbnail doesn't exist or is older than the segment
-      let regenerate = !streamThumbnailPromises[streamId];
-      const thumbName = 'latest.jpg';
-      const thumbPath = path.join(stream.config.thumbDir, thumbName);
+      let regenerate = !streamThumbnailPromises[streamId]
+      const thumbName = 'latest.jpg'
+      const thumbPath = path.join(stream.config.thumbDir, thumbName)
 
       if (regenerate) {
-        const latestTs = tsFiles[0];
-        const tsPath = path.join(stream.config.hlsDir, latestTs);
+        const latestTs = tsFiles[0]
+        const tsPath = path.join(stream.config.hlsDir, latestTs)
         try {
           const [thumbStat, tsStat] = await Promise.all([
             fs.promises.stat(thumbPath).catch(() => null),
             fs.promises.stat(tsPath),
-          ]);
+          ])
           if (thumbStat && thumbStat.mtime > tsStat.mtime) {
-            regenerate = false;
+            regenerate = false
           }
         } catch {
           /* ignore */
         }
 
         if (regenerate) {
-          const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=160:90" -vframes 1 -update 1 "${thumbPath}"`;
+          const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=160:90" -vframes 1 -update 1 "${thumbPath}"`
           streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>(
             (resolve) => {
               childProcess.exec(ffmpegCmd, (err) => {
@@ -925,73 +993,81 @@ app.get(
                   console.error(
                     `[${streamId}] Failed to generate thumbnail from ${latestTs}:`,
                     err,
-                  );
-                  resolve({ success: false });
-                } else resolve({ success: true });
-              });
+                  )
+                  resolve({ success: false })
+                } else resolve({ success: true })
+              })
             },
-          );
+          )
         }
       }
 
-      const awaited = await streamThumbnailPromises[streamId];
+      const awaited = await streamThumbnailPromises[streamId]
 
       if (regenerate && !awaited?.success) {
-        res.status(500).send('Failed to generate thumbnail');
-        return;
+        res.status(500).send('Failed to generate thumbnail')
+        return
       }
 
       // Reset the promise so it can be regenerated next time
-      streamThumbnailPromises[streamId] = null;
+      streamThumbnailPromises[streamId] = null
       res.setHeader(
         'Cache-Control',
         'no-store, no-cache, must-revalidate, proxy-revalidate',
-      );
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
+      )
+      res.setHeader('Pragma', 'no-cache')
+      res.setHeader('Expires', '0')
       res.sendFile(thumbPath, (err) => {
-        if (res.headersSent) return;
+        if (res.headersSent) return
         // @ts-expect-error types
         if (err && err.code !== 'ECONNABORTED') {
-          res.status(404).json({ error: 'File not found' });
+          res.status(404).json({ error: 'File not found' })
           console.error(
             `[${streamId}] Failed to serve thumbnail file ${thumbName}:`,
             JSON.stringify(err, null, 2),
-          );
+          )
         }
-      });
+      })
       // --- Lock logic end ---
-    });
+    })
   },
-);
+)
+
+const streamThumbnailLimiter = rateLimit({
+  windowMs: 1000, // 1 second
+  max: 4,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 // --- Serve latest thumbnail for a stream, generating it from the latest HLS segment ---
 app.get(
   '/recordings/:streamId/thumbnails/latest.jpg',
+  streamThumbnailLimiter,
   jwtAuth,
   async (req, res) => {
-    const { streamId } = req.params;
-    const stream = dynamicStreams[streamId];
+    const { streamId } = req.params
+    const stream = dynamicStreams[streamId]
 
     fs.readdir(stream.config.hlsDir, async (err, files) => {
       if (err) {
-        res.status(404).send('No segments');
-        return;
+        res.status(404).send('No segments')
+        return
       }
       const tsFiles = files
         .filter((f) => /^segment_(\d+)\.ts$/.test(f))
         .sort((a, b) => {
-          const aNum = parseInt(a.match(/^segment_(\d+)\.ts$/)![1], 10);
-          const bNum = parseInt(b.match(/^segment_(\d+)\.ts$/)![1], 10);
-          return bNum - aNum;
-        });
+          const aNum = parseInt(a.match(/^segment_(\d+)\.ts$/)![1], 10)
+          const bNum = parseInt(b.match(/^segment_(\d+)\.ts$/)![1], 10)
+          return bNum - aNum
+        })
 
       if (tsFiles.length === 0) {
-        res.status(404).send('No segments');
-        return;
+        res.status(404).send('No segments')
+        return
       }
 
-      const state = streamStates[streamId];
+      const state = streamStates[streamId]
 
       // --- If motion detection is active, serve the latest segment_*_motion.jpg if it exists ---
       if (!state?.motionPaused) {
@@ -1002,65 +1078,65 @@ app.get(
             const aNum = parseInt(
               a.match(/^segment_(\d+)_motion\.jpg$/)![1],
               10,
-            );
+            )
             const bNum = parseInt(
               b.match(/^segment_(\d+)_motion\.jpg$/)![1],
               10,
-            );
-            return bNum - aNum;
-          });
+            )
+            return bNum - aNum
+          })
         if (motionJpgs.length > 0) {
-          const latestMotionJpg = motionJpgs[0];
+          const latestMotionJpg = motionJpgs[0]
           const latestMotionJpgPath = path.join(
             stream.config.hlsDir,
             latestMotionJpg,
-          );
+          )
           // Serve the motion jpg directly
           res.setHeader(
             'Cache-Control',
             'no-store, no-cache, must-revalidate, proxy-revalidate',
-          );
-          res.setHeader('Pragma', 'no-cache');
-          res.setHeader('Expires', '0');
+          )
+          res.setHeader('Pragma', 'no-cache')
+          res.setHeader('Expires', '0')
           res.sendFile(latestMotionJpgPath, (err) => {
-            if (res.headersSent) return;
+            if (res.headersSent) return
             // @ts-expect-error types
             if (err && err.code !== 'ECONNABORTED') {
-              res.status(404).json({ error: 'File not found' });
+              res.status(404).json({ error: 'File not found' })
               console.error(
                 `[${streamId}] Failed to serve motion thumbnail file ${latestMotionJpg}:`,
                 JSON.stringify(err, null, 2),
-              );
+              )
             }
-          });
-          return;
+          })
+          return
         }
         // If no motion jpg exists, fall through to original logic
       }
 
       // --- Lock logic start ---
       // Only regenerate if thumbnail doesn't exist or is older than the segment
-      let regenerate = !streamThumbnailPromises[streamId];
-      const thumbName = 'latest.jpg';
-      const thumbPath = path.join(stream.config.thumbDir, thumbName);
+      let regenerate = !streamThumbnailPromises[streamId]
+      const thumbName = 'latest.jpg'
+      const thumbPath = path.join(stream.config.thumbDir, thumbName)
 
       if (regenerate) {
-        const latestTs = tsFiles[0];
-        const tsPath = path.join(stream.config.hlsDir, latestTs);
+        const latestTs = tsFiles[0]
+        const tsPath = path.join(stream.config.hlsDir, latestTs)
         try {
           const [thumbStat, tsStat] = await Promise.all([
             fs.promises.stat(thumbPath).catch(() => null),
             fs.promises.stat(tsPath),
-          ]);
+          ])
           if (thumbStat && thumbStat.mtime > tsStat.mtime) {
-            regenerate = false;
+            regenerate = false
           }
         } catch {
           /* ignore */
         }
 
         if (regenerate) {
-          const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 "${thumbPath}"`;
+          const ffmpegCmd = `ffmpeg -y -i "${tsPath}" -vf "select=eq(n\\,0),scale=320:180" -vframes 1 "${thumbPath}"`
           streamThumbnailPromises[streamId] = new Promise<{ success: boolean }>(
             (resolve) => {
               childProcess.exec(ffmpegCmd, { windowsHide: true }, (err) => {
@@ -1068,157 +1144,233 @@ app.get(
                   console.error(
                     `[${streamId}] Failed to generate thumbnail from ${latestTs}:`,
                     err,
-                  );
-                  resolve({ success: false });
-                } else resolve({ success: true });
-              });
+                  )
+                  resolve({ success: false })
+                } else resolve({ success: true })
+              })
             },
-          );
+          )
         }
       }
 
-      const awaited = await streamThumbnailPromises[streamId];
+      const awaited = await streamThumbnailPromises[streamId]
 
       if (regenerate && !awaited?.success) {
-        res.status(500).send('Failed to generate thumbnail');
-        return;
+        res.status(500).send('Failed to generate thumbnail')
+        return
       }
 
       // Reset the promise so it can be regenerated next time
-      streamThumbnailPromises[streamId] = null;
+      streamThumbnailPromises[streamId] = null
       res.setHeader(
         'Cache-Control',
         'no-store, no-cache, must-revalidate, proxy-revalidate',
-      );
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
+      )
+      res.setHeader('Pragma', 'no-cache')
+      res.setHeader('Expires', '0')
       res.sendFile(thumbPath, (err) => {
-        if (res.headersSent) return;
+        if (res.headersSent) return
         // @ts-expect-error types
         if (err && err.code !== 'ECONNABORTED') {
-          res.status(404).json({ error: 'File not found' });
+          res.status(404).json({ error: 'File not found' })
           console.error(
             `[${streamId}] Failed to serve thumbnail file ${thumbName}:`,
             JSON.stringify(err, null, 2),
-          );
+          )
         }
-      });
+      })
       // --- Lock logic end ---
-    });
+    })
   },
-);
+)
+
+const streamThumbnailsLimiter = rateLimit({
+  windowMs: 30 * 1000, // 30 seconds
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 // --- Serve thumbnails for a stream ---
-app.use('/recordings/:streamId/thumbnails', jwtAuth, (req, res, next) => {
-  const { streamId } = req.params;
-  const stream = dynamicStreams[streamId];
-  if (!stream) {
-    res.status(404).send('Stream not found');
-    return;
-  }
-  // Only set cache-control for non-latest.jpg
-  if (!req.url.endsWith('latest.jpg')) {
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  }
-  express.static(stream.config.thumbDir)(req, res, next);
-});
+app.use(
+  '/recordings/:streamId/thumbnails',
+  streamThumbnailsLimiter,
+  jwtAuth,
+  (req, res, next) => {
+    const { streamId } = req.params
+    const stream = dynamicStreams[streamId]
+    if (!stream) {
+      res.status(404).send('Stream not found')
+      return
+    }
+    // Only set cache-control for non-latest.jpg
+    if (!req.url.endsWith('latest.jpg')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    }
+    express.static(stream.config.thumbDir)(req, res, next)
+  },
+)
+
+const streamSignedUrlLimiter = rateLimit({
+  windowMs: 30 * 1000, // 30 seconds
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 // Endpoint to get a signed stream playlist URL for a specific stream
-app.get('/api/signed-stream-url/:streamId', jwtAuth, (req, res) => {
-  const { streamId } = req.params;
-  if (!dynamicStreams[streamId]) {
-    res.status(404).json({ error: 'Stream not found' });
-    return;
-  }
-  const url = createSignedStreamUrl(streamId);
-  res.json({ url });
-});
+app.get(
+  '/api/signed-stream-url/:streamId',
+  streamSignedUrlLimiter,
+  jwtAuth,
+  (req, res) => {
+    const { streamId } = req.params
+    if (!dynamicStreams[streamId]) {
+      res.status(404).json({ error: 'Stream not found' })
+      return
+    }
+    const url = createSignedStreamUrl(streamId)
+    res.json({ url })
+  },
+)
+
+const videoAndThumbnailSignedUrlLimiter = rateLimit({
+  windowMs: 2 * 1000, // 2 seconds
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 // Endpoint to get a signed URL for a video or thumbnail from a specific stream
-app.get('/api/signed-url/:streamId', jwtAuth, (req, res) => {
-  const { streamId } = req.params;
-  const { filename, type } = req.query;
-  if (
-    typeof filename !== 'string' ||
-    (type !== 'video' && type !== 'thumbnail')
-  ) {
-    res.status(400).json({ error: 'Invalid parameters' });
-    return;
-  }
-  const url = createSignedUrl(
-    streamId,
-    filename,
-    type as 'video' | 'thumbnail',
-  );
-  res.json(url);
-});
+app.get(
+  '/api/signed-url/:streamId',
+  videoAndThumbnailSignedUrlLimiter,
+  jwtAuth,
+  (req, res) => {
+    const { streamId } = req.params
+    const { filename, type } = req.query
+    if (
+      typeof filename !== 'string' ||
+      (type !== 'video' && type !== 'thumbnail')
+    ) {
+      res.status(400).json({ error: 'Invalid parameters' })
+      return
+    }
+    const url = createSignedUrl(
+      streamId,
+      filename,
+      type as 'video' | 'thumbnail',
+    )
+    res.json(url)
+  },
+)
+
+const videosAndThumbnailsSignedUrlLimiter = rateLimit({
+  windowMs: 2 * 1000, // 2 seconds
+  max: 2,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+app.get(
+  '/api/signed-urls/:streamId',
+  videosAndThumbnailsSignedUrlLimiter,
+  jwtAuth,
+  (req, res) => {
+    const { streamId } = req.params
+    const { type } = req.query
+    const filenames = String(req.query.filenames).split(',')
+    console.log('Typeof filenames: ' + typeof filenames)
+
+    if (type !== 'video' && type !== 'thumbnail') {
+      res.status(400).json({ error: 'Invalid parameters' })
+      return
+    }
+
+    const urls = createSignedUrl(
+      streamId,
+      filenames,
+      type as 'video' | 'thumbnail',
+    )
+    res.json(urls)
+  },
+)
 
 // Serve video file via signed URL
 app.get('/signed/video/:streamId/:filename', (req, res) => {
-  const { streamId, filename } = req.params;
-  const { expires, sig } = req.query;
+  const { streamId, filename } = req.params
+  const { expires, sig } = req.query
   if (
     typeof expires !== 'string' ||
     typeof sig !== 'string' ||
     !verifySignedUrl(streamId, filename, 'video', expires, sig)
   ) {
-    res.status(403).send('Forbidden');
-    return;
+    res.status(403).send('Forbidden')
+    return
   }
   const filePath = path.join(
     dynamicStreams[streamId].config.recordDir,
     filename,
-  );
+  )
+  if (!filePath.startsWith(dynamicStreams[streamId].config.recordDir)) {
+    res.status(403).send('Forbidden')
+    return
+  }
+
   res.sendFile(filePath, (err) => {
-    if (res.headersSent) return;
+    if (res.headersSent) return
     // @ts-expect-error types
     if (err && err.code !== 'ECONNABORTED') {
-      res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: 'File not found' })
       console.error(
         `[${streamId}] Failed to serve recording file ${filename}:`,
         JSON.stringify(err, null, 2),
-      );
+      )
     }
-  });
-});
+  })
+})
 
 app.get('/signed/thumbnail/:streamId/:filename', (req, res) => {
-  const { streamId, filename } = req.params;
-  const { expires, sig } = req.query;
+  const { streamId, filename } = req.params
+  const { expires, sig } = req.query
   if (
     typeof expires !== 'string' ||
     typeof sig !== 'string' ||
     !verifySignedUrl(streamId, filename, 'thumbnail', expires, sig)
   ) {
-    res.status(403).send('Forbidden');
-    return;
+    res.status(403).send('Forbidden')
+    return
   }
   const thumbPath = path.join(
     dynamicStreams[streamId].config.thumbDir,
     filename,
-  );
+  )
+  if (!thumbPath.startsWith(dynamicStreams[streamId].config.thumbDir)) {
+    res.status(403).send('Forbidden')
+    return
+  }
 
   if (!req.url.endsWith('latest.jpg')) {
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
   }
 
   res.sendFile(thumbPath, (err) => {
-    if (res.headersSent) return;
+    if (res.headersSent) return
     // @ts-expect-error types
     if (err && err.code !== 'ECONNABORTED') {
-      res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: 'File not found' })
       console.error(
         `[${streamId}] Failed to serve thumbnail file ${filename}:`,
         JSON.stringify(err, null, 2),
-      );
+      )
     }
-  });
-});
+  })
+})
 
 // Serve signed stream playlist for a specific stream
 app.get('/signed/stream/:streamId/stream.m3u8', (req, res) => {
-  const { streamId } = req.params;
-  const { expires, sig } = req.query;
+  const { streamId } = req.params
+  const { expires, sig } = req.query
   if (
     typeof streamId !== 'string' ||
     typeof expires !== 'string' ||
@@ -1226,22 +1378,22 @@ app.get('/signed/stream/:streamId/stream.m3u8', (req, res) => {
     !dynamicStreams[streamId] ||
     !verifySignedStreamUrl(streamId, expires, sig)
   ) {
-    res.status(403).send('Forbidden');
-    return;
+    res.status(403).send('Forbidden')
+    return
   }
-  const playlistPath = dynamicStreams[streamId].getPlaylistPath();
+  const playlistPath = dynamicStreams[streamId].getPlaylistPath()
   fs.readFile(playlistPath, 'utf8', (err, data) => {
     if (err) {
-      res.status(404).send('Not found');
-      return;
+      res.status(404).send('Not found')
+      return
     }
-    let lines = data.split('\n');
+    let lines = data.split('\n')
     if (!lines.some((line) => line.startsWith('#EXT-X-PLAYLIST-TYPE')))
       lines.splice(
         lines.findIndex((line) => line.startsWith('#EXTM3U')) + 1,
         0,
         '#EXT-X-PLAYLIST-TYPE:LIVE',
-      );
+      )
     if (!lines.some((line) => line.startsWith('#EXT-X-ALLOW-CACHE')))
       lines.splice(
         lines.findIndex((line) =>
@@ -1249,8 +1401,8 @@ app.get('/signed/stream/:streamId/stream.m3u8', (req, res) => {
         ) + 1,
         0,
         '#EXT-X-ALLOW-CACHE:NO',
-      );
-    lines = lines.filter((line) => !line.startsWith('#EXT-X-ENDLIST'));
+      )
+    lines = lines.filter((line) => !line.startsWith('#EXT-X-ENDLIST'))
     // Rewrite segment URLs to signed segment URLs for this stream
     const rewritten = lines
       .join('\n')
@@ -1258,23 +1410,23 @@ app.get('/signed/stream/:streamId/stream.m3u8', (req, res) => {
         /(segment_\d+\.ts)/g,
         (segment) =>
           `/signed/stream/${streamId}/${segment}?expires=${expires}&sig=${sig}`,
-      );
+      )
     res.setHeader(
       'Cache-Control',
       'no-store, no-cache, must-revalidate, proxy-revalidate',
-    );
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', '*');
-    res.type('application/vnd.apple.mpegurl').send(rewritten);
-  });
-});
+    )
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Headers', '*')
+    res.type('application/vnd.apple.mpegurl').send(rewritten)
+  })
+})
 
 // Serve signed stream segment for a specific stream
 app.get('/signed/stream/:streamId/:segment', (req, res) => {
-  const { streamId, segment } = req.params;
-  const { expires, sig } = req.query;
+  const { streamId, segment } = req.params
+  const { expires, sig } = req.query
   if (
     typeof streamId !== 'string' ||
     typeof segment !== 'string' ||
@@ -1284,43 +1436,43 @@ app.get('/signed/stream/:streamId/:segment', (req, res) => {
     !dynamicStreams[streamId] ||
     !verifySignedStreamUrl(streamId, expires, sig)
   ) {
-    res.status(403).send('Forbidden');
-    return;
+    res.status(403).send('Forbidden')
+    return
   }
-  const segmentPath = dynamicStreams[streamId].getSegmentPath(segment);
+  const segmentPath = dynamicStreams[streamId].getSegmentPath(segment)
   res.setHeader(
     'Cache-Control',
     'no-store, no-cache, must-revalidate, proxy-revalidate',
-  );
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  )
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Headers', '*')
   try {
     fs.createReadStream(segmentPath)
       .on('error', () => {
-        res.type('text/html').status(404).send('Segment not found');
+        res.type('text/html').status(404).send('Segment not found')
       })
-      .pipe(res.type('video/MP2T'));
+      .pipe(res.type('video/MP2T'))
   } catch (err) {
-    if (res.headersSent) return;
-    res.type('application/json').status(404).json({ error: 'File not found' });
+    if (res.headersSent) return
+    res.type('application/json').status(404).json({ error: 'File not found' })
     console.error(
       `[${streamId}] Failed to serve segment file ${segment}:`,
       JSON.stringify(err, null, 2),
-    );
+    )
   }
-});
+})
 
 // --- Safe unlink function ---
 export async function safeUnlinkWithRetry(filePath: string, retries = 3) {
-  const RETRY_DELAY_MS = 1000;
+  const RETRY_DELAY_MS = 1000
   if (retries <= 0) {
     logMotion(
       `[safeUnlinkWithRetry] Giving up deleting ${filePath} after retries`,
       'warn',
-    );
-    return;
+    )
+    return
   }
   return fs.promises
     .rm(filePath, { force: true, recursive: true })
@@ -1328,37 +1480,37 @@ export async function safeUnlinkWithRetry(filePath: string, retries = 3) {
       if (error) {
         if (error.code === 'ENOENT' || error.code === 'EPERM') {
           // File was already deleted by another process, which is fine
-          return;
+          return
         }
 
         if (error.code === 'EBUSY') {
           setTimeout(
             () => safeUnlinkWithRetry(filePath, retries - 1),
             RETRY_DELAY_MS,
-          );
+          )
           logMotion(
             `[safeUnlinkWithRetry] Failed to delete file ${filePath} (EBUSY), will retry (${retries - 1} left)`,
             'warn',
-          );
-          return;
+          )
+          return
         }
       }
-    });
+    })
 }
 
 // Helper: Create StreamManager instance for a stream
 export async function createStreamManager(stream: {
-  id: string;
-  ffmpegInput: string;
-  rtspUser: string | null;
-  rtspPass: string | null;
+  id: string
+  ffmpegInput: string
+  rtspUser: string | null
+  rtspPass: string | null
 }) {
   // Use unique folders for each stream
-  const hlsDir = path.join(__dirname, '..', `hls_${stream.id}`);
-  const recordDir = path.join(config.recordingsDirectory, stream.id);
-  const flushDir = path.join(recordDir, 'flush');
-  const thumbDir = path.join(recordDir, 'thumbnails');
-  const persistedStates = await loadPersistedStreamStates();
+  const hlsDir = path.join(__dirname, '..', `hls_${stream.id}`)
+  const recordDir = path.join(config.recordingsDirectory, stream.id)
+  const flushDir = path.join(recordDir, 'flush')
+  const thumbDir = path.join(recordDir, 'thumbnails')
+  const persistedStates = await loadPersistedStreamStates()
 
   streamStates[stream.id] = {
     notificationSent: false,
@@ -1381,7 +1533,7 @@ export async function createStreamManager(stream: {
     cleaningUp: false,
     cancelFlush: false,
     lowSpaceNotified: false,
-  };
+  }
 
   return new StreamManager(
     {
@@ -1395,56 +1547,56 @@ export async function createStreamManager(stream: {
       rtspPass: stream.rtspPass ?? undefined,
     },
     streamStates[stream.id],
-  );
+  )
 }
 
 async function loadPersistedStreamStates() {
-  const all = await prisma.streamState.findMany();
-  const persisted: Record<string, StreamMotionState> = {};
+  const all = await prisma.streamState.findMany()
+  const persisted: Record<string, StreamMotionState> = {}
   for (const row of all) {
     try {
-      persisted[row.streamId] = JSON.parse(row.state);
+      persisted[row.streamId] = JSON.parse(row.state)
     } catch {
       console.error(
         `[loadPersistedStreamStates] Failed to parse persisted state for stream ${row.streamId}`,
-      );
+      )
     }
   }
-  return persisted;
+  return persisted
 }
 
 // --- Persist stream state to database ---
 export async function persistStreamState(streamId: string) {
-  const state = streamStates[streamId];
-  if (!state) return;
+  const state = streamStates[streamId]
+  if (!state) return
   // Only persist what you need (here, just motionPaused, but you can add more)
-  const toPersist = { motionPaused: state.motionPaused };
+  const toPersist = { motionPaused: state.motionPaused }
   await prisma.streamState.upsert({
     where: { streamId },
     update: { state: JSON.stringify(toPersist), updatedAt: new Date() },
     create: { streamId, state: JSON.stringify(toPersist) },
-  });
+  })
 }
 
 async function syncDeletedRecordings() {
   for (const streamId in dynamicStreams) {
-    if (!dynamicStreams[streamId]) continue; // Skip if stream is not active
+    if (!dynamicStreams[streamId]) continue // Skip if stream is not active
     try {
-      const stream = dynamicStreams[streamId];
+      const stream = dynamicStreams[streamId]
       if (stream) {
         // Get all recordings from DB that aren't already marked as deleted
         const allDbRecordings = await prisma.motionRecording.findMany({
           where: { streamId },
           select: { filename: true },
-        });
+        })
 
         const existingDeleted = await prisma.deletedRecording.findMany({
           where: { streamId },
           select: { filename: true },
-        });
+        })
 
-        const deletedSet = new Set(existingDeleted.map((d) => d.filename));
-        const missingRecordings: string[] = [];
+        const deletedSet = new Set(existingDeleted.map((d) => d.filename))
+        const missingRecordings: string[] = []
 
         // Check which files are missing from the filesystem
         for (const recording of allDbRecordings) {
@@ -1452,11 +1604,11 @@ async function syncDeletedRecordings() {
             const filePath = path.join(
               stream.config.recordDir,
               recording.filename,
-            );
+            )
             try {
-              await fs.promises.access(filePath);
+              await fs.promises.access(filePath)
             } catch {
-              missingRecordings.push(recording.filename);
+              missingRecordings.push(recording.filename)
             }
           }
         }
@@ -1465,11 +1617,11 @@ async function syncDeletedRecordings() {
         if (missingRecordings.length > 0) {
           console.log(
             `[${streamId}] Syncing ${missingRecordings.length} deleted recordings to database`,
-          );
+          )
 
           await prisma.deletedRecording.createMany({
             data: missingRecordings.map((filename) => ({ streamId, filename })),
-          });
+          })
 
           // Also remove them from the motion recordings table
           await prisma.motionRecording.deleteMany({
@@ -1477,11 +1629,11 @@ async function syncDeletedRecordings() {
               streamId,
               filename: { in: missingRecordings },
             },
-          });
+          })
         }
       }
     } catch (error) {
-      console.error(`[${streamId}] Error syncing deleted recordings:`, error);
+      console.error(`[${streamId}] Error syncing deleted recordings:`, error)
       // Continue with the request even if sync fails
     }
   }
@@ -1489,75 +1641,75 @@ async function syncDeletedRecordings() {
 
 // --- Clean Exit Handler ---
 async function cleanExit() {
-  console.log('\nExiting... Cleaning up.');
+  console.log('\nExiting... Cleaning up.')
 
   // Rename log files
-  console.log('Renaming log files...');
+  console.log('Renaming log files...')
   try {
     fs.renameSync(
       `${motionLogPath}-latest.log`,
       `${motionLogPath}-${apiStartTime}.log`,
-    );
+    )
     fs.renameSync(
       `${authLogPath}-latest.log`,
       `${authLogPath}-${apiStartTime}.log`,
-    );
+    )
   } catch (error) {
-    console.error('Failed to rename log files:', error);
+    console.error('Failed to rename log files:', error)
   }
 
   // First, save any pending motion segments before cleaning up directories
   for (const streamId of Object.keys(dynamicStreams)) {
-    const state = streamStates[streamId];
-    if (state?.motionTimeout) clearTimeout(state.motionTimeout);
+    const state = streamStates[streamId]
+    if (state?.motionTimeout) clearTimeout(state.motionTimeout)
 
     // Cancel any ongoing save operations
     if (state?.savingInProgress && state.currentSaveProcess) {
-      console.log(`[${streamId}] [cleanExit] Canceling ongoing save operation`);
-      state.currentSaveProcess.kill('SIGTERM');
+      console.log(`[${streamId}] [cleanExit] Canceling ongoing save operation`)
+      state.currentSaveProcess.kill('SIGTERM')
     }
 
     // Save any pending segments BEFORE stopping FFmpeg and cleaning directories
-    if (state?.motionSegments.length > 0) {
+    if (state?.motionSegments.length > 0 || state.flushRecordings.length > 0) {
       logMotion(
-        `[${streamId}] [cleanExit] Saving ${state.motionSegments.length} pending segments`,
-      );
+        `[${streamId}] [cleanExit] Saving ${state.motionSegments.length || state.flushRecordings.length} pending segments`,
+      )
       try {
         await saveMotionSegmentsWithRetry(
           streamStates,
           dynamicStreams,
           streamId,
-        );
+        )
       } catch (error) {
         console.error(
           `[${streamId}] [cleanExit] Failed to save pending segments:`,
           error,
-        );
+        )
       }
     }
   }
 
   // Then stop FFmpeg processes and clean up directories
   for (const streamId of Object.keys(dynamicStreams)) {
-    dynamicStreams[streamId].destroy();
-    console.log(`[Cleanup] Stopped FFmpeg for stream ${streamId}`);
-    await new Promise((res) => setTimeout(res, 1000));
+    dynamicStreams[streamId].destroy()
+    console.log(`[Cleanup] Stopped FFmpeg for stream ${streamId}`)
+    await new Promise((res) => setTimeout(res, 1000))
 
     try {
       if (fs.existsSync(dynamicStreams[streamId].config.hlsDir)) {
         fs.rmSync(dynamicStreams[streamId].config.hlsDir, {
           recursive: true,
           force: true,
-        });
+        })
         console.log(
           `[Cleanup] Deleted HLS directory:`,
           dynamicStreams[streamId].config.hlsDir,
-        );
+        )
       }
     } catch (e) {
-      console.warn(`[Cleanup] Failed to delete HLS directory:`, e);
+      console.warn(`[Cleanup] Failed to delete HLS directory:`, e)
     }
   }
 
-  process.exit(0);
+  process.exit(0)
 }

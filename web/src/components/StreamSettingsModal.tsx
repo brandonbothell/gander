@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { type Stream } from '../../../source/types/shared';
+import React, { useState, useEffect } from 'react'
+import { type Stream } from '../../../source/types/shared'
 
 interface StreamSettingsModalProps {
-  showModal: boolean;
-  stream: Stream | null;
-  onClose: () => void;
-  onSave: (stream: Stream, newNickname: string, newFfmpegInput: string, newRtspUser: string, newRtspPass: string) => Promise<void>;
-  onReconnect: (stream: Stream) => Promise<void>; // <-- Add this prop
+  showModal: boolean
+  stream: Stream | null
+  onClose: () => void
+  onSave: (
+    stream: Stream,
+    newNickname: string,
+    newFfmpegInput: string,
+    newRtspUser: string,
+    newRtspPass: string,
+  ) => Promise<void>
+  onReconnect: (stream: Stream) => Promise<void> // <-- Add this prop
 }
 
 const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
@@ -16,49 +22,51 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
   onSave,
   onReconnect,
 }) => {
-  const [nicknameDraft, setNicknameDraft] = useState('');
-  const [ffmpegInputDraft, setFfmpegInputDraft] = useState('');
-  const [rtspUserDraft, setRtspUserDraft] = useState('');
-  const [rtspPassDraft, setRtspPassDraft] = useState('');
-  const [reconnecting, setReconnecting] = useState(false);
-  const [showReconnectedMessage, setShowReconnectedMessage] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const lastReconnectingRef = React.useRef<boolean>(reconnecting);
+  const [nicknameDraft, setNicknameDraft] = useState('')
+  const [ffmpegInputDraft, setFfmpegInputDraft] = useState('')
+  const [rtspUserDraft, setRtspUserDraft] = useState('')
+  const [rtspPassDraft, setRtspPassDraft] = useState('')
+  const [reconnecting, setReconnecting] = useState(false)
+  const [showReconnectedMessage, setShowReconnectedMessage] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const lastReconnectingRef = React.useRef<boolean>(reconnecting)
 
   // Update drafts when stream changes
   useEffect(() => {
     if (stream) {
-      setNicknameDraft(stream.nickname || '');
-      setFfmpegInputDraft(stream.ffmpegInput || '');
-      setRtspUserDraft(stream.rtspUser || '');
-      setRtspPassDraft(stream.rtspPass || '');
+      setNicknameDraft(stream.nickname || '')
+      setFfmpegInputDraft(stream.ffmpegInput || '')
+      setRtspUserDraft(stream.rtspUser || '')
+      setRtspPassDraft(stream.rtspPass || '')
     }
-  }, [stream]);
+  }, [stream])
 
   const handleClose = () => {
-    onClose();
-    setNicknameDraft('');
-    setFfmpegInputDraft('');
-    setRtspUserDraft('');
-    setRtspPassDraft('');
-    setSaveError(null);
-  };
+    onClose()
+    setNicknameDraft('')
+    setFfmpegInputDraft('')
+    setRtspUserDraft('')
+    setRtspPassDraft('')
+    setSaveError(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaveError(null);
+    e.preventDefault()
+    setSaveError(null)
 
     // Basic client validation
     if (!nicknameDraft.trim() || !ffmpegInputDraft.trim()) {
-      setSaveError('Nickname and Stream URL are required.');
-      return;
+      setSaveError('Nickname and Stream URL are required.')
+      return
     }
     if (
       !/^rtsp:\/\//i.test(ffmpegInputDraft.trim()) &&
       !/^video=.+:audio=.+/i.test(ffmpegInputDraft.trim())
     ) {
-      setSaveError('Stream URL must be an RTSP URL or a video=...:audio=... string.');
-      return;
+      setSaveError(
+        'Stream URL must be an RTSP URL or a video=...:audio=... string.',
+      )
+      return
     }
 
     if (stream) {
@@ -68,38 +76,38 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
           nicknameDraft.trim(),
           ffmpegInputDraft.trim(),
           rtspUserDraft.trim(),
-          rtspPassDraft.trim()
-        );
-        handleClose();
+          rtspPassDraft.trim(),
+        )
+        handleClose()
       } catch (err) {
         if (err instanceof Error) {
-          setSaveError(err.message || 'Failed to save stream.');
+          setSaveError(err.message || 'Failed to save stream.')
         } else {
-          setSaveError(String(err) || 'Failed to save stream.');
+          setSaveError(String(err) || 'Failed to save stream.')
         }
       }
     }
-  };
+  }
 
   const handleReconnect = async () => {
-    if (!stream) return;
-    setReconnecting(true);
+    if (!stream) return
+    setReconnecting(true)
     try {
-      await onReconnect(stream);
+      await onReconnect(stream)
     } finally {
-      setReconnecting(false);
+      setReconnecting(false)
     }
-  };
+  }
 
   useEffect(() => {
     if (lastReconnectingRef.current !== reconnecting && !reconnecting) {
-      setShowReconnectedMessage(true);
-      setTimeout(() => setShowReconnectedMessage(false), 3000);
+      setShowReconnectedMessage(true)
+      setTimeout(() => setShowReconnectedMessage(false), 3000)
     }
-    lastReconnectingRef.current = reconnecting;
-  }, [reconnecting]);
+    lastReconnectingRef.current = reconnecting
+  }, [reconnecting])
 
-  if (!showModal || !stream) return null;
+  if (!showModal || !stream) return null
 
   return (
     <div
@@ -128,7 +136,7 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
           color: '#fff',
           position: 'relative',
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <h2 style={{ marginTop: 0 }}>Stream Settings</h2>
         <form onSubmit={handleSubmit}>
@@ -137,7 +145,7 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
             <input
               type="text"
               value={nicknameDraft}
-              onChange={e => setNicknameDraft(e.target.value)}
+              onChange={(e) => setNicknameDraft(e.target.value)}
               style={{
                 width: '100%',
                 padding: 8,
@@ -154,7 +162,7 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
             <input
               type="text"
               value={ffmpegInputDraft}
-              onChange={e => setFfmpegInputDraft(e.target.value)}
+              onChange={(e) => setFfmpegInputDraft(e.target.value)}
               style={{
                 width: '100%',
                 padding: 8,
@@ -173,7 +181,7 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
                 <input
                   type="text"
                   value={rtspUserDraft}
-                  onChange={e => setRtspUserDraft(e.target.value)}
+                  onChange={(e) => setRtspUserDraft(e.target.value)}
                   style={{
                     width: '100%',
                     padding: 8,
@@ -189,7 +197,7 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
                 <input
                   type="password"
                   value={rtspPassDraft}
-                  onChange={e => setRtspPassDraft(e.target.value)}
+                  onChange={(e) => setRtspPassDraft(e.target.value)}
                   style={{
                     width: '100%',
                     padding: 8,
@@ -203,7 +211,9 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
             </>
           )}
           {saveError && (
-            <div style={{ color: '#ff6b6b', marginBottom: 12 }}>{saveError}</div>
+            <div style={{ color: '#ff6b6b', marginBottom: 12 }}>
+              {saveError}
+            </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
             <button
@@ -240,7 +250,9 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
               onClick={handleReconnect}
               disabled={reconnecting || showReconnectedMessage}
               style={{
-                background: showReconnectedMessage ? 'rgb(30, 209, 51)' : '#1976d2',
+                background: showReconnectedMessage
+                  ? 'rgb(30, 209, 51)'
+                  : '#1976d2',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 6,
@@ -250,13 +262,17 @@ const StreamSettingsModal: React.FC<StreamSettingsModalProps> = ({
                 opacity: reconnecting ? 0.7 : 1,
               }}
             >
-              {reconnecting ? 'Reconnecting...' : showReconnectedMessage ? 'Reconnected!' : 'Reconnect Camera'}
+              {reconnecting
+                ? 'Reconnecting...'
+                : showReconnectedMessage
+                  ? 'Reconnected!'
+                  : 'Reconnect Camera'}
             </button>
           </div>
         </form>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default StreamSettingsModal;
+export default StreamSettingsModal

@@ -1,23 +1,23 @@
-import React from 'react';
-import { FiBell, FiBellOff, FiUsers, FiLogOut } from 'react-icons/fi';
-import { type Stream, type StreamMask } from '../../../source/types/shared';
+import React from 'react'
+import { FiBell, FiBellOff, FiUsers, FiLogOut } from 'react-icons/fi'
+import { type Stream, type StreamMask } from '../../../source/types/shared'
 
 interface StreamControlsProps {
-  shouldNotifyOnMotion: boolean;
-  isLoadingMotionNotifications: boolean;
-  setShouldNotifyOnMotion: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsLoadingMotionNotifications: React.Dispatch<React.SetStateAction<boolean>>;
-  showMaskEditor: boolean;
-  setShowMaskEditor: React.Dispatch<React.SetStateAction<boolean>>;
-  onShowSessionMonitor?: () => void;
-  showMobileLogout: boolean;
-  isMobile: boolean;
-  handleLogout: () => void;
-  activeStream: Stream | null;
-  setMasks: React.Dispatch<React.SetStateAction<StreamMask[]>>;
-  authFetch: (url: string, options?: object) => Promise<Response>;
-  API_BASE: string;
-  pauseMaskPollingUntil: React.RefObject<number>;
+  shouldNotifyOnMotion: boolean
+  isLoadingMotionNotifications: boolean
+  setShouldNotifyOnMotion: React.Dispatch<React.SetStateAction<boolean>>
+  setIsLoadingMotionNotifications: React.Dispatch<React.SetStateAction<boolean>>
+  showMaskEditor: boolean
+  setShowMaskEditor: React.Dispatch<React.SetStateAction<boolean>>
+  onShowSessionMonitor?: () => void
+  showMobileLogout: boolean
+  isMobile: boolean
+  handleLogout: () => void
+  activeStream: Stream | null
+  setMasks: React.Dispatch<React.SetStateAction<StreamMask[]>>
+  authFetch: (url: string, options?: object) => Promise<Response>
+  API_BASE: string
+  pauseMaskPollingUntilRef: React.RefObject<number>
 }
 
 const StreamControls: React.FC<StreamControlsProps> = ({
@@ -35,38 +35,39 @@ const StreamControls: React.FC<StreamControlsProps> = ({
   setMasks,
   authFetch,
   API_BASE,
-  pauseMaskPollingUntil,
+  pauseMaskPollingUntilRef,
 }) => {
   // Add this state to track if recording bar was ever open
-  const [hasRecordingBarBeenOpen, setHasRecordingBarBeenOpen] = React.useState(false);
+  const [hasRecordingBarBeenOpen, setHasRecordingBarBeenOpen] =
+    React.useState(false)
 
   // Listen for recording bar state changes
   React.useEffect(() => {
     // Check if RecordingBar is open by looking for it in the DOM
-    const recordingBar = document.querySelector('.recording-bar');
+    const recordingBar = document.querySelector('.recording-bar')
     if (recordingBar) {
-      setHasRecordingBarBeenOpen(true);
+      setHasRecordingBarBeenOpen(true)
     }
-  }, []);
+  }, [])
 
   // Calculate dynamic top position
   const getTopPosition = () => {
-    const recordingBar = document.querySelector('.recording-bar');
-    const isRecordingBarOpen = recordingBar && recordingBar.clientHeight > 0;
+    const recordingBar = document.querySelector('.recording-bar')
+    const isRecordingBarOpen = recordingBar && recordingBar.clientHeight > 0
 
     if (isRecordingBarOpen) {
-      return -44; // Normal position when recording bar is open
+      return -44 // Normal position when recording bar is open
     } else if (hasRecordingBarBeenOpen) {
-      return -44; // Maintain consistent position after recording bar has been used
+      return -44 // Maintain consistent position after recording bar has been used
     } else {
-      return -44; // Default position
+      return -44 // Default position
     }
-  };
+  }
 
-  const topPosition = getTopPosition();
+  const topPosition = getTopPosition()
 
   const handleAddMask = async () => {
-    if (!activeStream) return;
+    if (!activeStream) return
 
     // Default mask size and position (centered, 160x90 on 320x180 stream)
     const defaultMask = {
@@ -74,32 +75,32 @@ const StreamControls: React.FC<StreamControlsProps> = ({
       y: 35,
       w: 40,
       h: 20,
-      type: 'fixed'
-    };
+      type: 'fixed',
+    }
     // After any mask API update:
-    pauseMaskPollingUntil.current = Date.now() + 1000; // Pause polling for 1 second
+    pauseMaskPollingUntilRef.current = Date.now() + 1000 // Pause polling for 1 second
     authFetch(`${API_BASE}/api/masks/${activeStream.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mask: defaultMask }),
-    }).then(async result => {
+    }).then(async (result) => {
       if (!result.body) {
-        console.error('Failed to create new mask');
-        return;
+        console.error('Failed to create new mask')
+        return
       }
       // Parse the response and add the new mask
-      let data;
+      let data
       try {
-        data = await result.json();
+        data = await result.json()
       } catch {
-        console.error('Failed to parse mask creation response');
-        return;
+        console.error('Failed to parse mask creation response')
+        return
       }
       if (data && data.mask) {
-        setMasks(prev => [...prev, data.mask]);
+        setMasks((prev) => [...prev, data.mask])
       }
-    });
-  };
+    })
+  }
 
   return (
     <>
@@ -132,19 +133,23 @@ const StreamControls: React.FC<StreamControlsProps> = ({
         }}
         onMouseEnter={(e) => {
           if (!isLoadingMotionNotifications) {
-            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-            e.currentTarget.style.color = '#1cf1d1';
+            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+            e.currentTarget.style.color = '#1cf1d1'
           }
         }}
         onMouseLeave={(e) => {
-          const color = shouldNotifyOnMotion ? '#fff' : '#ff6b6b';
-          e.currentTarget.style.boxShadow = `inset 0 -3px 0 0 ${color}`;
-          e.currentTarget.style.color = color;
+          const color = shouldNotifyOnMotion ? '#fff' : '#ff6b6b'
+          e.currentTarget.style.boxShadow = `inset 0 -3px 0 0 ${color}`
+          e.currentTarget.style.color = color
         }}
-        aria-label={shouldNotifyOnMotion ? "Disable Motion Notifications" : "Enable Motion Notifications"}
+        aria-label={
+          shouldNotifyOnMotion
+            ? 'Disable Motion Notifications'
+            : 'Enable Motion Notifications'
+        }
         onClick={() => {
-          setIsLoadingMotionNotifications(true);
-          setShouldNotifyOnMotion(v => !v)
+          setIsLoadingMotionNotifications(true)
+          setShouldNotifyOnMotion((v) => !v)
         }}
         disabled={isLoadingMotionNotifications}
       >
@@ -156,7 +161,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
       </button>
 
       {/* Active Sessions button - Desktop */}
-      <div className='desktop-only'>
+      <div className="desktop-only">
         {!showMaskEditor && (
           <button
             className="reload-btn"
@@ -180,12 +185,12 @@ const StreamControls: React.FC<StreamControlsProps> = ({
               gap: 8,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-              e.currentTarget.style.color = '#1cf1d1';
+              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+              e.currentTarget.style.color = '#1cf1d1'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+              e.currentTarget.style.color = '#fff'
             }}
             onClick={() => onShowSessionMonitor?.()}
           >
@@ -196,7 +201,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
       </div>
 
       {/* Sessions button for mobile - only show when logout is NOT showing */}
-      <div className='mobile-only'>
+      <div className="mobile-only">
         {!showMaskEditor && !showMobileLogout && (
           <button
             className="reload-btn"
@@ -250,16 +255,21 @@ const StreamControls: React.FC<StreamControlsProps> = ({
             alignItems: 'center',
             gap: 8,
             // Add fade-in animation for mobile
-            opacity: isMobile && showMobileLogout ? 1 : (!isMobile ? 1 : 0),
-            transform: isMobile && showMobileLogout ? 'translateY(0)' : (isMobile ? 'translateY(-10px)' : 'translateY(0)'),
+            opacity: isMobile && showMobileLogout ? 1 : !isMobile ? 1 : 0,
+            transform:
+              isMobile && showMobileLogout
+                ? 'translateY(0)'
+                : isMobile
+                  ? 'translateY(-10px)'
+                  : 'translateY(0)',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-            e.currentTarget.style.color = '#1cf1d1';
+            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+            e.currentTarget.style.color = '#1cf1d1'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #ff6b6b';
-            e.currentTarget.style.color = '#ff6b6b';
+            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #ff6b6b'
+            e.currentTarget.style.color = '#ff6b6b'
           }}
           onClick={handleLogout}
           aria-label="Logout"
@@ -293,12 +303,12 @@ const StreamControls: React.FC<StreamControlsProps> = ({
             gap: 8,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-            e.currentTarget.style.color = '#1cf1d1';
+            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+            e.currentTarget.style.color = '#1cf1d1'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+            e.currentTarget.style.color = '#fff'
           }}
           onClick={handleAddMask}
         >
@@ -329,14 +339,14 @@ const StreamControls: React.FC<StreamControlsProps> = ({
           gap: 8,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1';
-          e.currentTarget.style.color = '#1cf1d1';
+          e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #1cf1d1'
+          e.currentTarget.style.color = '#1cf1d1'
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff';
-          e.currentTarget.style.color = '#fff';
+          e.currentTarget.style.boxShadow = 'inset 0 -3px 0 0 #fff'
+          e.currentTarget.style.color = '#fff'
         }}
-        onClick={() => setShowMaskEditor(showMaskEditor => !showMaskEditor)}
+        onClick={() => setShowMaskEditor((showMaskEditor) => !showMaskEditor)}
       >
         {!showMaskEditor ? 'Edit Masks' : 'Done'}
         {!showMaskEditor ? (
@@ -350,7 +360,11 @@ const StreamControls: React.FC<StreamControlsProps> = ({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            style={{ marginLeft: 6, display: 'inline-block', verticalAlign: 'middle' }}
+            style={{
+              marginLeft: 6,
+              display: 'inline-block',
+              verticalAlign: 'middle',
+            }}
             aria-hidden="true"
             focusable="false"
           >
@@ -367,7 +381,11 @@ const StreamControls: React.FC<StreamControlsProps> = ({
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            style={{ marginLeft: 6, display: 'inline-block', verticalAlign: 'middle' }}
+            style={{
+              marginLeft: 6,
+              display: 'inline-block',
+              verticalAlign: 'middle',
+            }}
             aria-hidden="true"
             focusable="false"
           >
@@ -376,7 +394,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
         )}
       </button>
     </>
-  );
-};
+  )
+}
 
-export default StreamControls;
+export default StreamControls

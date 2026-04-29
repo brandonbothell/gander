@@ -1,8 +1,10 @@
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin } from '@capacitor/core'
 
 export interface BatteryOptimizationPlugin {
   // Define your plugin methods here, for example:
-  prompt(): Promise<void>;
+  prompt(): Promise<void>
 }
 
-export const BatteryOptimization = registerPlugin<BatteryOptimizationPlugin>('BatteryOptimization');
+export const BatteryOptimization = registerPlugin<BatteryOptimizationPlugin>(
+  'BatteryOptimization',
+)

@@ -1,46 +1,58 @@
-import { useState } from 'react';
-import { API_BASE } from './main';
-import { getDeviceFingerprint } from '../../source/types/deviceInfo';
-import { Capacitor } from '@capacitor/core';
+import { useState } from 'react'
+import { API_BASE } from './main'
+import { getDeviceFingerprint } from '../../source/types/deviceInfo'
+import { Capacitor } from '@capacitor/core'
 
-export default function LoginPage({ onLogin }: { onLogin: (token: string, refreshToken: string) => void }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setIsLoading] = useState(false);
+export default function LoginPage({
+  onLogin,
+}: {
+  onLogin: (token: string, refreshToken: string) => void
+}) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
 
     try {
-      const deviceInfo = getDeviceFingerprint();
+      const deviceInfo = getDeviceFingerprint()
 
       const response = await fetch(`${API_BASE}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, deviceInfo })
-      });
+        body: JSON.stringify({ username, password, deviceInfo }),
+      })
 
-      const data = await response.json();
+      const data = await response.json()
       if (data.success) {
         if (!Capacitor.isNativePlatform()) {
-          localStorage.removeItem('tokenRefreshInProgress');
+          localStorage.removeItem('tokenRefreshInProgress')
         }
-        onLogin(data.token, data.refreshToken);
+        onLogin(data.token, data.refreshToken)
       } else {
-        setError(data.message ?? 'Login failed');
+        setError(data.message ?? 'Login failed')
       }
     } catch {
-      setError('Login failed. Please try again.');
+      setError('Login failed. Please try again.')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="App" style={{ minHeight: '100vh', justifyContent: 'center', alignItems: 'center', display: 'flex' }}>
+    <div
+      className="App"
+      style={{
+        minHeight: '100vh',
+        justifyContent: 'center',
+        alignItems: 'center',
+        display: 'flex',
+      }}
+    >
       <form
         onSubmit={handleSubmit}
         style={{
@@ -58,8 +70,13 @@ export default function LoginPage({ onLogin }: { onLogin: (token: string, refres
             type="text"
             placeholder="Username"
             value={username}
-            onChange={e => setUsername(e.target.value)}
-            style={{ width: 220, padding: 8, borderRadius: 6, border: '1px solid #444' }}
+            onChange={(e) => setUsername(e.target.value)}
+            style={{
+              width: 220,
+              padding: 8,
+              borderRadius: 6,
+              border: '1px solid #444',
+            }}
             autoFocus
             autoComplete="username"
             disabled={loading}
@@ -70,13 +87,20 @@ export default function LoginPage({ onLogin }: { onLogin: (token: string, refres
             type="password"
             placeholder="Password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
-            style={{ width: 220, padding: 8, borderRadius: 6, border: '1px solid #444' }}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{
+              width: 220,
+              padding: 8,
+              borderRadius: 6,
+              border: '1px solid #444',
+            }}
             autoComplete="current-password"
             disabled={loading}
           />
         </div>
-        {error && <div style={{ color: '#ff5f5f', marginBottom: 12 }}>{error}</div>}
+        {error && (
+          <div style={{ color: '#ff5f5f', marginBottom: 12 }}>{error}</div>
+        )}
         <button
           type="submit"
           style={{
@@ -97,5 +121,5 @@ export default function LoginPage({ onLogin }: { onLogin: (token: string, refres
         </button>
       </form>
     </div>
-  );
+  )
 }
