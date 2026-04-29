@@ -21,10 +21,23 @@ export type Recording = { streamId: string; filename: string }
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  const [___, setCachedRecordings] = useLocalStorageState<{
+  const [______, setSignedUrlCache] = useLocalStorageState<{
+    [cacheKey: string]: {
+      url: string
+      expiresAt: number
+      streamId: string
+      filename: string
+      type: 'video' | 'thumbnail'
+      lastAccessed: number
+    }
+  }>('signedUrlCache', {})
+  const [_____, setSignedLiveThumbUrls] = useLocalStorageState<{
+    [streamId: string]: { url: string; expires: number }
+  }>('signedLiveThumbUrls', {})
+  const [____, setCachedRecordings] = useLocalStorageState<{
     [streamId: string]: Recording[]
   }>('cachedRecordings', {})
-  const [____, setTotalRecordings] = useLocalStorageState<{
+  const [___, setTotalRecordings] = useLocalStorageState<{
     [streamId: string]: number
   }>('totalRecordings', {})
   const [__, setCachedRecordingRanges] = useLocalStorageState<{
@@ -476,24 +489,24 @@ export default function App() {
 
   function checkLocalStorageStateConsistency() {
     try {
-      const LAST_UPDATE_KEY = 'lastUpdateTimestamp'
-      const lastUpdate = localStorage.getItem(LAST_UPDATE_KEY)
       const currentVersion = import.meta.env.VITE_REACT_APP_VERSION ?? '1.0.0'
+      let lastUpdate = localStorage.getItem('lastUsedAppVersion')
 
-      // Use a versioned timestamp to detect updates
-      const versionedUpdateKey = `${LAST_UPDATE_KEY}_${currentVersion}`
-      const lastVersionedUpdate = localStorage.getItem(versionedUpdateKey)
+      if (!lastUpdate) {
+        localStorage.setItem('lastUsedAppVersion', currentVersion)
+        lastUpdate = currentVersion
+      }
 
       // If new version, reset cached data
-      if (lastUpdate !== lastVersionedUpdate) {
+      if (lastUpdate !== currentVersion) {
         // Reset all cached states if the website was updated
-        const now = Date.now().toString()
         setCachedRecordings({})
         setCachedRecordingRanges({})
         setCachedPages({})
         setTotalRecordings({})
-        localStorage.setItem(versionedUpdateKey, lastUpdate ?? now)
-        if (!lastUpdate) localStorage.setItem(LAST_UPDATE_KEY, now)
+        setSignedUrlCache({})
+        setSignedLiveThumbUrls({})
+        localStorage.setItem('lastUsedAppVersion', currentVersion)
         alert('Cache reset due to website update or new deployment.')
       }
     } catch (err) {
