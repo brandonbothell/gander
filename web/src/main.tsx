@@ -116,7 +116,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
       if (refreshSuccess) {
         // Retry the original request with the new token
         const newToken = getToken()
-        return await makeRequest(newToken)
+        return makeRequest(newToken)
       } else {
         // Refresh failed, logout
         await globalLogout()

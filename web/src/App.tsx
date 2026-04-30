@@ -12,12 +12,11 @@ import { SessionMonitor } from './components/SessionMonitor'
 import { type TrustedDevice, type Session } from '../../source/types/deviceInfo'
 import { Capacitor } from '@capacitor/core'
 import { debugLog } from './utils/debugLog'
-
-export type Recording = { streamId: string; filename: string }
+import type { RecordingType } from './components/Recording'
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  const [______, setSignedUrlCache] = useLocalStorageState<{
+  const [_signedUrlCache, setSignedUrlCache] = useLocalStorageState<{
     [cacheKey: string]: {
       url: string
       expiresAt: number
@@ -27,19 +26,20 @@ export default function App() {
       lastAccessed: number
     }
   }>('signedUrlCache', {})
-  const [_____, setSignedLiveThumbUrls] = useLocalStorageState<{
+  const [_signedLiveThumbUrls, setSignedLiveThumbUrls] = useLocalStorageState<{
     [streamId: string]: { url: string; expires: number }
   }>('signedLiveThumbUrls', {})
-  const [____, setCachedRecordings] = useLocalStorageState<{
-    [streamId: string]: Recording[]
+  const [_cachedRecordings, setCachedRecordings] = useLocalStorageState<{
+    [streamId: string]: RecordingType[]
   }>('cachedRecordings', {})
-  const [___, setTotalRecordings] = useLocalStorageState<{
+  const [_totalRecordings, setTotalRecordings] = useLocalStorageState<{
     [streamId: string]: number
   }>('totalRecordings', {})
-  const [__, setCachedRecordingRanges] = useLocalStorageState<{
-    [streamId: string]: Array<{ from: string; to: string }>
-  }>('cachedRecordingRanges', {})
-  const [_, setCachedPages] = useLocalStorageState<{
+  const [_cachedRecordingRanges, setCachedRecordingRanges] =
+    useLocalStorageState<{
+      [streamId: string]: Array<{ from: string; to: string }>
+    }>('cachedRecordingRanges', {})
+  const [_cachedPages, setCachedPages] = useLocalStorageState<{
     [streamId: string]: number[]
   }>('cachedPages', {})
   const [knownSessions, setKnownSessions] = useLocalStorageState<string[]>(

@@ -16,6 +16,7 @@ interface StreamControlsProps {
   activeStream: Stream | null
   setMasks: React.Dispatch<React.SetStateAction<StreamMask[]>>
   authFetch: (url: string, options?: object) => Promise<Response>
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   API_BASE: string
   pauseMaskPollingUntilRef: React.RefObject<number>
 }
@@ -34,6 +35,7 @@ const StreamControls: React.FC<StreamControlsProps> = ({
   activeStream,
   setMasks,
   authFetch,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   API_BASE,
   pauseMaskPollingUntilRef,
 }) => {

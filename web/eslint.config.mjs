@@ -1,71 +1,66 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import globals from 'globals'
-import { defineConfig, globalIgnores } from 'eslint/config'
-import tsParser from '@typescript-eslint/parser'
-import typescriptEslint from '@typescript-eslint/eslint-plugin'
-import { FlatCompat } from '@eslint/eslintrc'
-import unusedImports from 'eslint-plugin-unused-imports'
-import stylistic from '@stylistic/eslint-plugin'
 import js from '@eslint/js'
-import { fixupConfigRules } from '@eslint/compat'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import unusedImports from 'eslint-plugin-unused-imports'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+import stylistic from '@stylistic/eslint-plugin'
+import { FlatCompat } from '@eslint/eslintrc'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const compat = new FlatCompat({
   baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
+  recommendedConfig: tseslint.configs.recommended,
   allConfig: js.configs.all,
 })
 
-export default defineConfig([
-  globalIgnores([
-    'web/',
-    'compiled/**/*',
-    '**/.pnp.*',
-    '.yarn/',
-    'android/',
-    'source/generated/',
-  ]),
+export default tseslint.config(
+  { ignores: ['dist'] },
   {
-    extends: fixupConfigRules(compat.extends('plugin:import/recommended')),
-
-    files: ['source/**/*.ts', 'eslint.config.mts', 'scripts/**/*.ts'],
-
-    plugins: {
-      '@stylistic': stylistic,
-      // @ts-ignore
-      '@typescript-eslint': typescriptEslint,
-      'unused-imports': unusedImports,
-    },
-
+    extends: compat.extends('plugin:import/recommended'),
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      globals: {
-        ...globals.node,
-      },
-
-      parser: tsParser,
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parser: tseslint.parser,
       ecmaVersion: 5,
       sourceType: 'module',
 
       parserOptions: {
-        project: ['tsconfig.json'],
+        project: ['tsconfig.app.json', 'tsconfig.node.json'],
       },
     },
-
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+      '@stylistic': stylistic,
+      // @ts-ignore
+      '@typescript-eslint': tseslint.plugin,
+      'unused-imports': unusedImports,
+    },
     rules: {
+      ...reactHooks.configs.recommended.rules,
+      'react-hooks/set-state-in-effect': 'off',
       'preserve-caught-error': 'off',
-      'import/no-unresolved': [0],
-
-      'import/order': [
-        'error',
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
         {
-          alphabetize: {
-            order: 'desc',
-          },
+          caughtErrorsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          argsIgnorePattern: '^_',
         },
       ],
+
+      'preserve-caught-error': 'off',
+      'import/no-unresolved': [0],
+      'import/no-named-as-default-member': 'off',
 
       'unused-imports/no-unused-imports': 'error',
       '@typescript-eslint/await-thenable': 'error',
@@ -173,7 +168,6 @@ export default defineConfig([
       curly: ['error', 'multi-line'],
       'eol-last': 'error',
       eqeqeq: ['error', 'smart'],
-      'func-call-spacing': ['error', 'never'],
 
       'id-blacklist': [
         'error',
@@ -252,4 +246,4 @@ export default defineConfig([
       'valid-typeof': 'error',
     },
   },
-])
+)

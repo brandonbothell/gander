@@ -1,15 +1,15 @@
 import React from 'react'
 import { BatchDeleteButton } from './BatchDeleteButton'
 import { DeselectButton } from './DeselectButton'
-import type { Recording } from '../App'
+import type { RecordingType } from './Recording'
 
 interface FloatingMenuPopoutProps {
   open: boolean
   selected: string[]
   setSelected: (sel: string[]) => void
   viewingStreamId: string
-  cachedRecordings: Recording[]
-  setRecordings: (recs: Recording[]) => void
+  cachedRecordings: RecordingType[]
+  setRecordings: (recs: RecordingType[]) => void
   recordingsListRef: React.RefObject<HTMLDivElement | null>
 }
 

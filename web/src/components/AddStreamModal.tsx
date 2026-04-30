@@ -6,6 +6,7 @@ interface AddStreamModalProps {
   onClose: () => void
   onStreamCreated: (stream: Stream) => void
   authFetch: (url: string, options?: RequestInit) => Promise<Response>
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   API_BASE: string
 }
 
@@ -14,6 +15,7 @@ const AddStreamModal: React.FC<AddStreamModalProps> = ({
   onClose,
   onStreamCreated,
   authFetch,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   API_BASE,
 }) => {
   const [newStream, setNewStream] = useState({

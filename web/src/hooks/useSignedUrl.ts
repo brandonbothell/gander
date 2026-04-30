@@ -119,14 +119,16 @@ export function useSignedUrl(
         return
       }
 
-      if (!signedUrlsToFetch[streamId])
-        signedUrlsToFetch[streamId] = {
+      if (!signedUrlsToFetch[streamId]) {
+signedUrlsToFetch[streamId] = {
           thumbnail: [],
           video: [],
         }
+}
 
-      if (isMounted)
-        signedUrlsToFetch[streamId][type].push(encodeURIComponent(filename))
+      if (isMounted) {
+signedUrlsToFetch[streamId][type].push(encodeURIComponent(filename))
+}
 
       if (isMounted && !queuedForFetching[streamId]) {
         queuedForFetching[streamId] = {

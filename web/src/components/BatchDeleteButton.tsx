@@ -1,12 +1,12 @@
 import { authFetch } from '../main'
-import type { Recording } from '../App'
+import type { RecordingType } from './Recording'
 
 interface BatchDeleteButtonProps {
   streamId: string
   count: number
   selected: string[]
-  recordings: Recording[]
-  setRecordings: (recs: Recording[]) => void
+  recordings: RecordingType[]
+  setRecordings: (recs: RecordingType[]) => void
   setSelected: (sel: string[]) => void
   recordingsListRef: React.RefObject<HTMLDivElement | null>
 }

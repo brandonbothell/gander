@@ -53,7 +53,7 @@ export function StreamControlBar({
 
   // Calculate responsive sizes based on video dimensions
   const getResponsiveSizes = () => {
-    if (!videoRect)
+    if (!videoRect) {
       return {
         barHeight: 80,
         iconSize: 24,
@@ -61,6 +61,7 @@ export function StreamControlBar({
         gap: 20,
         buttonPadding: 8,
       }
+    }
 
     const videoWidth = videoRect.width
     const videoHeight = videoRect.height
@@ -224,7 +225,7 @@ export function StreamControlBar({
     if (!video) return
 
     if (video.paused) {
-      video.play().catch(() => {})
+      video.play().catch(() => console.warn('Failed to play stream'))
     } else {
       video.pause()
     }
@@ -280,7 +281,9 @@ export function StreamControlBar({
             lockResult &&
             typeof (lockResult as Promise<void>).catch === 'function'
           ) {
-            ;(lockResult as Promise<void>).catch(() => {})
+            ;(lockResult as Promise<void>).catch(() => {
+              /* ignore */
+            })
           }
         } catch (_) {
           // Ignore errors
@@ -301,7 +304,9 @@ export function StreamControlBar({
       try {
         const result = orientation.unlock()
         if (result && typeof result.catch === 'function') {
-          result.catch(() => {})
+          result.catch((err) =>
+            console.error('Failed to exit fullscreen:', err),
+          )
         }
       } catch (error) {
         console.error('Failed to exit fullscreen orientation lock:', error)

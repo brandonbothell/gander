@@ -2,12 +2,13 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
-import { API_BASE, authFetch } from './main'
+import { API_BASE, authFetch, fetchWithRetry } from './main'
 import { setupPushNotifications, subscribeToWebPush } from './pushNotifications'
 import { FloatingMenuButton } from './components/FloatingMenuButton'
 import { FloatingMenuPopout } from './components/FloatingMenuPopout'
 import { MotionService } from './plugins/motionService'
 import { useLocalStorageState } from './hooks/useLocalStorageState'
+// eslint-disable-next-line import/no-named-as-default
 import Hls from 'hls.js'
 import { useLoading } from './hooks/useLoading'
 import { SearchTools } from './components/SearchTools'
@@ -19,13 +20,12 @@ import AddStreamModal from './components/AddStreamModal'
 import StreamSettingsModal from './components/StreamSettingsModal'
 import { RecordingBar } from './components/RecordingBar'
 import { StreamControlBar } from './components/StreamControlBar'
-import type { Recording } from './App'
+import type { RecordingType } from './components/Recording'
 import SecureStorage from './utils/secureStorage'
 import { Preferences } from '@capacitor/preferences'
 import { DebugInfo } from './components/DebugInfo'
 import RecordingsListContent from './components/RecordingsListContent'
 import StreamControls from './components/StreamControls'
-import { fetchWithRetry } from './main'
 import ErrorModal from './components/ErrorModal'
 
 export type ClientMask = StreamMask & {
@@ -90,7 +90,7 @@ export default function StreamPage({
   const recordingsListRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const [cachedRecordings, setCachedRecordings] = useLocalStorageState<{
-    [streamId: string]: Recording[]
+    [streamId: string]: RecordingType[]
   }>('cachedRecordings', {})
   const [viewed, setViewed] = useLocalStorageState<
     { filename: string; streamId: string }[]
@@ -257,9 +257,9 @@ export default function StreamPage({
         console.error('Error during logout:', error)
         // Fallback: just clear storage and reload
         localStorage.removeItem('jwt')
-        if (Capacitor.isNativePlatform())
+        if (Capacitor.isNativePlatform()) {
           await Preferences.remove({ key: 'refreshToken' })
-        else await SecureStorage.removeRefreshToken()
+        } else await SecureStorage.removeRefreshToken()
         window.location.reload()
       }
     }
@@ -305,11 +305,11 @@ export default function StreamPage({
 
   // Add a cache for filtered recordings
   const [filteredRecordingsCache, setFilteredRecordingsCache] = useState<
-    Recording[]
+    RecordingType[]
   >([])
   // Add this new state to store a "frozen" version of filtered recordings during typing
   const [frozenFilteredRecordings, setFrozenFilteredRecordings] = useState<
-    Recording[]
+    RecordingType[]
   >([])
 
   // Update the filteredRecordings useMemo in StreamPage.tsx:
@@ -392,14 +392,16 @@ export default function StreamPage({
               dateRange.from &&
               /^\d{4}-\d{2}-\d{2}$/.test(dateRange.from) &&
               fileDateLocal < dateRange.from
-            )
+            ) {
               return false
+            }
             if (
               dateRange.to &&
               /^\d{4}-\d{2}-\d{2}$/.test(dateRange.to) &&
               fileDateLocal > dateRange.to
-            )
+            ) {
               return false
+            }
           } catch (_dateError) {
             // If date parsing fails, exclude the recording
             return false
@@ -485,9 +487,9 @@ export default function StreamPage({
 
   const processSearchChunk = useCallback(
     (
-      recordings: Recording[],
+      recordings: RecordingType[],
       startIndex: number,
-      filtered: Recording[],
+      filtered: RecordingType[],
       requestId: number,
     ) => {
       // Check if this request was cancelled
@@ -542,14 +544,16 @@ export default function StreamPage({
                 dateRange.from &&
                 /^\d{4}-\d{2}-\d{2}$/.test(dateRange.from) &&
                 fileDateLocal < dateRange.from
-              )
+              ) {
                 continue
+              }
               if (
                 dateRange.to &&
                 /^\d{4}-\d{2}-\d{2}$/.test(dateRange.to) &&
                 fileDateLocal > dateRange.to
-              )
+              ) {
                 continue
+              }
             } catch (_dateError) {
               // If date parsing fails, exclude the recording
               continue
@@ -588,7 +592,7 @@ export default function StreamPage({
 
   // Update the performSearchSync function to accept and check request ID:
   const performSearchSync = useCallback(
-    (recordings: Recording[], requestId: number) => {
+    (recordings: RecordingType[], requestId: number) => {
       // Use requestIdleCallback or setTimeout to chunk the work
       if ('requestIdleCallback' in window) {
         window.requestIdleCallback(() => {
@@ -644,8 +648,9 @@ export default function StreamPage({
         if (
           !currentRecordingsStream ||
           currentRecordingsStream.id !== recordingsStream.id
-        )
+        ) {
           return
+        }
 
         // Use sync search on iOS, worker on other platforms
         if (isIOS() || !searchWorkerRef.current) {
@@ -712,8 +717,9 @@ export default function StreamPage({
 
   // Update the loadStream function with proper HLS cleanup
   const loadStream = useCallback(async () => {
-    if (!videoRef.current || !activeStream)
+    if (!videoRef.current || !activeStream) {
       return console.warn('No video ref and/or active stream set')
+    }
 
     setIsLoadingStream(true)
     setLoading(true)
@@ -726,11 +732,11 @@ export default function StreamPage({
       })
 
       // Apply the current dimensions to prevent flashing to small size
-      videoRef.current.style.width = `100%`
+      videoRef.current.style.width = '100%'
       videoRef.current.style.height = `${videoRef.current.clientHeight}px`
     } else if (lastVideoSize.width > 0 && lastVideoSize.height > 0) {
       // Use last known dimensions if current dimensions aren't available
-      videoRef.current.style.width = `$100%`
+      videoRef.current.style.width = '$100%'
       videoRef.current.style.height = `${lastVideoSize.height}px`
     }
 
@@ -772,7 +778,9 @@ export default function StreamPage({
     if (isSafari) {
       videoRef.current.src = url
       videoRef.current.load()
-      videoRef.current.play().catch(() => {})
+      videoRef.current
+        .play()
+        .catch(() => console.error('Failed to play stream'))
 
       // Safari-specific live seeking - wait for actual playback
       const video = videoRef.current
@@ -990,7 +998,9 @@ export default function StreamPage({
           // Fallback for browsers without HLS.js support
           videoRef.current.src = url
           videoRef.current.load()
-          videoRef.current.play().catch(() => {})
+          videoRef.current
+            .play()
+            .catch(() => console.warn('Failed to play stream'))
 
           const video = videoRef.current
           const handleCanPlay = () => {
@@ -1018,7 +1028,9 @@ export default function StreamPage({
         console.error('HLS.js failed, using native video:', err)
         videoRef.current.src = url
         videoRef.current.load()
-        videoRef.current.play().catch(() => {})
+        videoRef.current
+          .play()
+          .catch(() => console.warn('Failed to play stream'))
 
         const video = videoRef.current
         const handleCanPlay = () => {
@@ -1157,9 +1169,8 @@ export default function StreamPage({
         setTimeout(() => {
           keyboardTransitioningRef.current = false
         }, 700) // Allow time for transition
-      }
-      // If height grows by more than 100px, likely keyboard closed
-      else if (height - lastHeight > 100) {
+      } else if (height - lastHeight > 100) {
+        // If height grows by more than 100px, likely keyboard closed
         keyboardTransitioningRef.current = true
         setIsKeyboardOpen(false)
         setTimeout(() => {
@@ -1206,8 +1217,8 @@ export default function StreamPage({
       )
       if (!res.ok) return
       const data = await res.json()
-      const newRecs: Recording[] = (data.recordings || []).map(
-        (rec: Recording) => ({
+      const newRecs: RecordingType[] = (data.recordings || []).map(
+        (rec: RecordingType) => ({
           filename: rec.filename,
           streamId: stream.id,
         }),
@@ -1475,8 +1486,9 @@ export default function StreamPage({
 
       setIsAtBottomOfPage(distanceFromBottom <= bottomThreshold)
 
-      if (keyboardTransitioningRef.current || isKeyboardOpen || forceSticky)
+      if (keyboardTransitioningRef.current || isKeyboardOpen || forceSticky) {
         return
+      }
       const currentScrollY = window.scrollY
       if (currentScrollY > lastScrollY) {
         if (
@@ -1851,7 +1863,7 @@ export default function StreamPage({
       )
       if (!res.ok) return
       const data = await res.json()
-      const newRecs: Recording[] = (data.recordings || []).map(
+      const newRecs: RecordingType[] = (data.recordings || []).map(
         (filename: string) => ({
           filename,
           streamId: stream.id,
@@ -2088,7 +2100,7 @@ export default function StreamPage({
         .then((data) => {
           setMotionRecordingPaused(data)
         })
-        .catch(() => {})
+        .catch((err) => console.warn('Failed to poll pause state', err))
     }
     pollPauseState()
     const interval = setInterval(pollPauseState, 3000)
@@ -2397,8 +2409,9 @@ export default function StreamPage({
     windowWithThumbInterval._thumbInterval = interval
 
     return () => {
-      if (windowWithThumbInterval._thumbInterval)
+      if (windowWithThumbInterval._thumbInterval) {
         clearInterval(windowWithThumbInterval._thumbInterval)
+      }
     }
   }, [activeStream])
 
@@ -2498,8 +2511,9 @@ export default function StreamPage({
     if (
       Object.values(deletedRecordings).every((d) => d.length === 0) ||
       !activeStream
-    )
+    ) {
       return
+    }
 
     // Update cached recordings
     setCachedRecordings((prev) => {
@@ -2864,8 +2878,8 @@ export default function StreamPage({
       <ErrorModal
         open={lowDiskModalOpen}
         message={
-          `Host is low on disk space. Motion recording saving is paused and new segments will be deleted for this stream. ` +
-          `Free space on the host to resume saving.`
+          'Host is low on disk space. Motion recording saving is paused and new segments will be deleted for this stream. ' +
+          'Free space on the host to resume saving.'
         }
         onClose={handleLowDiskModalClose}
       />
@@ -2879,7 +2893,7 @@ export default function StreamPage({
             alignItems: 'center',
             width: '100%',
             maxWidth: 900,
-            margin: `25px auto`,
+            margin: '25px auto',
           }}
         >
           <RecordingBar
@@ -3033,10 +3047,11 @@ export default function StreamPage({
                     console.warn(`Mask with ID ${maskId} not found`)
                     return
                   }
-                  if (!activeStream)
+                  if (!activeStream) {
                     return console.warn(
                       'No active stream to save mask position',
                     )
+                  }
                   let mask
                   try {
                     mask =
@@ -3291,9 +3306,9 @@ export default function StreamPage({
                       const recordingsStream =
                         viewingRecordingsFrom ?? activeStream
                       const start = Date.now()
-                      if (recordingsStream)
+                      if (recordingsStream) {
                         await pollLatestRecordings(recordingsStream)
-                      else alert('No active stream to refresh recordings for')
+                      } else alert('No active stream to refresh recordings for')
                       const elapsed = Date.now() - start
                       setTimeout(
                         () => setIsDesktopRefreshing(false),
@@ -3339,8 +3354,9 @@ export default function StreamPage({
           }
           setIsRecordingsListScrolling(true)
           // Debounce: set back to false after scrolling stops for 120ms
-          if (windowWithScrollTimeout._scrollTimeout)
+          if (windowWithScrollTimeout._scrollTimeout) {
             clearTimeout(windowWithScrollTimeout._scrollTimeout)
+          }
           windowWithScrollTimeout._scrollTimeout = setTimeout(
             () => setIsRecordingsListScrolling(false),
             120,
@@ -3423,7 +3439,7 @@ export default function StreamPage({
             position: 'fixed',
             left: 0,
             right: 0,
-            top: `80vh`, // Adjust if needed to match the bottom of the recordings list
+            top: '80vh', // Adjust if needed to match the bottom of the recordings list
             bottom: 0,
             zIndex: 1000,
             background: 'transparent',

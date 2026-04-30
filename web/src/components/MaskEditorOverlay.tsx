@@ -179,7 +179,8 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
       if (!overlayRef.current) return null
 
       const rect = overlayRef.current.getBoundingClientRect()
-      let clientX, clientY
+      let clientX
+      let clientY
 
       if ('touches' in e && e.touches.length > 0) {
         clientX = e.touches[0].clientX
@@ -579,10 +580,10 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                 >
                   <g>
                     <polygon
-                      points="495.405,241.769 418.657,197.457 418.657,258.115 314.042,258.115 314.042,153.498 374.699,153.498 
-            330.389,76.751 286.078,0 241.769,76.751 197.457,153.498 258.115,153.498 258.115,258.115 153.498,258.115 153.498,197.457 
-            76.751,241.767 0,286.078 76.751,330.387 153.498,374.699 153.498,314.042 258.115,314.042 258.115,418.657 197.457,418.657 
-            241.767,495.405 286.078,572.156 330.387,495.405 374.699,418.657 314.042,418.657 314.042,314.042 418.657,314.042 
+                      points="495.405,241.769 418.657,197.457 418.657,258.115 314.042,258.115 314.042,153.498 374.699,153.498
+            330.389,76.751 286.078,0 241.769,76.751 197.457,153.498 258.115,153.498 258.115,258.115 153.498,258.115 153.498,197.457
+            76.751,241.767 0,286.078 76.751,330.387 153.498,374.699 153.498,314.042 258.115,314.042 258.115,418.657 197.457,418.657
+            241.767,495.405 286.078,572.156 330.387,495.405 374.699,418.657 314.042,418.657 314.042,314.042 418.657,314.042
             418.657,374.699 495.405,330.389 572.156,286.078 	"
                     />
                   </g>
@@ -686,10 +687,10 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                     <polygon
                       points={
                         isDragging
-                          ? `17.5,17.5 17.5,21.5 21.5,17.5`
+                          ? '17.5,17.5 17.5,21.5 21.5,17.5'
                           : hoveredResizeId === maskObj.id
-                            ? `17.5,16.5 17.5,20.5 21.5,16.5`
-                            : `17.5,17.5 17.5,21.5 21.5,17.5`
+                            ? '17.5,16.5 17.5,20.5 21.5,16.5'
+                            : '17.5,17.5 17.5,21.5 21.5,17.5'
                       }
                       fill={
                         isDragging
@@ -708,10 +709,10 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                     <polygon
                       points={
                         isDragging
-                          ? `23.5,23.5 23.5,19.5 19.5,23.5`
+                          ? '23.5,23.5 23.5,19.5 19.5,23.5'
                           : hoveredResizeId === maskObj.id
-                            ? `23.5,22.5 23.5,18.5 19.5,22.5`
-                            : `23.5,23.5 23.5,19.5 19.5,23.5`
+                            ? '23.5,22.5 23.5,18.5 19.5,22.5'
+                            : '23.5,23.5 23.5,19.5 19.5,23.5'
                       }
                       fill={
                         isDragging
@@ -752,17 +753,17 @@ export const MaskEditorOverlay: React.FC<MaskEditorOverlayProps> = ({
                     for (const m of newMasks) {
                       const maskB =
                         typeof m.mask === 'string' ? JSON.parse(m.mask) : m.mask
-                      const x_overlap = Math.max(
+                      const xOverlap = Math.max(
                         0,
                         Math.min(maskA.x + maskA.w, maskB.x + maskB.w) -
                           Math.max(maskA.x, maskB.x),
                       )
-                      const y_overlap = Math.max(
+                      const yOverlap = Math.max(
                         0,
                         Math.min(maskA.y + maskA.h, maskB.y + maskB.h) -
                           Math.max(maskA.y, maskB.y),
                       )
-                      const overlapArea = x_overlap * y_overlap
+                      const overlapArea = xOverlap * yOverlap
                       if (overlapArea > maxOverlap) {
                         maxOverlap = overlapArea
                         mostOverlapping = m

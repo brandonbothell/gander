@@ -1,6 +1,0 @@
-{
-  "compilerOptions": {
-    "rootDir": "."
-  },
-  "files": ["scripts/**/*.ts"]
-}

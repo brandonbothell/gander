@@ -1,8 +1,8 @@
-import { PrismaClient } from '../source/generated/prisma';
-import fs from 'fs';
-import path from 'path';
+import path from 'path'
+import fs from 'fs'
+import { PrismaClient } from '../source/generated/prisma'
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
 
 // List your streams and their recording directories here
 const streams = [
@@ -14,31 +14,31 @@ const streams = [
     id: 'cmcs4vqkq0000p0ngn9dty48f',
     recordDir: 'D:/Recordings/SecurityCam/cmcs4vqkq0000p0ngn9dty48f',
   },
-];
+]
 
 // Helper to get the latest recordedAt date across all streams
 async function getLastRecordingDay(): Promise<string | null> {
-  let latest: string | null = null;
+  let latest: string | null = null
   for (const stream of streams) {
     const rec = await prisma.motionRecording.findFirst({
       where: { streamId: stream.id },
       orderBy: { recordedAt: 'desc' },
       select: { recordedAt: true },
-    });
+    })
     if (rec && (!latest || rec.recordedAt > latest)) {
-      latest = rec.recordedAt;
+      latest = rec.recordedAt
     }
   }
-  return latest;
+  return latest
 }
 
 async function main() {
-  const lastRecordingDay = await getLastRecordingDay();
+  const lastRecordingDay = await getLastRecordingDay()
   if (!lastRecordingDay) {
-    console.log('No recordings found.');
-    return;
+    console.log('No recordings found.')
+    return
   }
-  let totalDeleted = 0;
+  let totalDeleted = 0
 
   for (const stream of streams) {
     // Find all recordings before the last recording day and with no nickname
@@ -48,10 +48,10 @@ async function main() {
         recordedAt: { lt: lastRecordingDay },
         OR: [{ nickname: null }, { nickname: '' }],
       },
-    });
+    })
 
     for (const rec of oldRecordings) {
-      const filePath = path.join(stream.recordDir, rec.filename);
+      const filePath = path.join(stream.recordDir, rec.filename)
 
       // Add to DeletedRecording table
       await prisma.deletedRecording
@@ -62,33 +62,37 @@ async function main() {
             // deletedAt will default to now()
           },
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn(
+            `Failed to add ${rec.filename} to deleted recordings table, skipping...`,
+          )
+        })
 
       // Delete from DB
       await prisma.motionRecording.delete({
         where: {
           streamId_filename: { streamId: stream.id, filename: rec.filename },
         },
-      });
+      })
 
       // Delete from filesystem if exists
       if (fs.existsSync(filePath)) {
         try {
-          fs.unlinkSync(filePath);
-          console.log(`Deleted: ${filePath}`);
+          fs.unlinkSync(filePath)
+          console.log(`Deleted: ${filePath}`)
         } catch (e) {
-          console.error(`Failed to delete file: ${filePath}`, e);
+          console.error(`Failed to delete file: ${filePath}`, e)
         }
       } else {
-        console.log(`File not found (DB entry deleted): ${filePath}`);
+        console.log(`File not found (DB entry deleted): ${filePath}`)
       }
-      totalDeleted++;
+      totalDeleted++
     }
   }
 
   console.log(
     `Done. Deleted ${totalDeleted} recordings before ${lastRecordingDay}.`,
-  );
+  )
 }
 
-main().then(() => prisma.$disconnect());
+main().then(() => prisma.$disconnect())

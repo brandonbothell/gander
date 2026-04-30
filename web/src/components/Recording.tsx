@@ -12,14 +12,14 @@ import { Capacitor } from '@capacitor/core'
 import { ScreenOrientation } from '@capacitor/screen-orientation'
 import { formatTimestamp } from '../utils/format'
 
-export type Recording = { streamId: string; filename: string }
+export type RecordingType = { streamId: string; filename: string }
 
 interface RecordingProps {
   open: boolean
   streamId: string
   filename: string
   onClose: () => void
-  cachedRecordings: Recording[]
+  cachedRecordings: RecordingType[]
   onNavigate: (filename: string) => void
   setNicknames: React.Dispatch<
     React.SetStateAction<{
@@ -166,7 +166,7 @@ export function Recording({
           'catch' in result &&
           typeof result.catch === 'function'
         ) {
-          result.catch(() => {})
+          result.catch(() => console.warn('Failed to exit fullscreen'))
         }
       } catch (error) {
         console.error('Failed to exit fullscreen orientation lock:', error)
@@ -346,7 +346,7 @@ export function Recording({
       }
       // Optionally play if not paused
       if (!video.paused) {
-        video.play().catch(() => {})
+        video.play().catch(() => console.warn('Failed to play stream'))
       }
     }
 

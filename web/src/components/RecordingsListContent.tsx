@@ -2,7 +2,7 @@ import { VariableSizeGrid as Grid } from 'react-window'
 import { useRef, useEffect, useState, useCallback, type RefObject } from 'react'
 import { RecordingThumbItem } from './RecordingThumbItem'
 import { FiArrowUp, FiChevronUp } from 'react-icons/fi'
-import type { Recording } from './Recording'
+import type { RecordingType } from './Recording'
 import type { Stream } from '../../../source/types/shared'
 
 // Helper to measure nickname height
@@ -34,7 +34,7 @@ interface RecordingsListContentProps {
   pullStartY: React.RefObject<number | null>
   gridOuterRef: React.RefObject<HTMLDivElement | null>
   isMobile: boolean
-  filteredRecordings: Array<Recording>
+  filteredRecordings: Array<RecordingType>
   search: string
   isNicknamedOnly: boolean
   dateRange: { from?: string | null; to?: string | null }
@@ -54,7 +54,7 @@ interface RecordingsListContentProps {
   nicknames: Record<string, string>
   viewed: Array<{ filename: string; streamId: string }>
   totalRecordings: Record<string, number>
-  cachedRecordings: Record<string, Array<Recording>>
+  cachedRecordings: Record<string, Array<RecordingType>>
   isLoadingMore: boolean
   setIsLoadingMore: (loading: boolean) => void
   setCurrentPage: (page: number) => void
@@ -83,7 +83,7 @@ const Cell = ({
   style: React.CSSProperties
   data: {
     numColumns: number
-    filteredRecordings: Array<Recording>
+    filteredRecordings: Array<RecordingType>
     selected: string[]
     viewingRecordingsFrom: Stream | null
     activeStream: Stream | null
@@ -97,8 +97,11 @@ const Cell = ({
     handleCheckboxChange: (filename: string, checked: boolean) => void
     nicknames: Record<string, string>
     viewed: Array<{ filename: string; streamId: string }>
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     THUMB_WIDTH: number
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     THUMB_HEIGHT: number
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     GRID_GAP: number
   }
 }) => {
@@ -209,11 +212,11 @@ export default function RecordingsListContent(
   }, [getNumColumns])
 
   // Calculate thumbnail width based on columns
-  let THUMB_WIDTH = Math.max(
+  let thumbWidth = Math.max(
     MIN_THUMB_WIDTH,
     (containerWidth - GRID_GAP * numColumns) / numColumns,
   )
-  if (THUMB_WIDTH > MAX_THUMB_WIDTH) THUMB_WIDTH = MAX_THUMB_WIDTH
+  if (thumbWidth > MAX_THUMB_WIDTH) thumbWidth = MAX_THUMB_WIDTH
   const THUMB_HEIGHT = props.isMobile ? 180 : 150
 
   // Calculate row count
@@ -235,7 +238,7 @@ export default function RecordingsListContent(
           if (nickname) {
             const nicknameHeight = measureNicknameHeight(
               nickname,
-              THUMB_WIDTH - 24,
+              thumbWidth - 24,
             ) // 24px padding
             maxHeight = Math.max(maxHeight, THUMB_HEIGHT + nicknameHeight + 8)
           }
@@ -247,7 +250,7 @@ export default function RecordingsListContent(
   }, [
     props.filteredRecordings,
     props.nicknames,
-    THUMB_WIDTH,
+    thumbWidth,
     rowCount,
     numColumns,
     THUMB_HEIGHT,
@@ -257,13 +260,13 @@ export default function RecordingsListContent(
   // VariableSizeGrid rowHeight/columnWidth
   const rowHeight = (rowIdx: number) =>
     rowHeights[rowIdx] || THUMB_HEIGHT + GRID_GAP
-  const columnWidth = () => THUMB_WIDTH + GRID_GAP
+  const columnWidth = () => thumbWidth + GRID_GAP
 
   // Compose all needed data for the cell renderer
   const itemData = {
     ...props,
     numColumns,
-    THUMB_WIDTH,
+    THUMB_WIDTH: thumbWidth,
     THUMB_HEIGHT,
     GRID_GAP,
   }
@@ -282,7 +285,7 @@ export default function RecordingsListContent(
     if (gridRef.current) {
       gridRef.current.resetAfterColumnIndex(0, true)
     }
-  }, [numColumns, THUMB_WIDTH, GRID_GAP])
+  }, [numColumns, thumbWidth, GRID_GAP])
 
   // --- Touch handling for pull-to-refresh ---
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -323,7 +326,7 @@ export default function RecordingsListContent(
   }
 
   // --- Render ---
-  const gridWidth = numColumns * (THUMB_WIDTH + GRID_GAP)
+  const gridWidth = numColumns * (thumbWidth + GRID_GAP)
 
   return (
     <>
@@ -421,7 +424,7 @@ export default function RecordingsListContent(
             width={props.isMobile ? containerWidth : gridWidth}
             itemData={itemData}
             estimatedRowHeight={THUMB_HEIGHT + 32 + GRID_GAP}
-            estimatedColumnWidth={THUMB_WIDTH + GRID_GAP}
+            estimatedColumnWidth={thumbWidth + GRID_GAP}
             overscanRowCount={2}
             overscanColumnCount={1}
           >

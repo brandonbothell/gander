@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "ts-node ../scripts/injectServiceWorkerConfig.ts && vite",
-    "build": "tsc -b && vite build && ts-node ../scripts/injectServiceWorkerConfig.ts",
+    "dev": "ts-node -P ../tsconfig.build.json ../scripts/injectServiceWorkerConfig.ts && vite",
+    "build": "tsc -b && vite build && ts-node -P ../tsconfig.build.json ../scripts/injectServiceWorkerConfig.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -16,7 +16,11 @@
     "@capacitor/preferences": "8.0.1",
     "@capacitor/push-notifications": "8.0.3",
     "@capacitor/screen-orientation": "8.0.1",
+    "@eslint/eslintrc": "3.3.5",
+    "@stylistic/eslint-plugin": "5.10.0",
     "@types/google.maps": "3.64.0",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-unused-imports": "4.4.1",
     "hls.js": "1.6.16",
     "react": "19.2.5",
     "react-dom": "19.2.5",
