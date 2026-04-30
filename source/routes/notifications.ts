@@ -1,5 +1,5 @@
 import webpush from 'web-push'
-import * as admin from 'firebase-admin'
+import admin from 'firebase-admin'
 import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'

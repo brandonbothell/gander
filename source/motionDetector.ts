@@ -7,9 +7,10 @@ import path from 'path'
 import fs from 'fs'
 import { spawn } from 'child_process'
 import { Jimp, diff as getDiff } from 'jimp'
+import { StreamMotionState } from './types/stream'
 import { StreamManager } from './streamManager'
 import { logMotion } from './logMotion'
-import { prisma, StreamMotionState } from './camera'
+import { prisma } from './camera'
 
 const STANDARD_WIDTH = 160 // Much smaller for performance
 const STANDARD_HEIGHT = 90
@@ -438,8 +439,8 @@ export async function detectMotion(
 
         // Movement history logic
         if (!streamMovementHistory[streamId]) {
-streamMovementHistory[streamId] = []
-}
+          streamMovementHistory[streamId] = []
+        }
         streamMovementHistory[streamId].push(isAboveDiffThreshold)
         if (
           streamMovementHistory[streamId].length >

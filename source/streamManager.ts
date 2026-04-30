@@ -1,12 +1,12 @@
 import path from 'path'
 import fs from 'fs'
 import { exec, spawn } from 'child_process'
+import { StreamMotionState } from './types/stream'
 import { logMotion } from './logMotion'
 import {
   saveMotionSegments,
   setupStreamMotionMonitoring,
   stopStreamMotionMonitoring,
-  StreamMotionState,
 } from './camera'
 
 export interface StreamConfig {

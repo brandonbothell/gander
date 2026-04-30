@@ -2,6 +2,7 @@ import path from 'path'
 import * as fs from 'fs'
 import { exec } from 'child_process'
 import express, { Express } from 'express'
+import { StreamMotionState } from '../types/stream'
 import { StreamManager } from '../streamManager'
 import { clearMotionHistory } from '../motionDetector'
 import { jwtAuth } from '../middleware/jwtAuth'
@@ -10,7 +11,6 @@ import {
   persistStreamState,
   prisma,
   safeUnlinkWithRetry,
-  StreamMotionState,
   saveMotionSegments as saveMotionSegmentsCamera,
 } from '../camera'
 import { recordingsLowSpaceThresholdMb } from '../../config.json'

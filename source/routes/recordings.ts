@@ -83,6 +83,14 @@ export default function initializeRecordingRoutes(
     legacyHeaders: false,
   })
 
+  const streamThumbnailsLimiter = rateLimit({
+    validate: { ip: false },
+    windowMs: 30 * 1000, // 30 seconds
+    max: 50,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+
   // --- Get all recordings for a stream ---
   app.get(
     '/api/recordings/:streamId',
@@ -366,6 +374,26 @@ export default function initializeRecordingRoutes(
         select: { filename: true, nickname: true },
       })
       res.json(all)
+    },
+  )
+
+  // --- Serve thumbnails for a stream ---
+  app.use(
+    '/recordings/:streamId/thumbnails',
+    streamThumbnailsLimiter,
+    jwtAuth,
+    (req, res, next) => {
+      const { streamId } = req.params
+      const stream = dynamicStreams[streamId]
+      if (!stream) {
+        res.status(404).send('Stream not found')
+        return
+      }
+      // Only set cache-control for non-latest.jpg
+      if (!req.url.endsWith('latest.jpg')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+      }
+      express.static(stream.config.thumbDir)(req, res, next)
     },
   )
 
