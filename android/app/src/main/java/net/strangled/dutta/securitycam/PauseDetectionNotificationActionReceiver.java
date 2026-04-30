@@ -62,7 +62,7 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
         JsonObject dummyDeviceInfo = new JsonObject();
         dummyDeviceInfo.add("deviceInfo", dummyDeviceInfoInner);
 
-        Log.d("NotificationActionReceiver", "Device info: " + dummyDeviceInfo.toString());
+        Log.d("NotificationActionReceiver", "Device info: " + dummyDeviceInfo);
 
         service.refreshToken(refreshToken, dummyDeviceInfo).enqueue(new Callback<>() {
             @Override

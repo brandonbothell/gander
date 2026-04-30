@@ -1052,7 +1052,6 @@ export default function StreamPage({
       // setIsLoadingStream(false);
       setLoading(false)
     }, 100)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStream])
 
   // Also update the cleanup effect to be more thorough
@@ -1757,7 +1756,6 @@ export default function StreamPage({
     setReachedLastSeen(!recordingsStream) // reachedLastSeen is false if activeStream is set, true if not
     // Fetch the first page of recordings
     if (recordingsStream) loadPage(recordingsStream, 1, true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStream, viewingRecordingsFrom, loadStream])
 
   // 1. --- Load stream video on stream change ---
@@ -1835,7 +1833,6 @@ export default function StreamPage({
       if (preCacheTimeout) clearTimeout(preCacheTimeout)
       if (preCacheInterval) clearInterval(preCacheInterval)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     // Only include dependencies that should trigger a restart of the polling
     dateRange.from,
@@ -1984,7 +1981,6 @@ export default function StreamPage({
         `Switched to stream ${activeStream.id} - not recording or no start time`,
       )
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStream]) // Remove motionStatus dependency to only trigger on stream changes
   // Add the playMotionSound function
   const playMotionSound = () => {
@@ -2061,7 +2057,6 @@ export default function StreamPage({
   // Add cleanup for HLS instance
   useEffect(() => {
     return () => {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       const video = videoRef.current
       const hls = video?._hls
       if (hls) {
