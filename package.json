@@ -33,7 +33,9 @@
     "format:server:fix": "prettier --write source/",
     "format:client": "prettier --check web/src",
     "format:client:fix": "prettier --write web/src",
-    "generate:ssl": "ts-node -P tsconfig.build.json scripts/generateSSLCertificates.ts"
+    "generate:ssl": "ts-node -P tsconfig.build.json scripts/generateSSLCertificates.ts",
+    "env:encrypt": "yarn dotenvx encrypt",
+    "env:decrypt": "yarn dotenvx decrypt"
   },
   "devDependencies": {
     "@eslint/compat": "2.0.5",
