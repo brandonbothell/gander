@@ -22,5 +22,5 @@
     "scripts/**/*.ts",
     "eslint.config.mts"
   ],
-  "files": ["eslint.config.mts"]
+  "files": ["eslint.config.mts", "prisma.config.ts", "capacitor.config.ts"]
 }

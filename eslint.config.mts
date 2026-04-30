@@ -31,7 +31,7 @@ export default defineConfig([
   {
     extends: fixupConfigRules(compat.extends('plugin:import/recommended')),
 
-    files: ['source/**/*.ts', 'eslint.config.mts', 'scripts/**/*.ts'],
+    files: ['source/**/*.ts', 'eslint.config.mts', 'scripts/**/*.ts', 'prisma.config.ts', 'capacitor.config.ts'],
 
     plugins: {
       '@stylistic': stylistic,
