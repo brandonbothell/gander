@@ -49,6 +49,7 @@
             android:foregroundServiceType="specialUse" />
 
         <receiver android:name=".PauseDetectionNotificationActionReceiver" android:exported="false" />
+        <receiver android:name=".StartDetectionNotificationActionReceiver" android:exported="false" />
 
     </application>
 

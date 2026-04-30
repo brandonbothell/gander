@@ -53,7 +53,7 @@ public class FCMService extends FirebaseMessagingService {
         for (String key : keys) {
             allKeys.append(key).append(" ");
         }
-        Log.i("FCMService", "Notification action received, intent extras: " + allKeys);
+        Log.i("FCMService", "Notification received, intent extras: " + allKeys);
         if (!data.isEmpty()) {
             try {
                 String vibrateTimingsMillis = data.get("vibrateTimingsMillis");
@@ -101,7 +101,7 @@ public class FCMService extends FirebaseMessagingService {
 
         String channelIdFinal = Objects.requireNonNullElse(channelId, EVENT_CHANNEL_ID);
 
-        Log.d("FCMService", "Showing notification with actions");
+        Log.d("FCMService", "Showing notification");
         Log.d("FCMService", "Title: " + title);
         Log.d("FCMService", "Body: " + body);
         Log.d("FCMService", "Icon: " + icon);
@@ -126,6 +126,7 @@ public class FCMService extends FirebaseMessagingService {
 
         if (group != null) builder.setGroup(group);
         if (actions.equals("true")) {
+            Log.d("FCMService", "Actions enabled");
             InputStream is = getAssets().open("capacitor.config.json");
             InputStreamReader reader = new InputStreamReader(is);
             JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
@@ -159,7 +160,7 @@ public class FCMService extends FirebaseMessagingService {
         }
 
         Notification notif = builder.build();
-        Log.d("FCMService", "Notification built".concat(notif.toString()));
+        Log.d("FCMService", "Notification built: ".concat(notif.toString()));
 
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         // Use a unique ID (like current time) so notifications don't overwrite each other

@@ -15,6 +15,7 @@ import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
+
 import com.google.gson.JsonObject;
 
 import net.strangled.dutta.securitycam.API.APIService;
@@ -32,7 +33,7 @@ import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 import retrofit2.internal.EverythingIsNonNull;
 
-public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver {
+public class StartDetectionNotificationActionReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent intent) {
         StringBuilder allKeys = new StringBuilder();
@@ -57,19 +58,19 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
                     .filter(n -> n.getId() == notificationId)
                     .findFirst();
             if (notificationOptional.isPresent()) {
-                Intent startIntent = new Intent(ctx, StartDetectionNotificationActionReceiver.class)
-                    .putExtra(ctx.getPackageName() + ".cameraId", cameraId)
-                    .putExtra(ctx.getPackageName() + ".baseUrl", baseUrl)
-                    .putExtra(ctx.getPackageName() + ".notificationId", notificationId)
-                    .putExtra(ctx.getPackageName() + ".clientId", clientId);
+                Intent pauseIntent = new Intent(ctx, PauseDetectionNotificationActionReceiver.class)
+                        .putExtra(ctx.getPackageName() + ".cameraId", cameraId)
+                        .putExtra(ctx.getPackageName() + ".baseUrl", baseUrl)
+                        .putExtra(ctx.getPackageName() + ".notificationId", notificationId)
+                        .putExtra(ctx.getPackageName() + ".clientId", clientId);
 
                 StatusBarNotification notification = notificationOptional.get();
                 Notification notificationObj = notification.getNotification();
-                notificationObj.actions[0].title = "Start Detection";
+                notificationObj.actions[0].title = "Pause Detection";
                 notificationObj.actions[0].actionIntent = PendingIntent.getBroadcast(
                         ctx,
-                        notificationId + 1, // Unique request code
-                        startIntent,
+                        notificationId, // Unique request code
+                        pauseIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
                 if (ActivityCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -84,8 +85,6 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
                 }
                 NotificationManagerCompat.from(ctx).notify(notificationId, notificationObj);
             }
-        } else {
-            NotificationManagerCompat.from(ctx).cancel(notificationId);
         }
 
         // 2. Execute Retrofit Call
@@ -98,7 +97,7 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
 
         APIService service = retrofit.create(APIService.class);
         JsonObject motionPauseBody = new JsonObject();
-        motionPauseBody.addProperty("paused", true);
+        motionPauseBody.addProperty("paused", false);
 
         JsonObject dummyDeviceInfoInner = new JsonObject();
         dummyDeviceInfoInner.addProperty("clientId", clientId);
