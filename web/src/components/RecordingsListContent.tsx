@@ -190,7 +190,7 @@ export default function RecordingsListContent(
         1,
         Math.floor((width + GRID_GAP) / (MIN_THUMB_WIDTH + GRID_GAP)),
       )
-      return columns // Limit to max 4 columns
+      return Math.min(5, columns) // Limit to 5 columns
     },
     [GRID_GAP, MIN_THUMB_WIDTH],
   )
