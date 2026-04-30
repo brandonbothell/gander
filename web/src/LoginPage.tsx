@@ -19,7 +19,7 @@ export default function LoginPage({
     setError('')
 
     try {
-      const deviceInfo = getDeviceFingerprint()
+      const deviceInfo = await getDeviceFingerprint()
 
       const response = await fetch(`${API_BASE}/api/login`, {
         method: 'POST',

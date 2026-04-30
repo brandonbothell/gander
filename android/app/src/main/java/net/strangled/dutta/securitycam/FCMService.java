@@ -1,5 +1,6 @@
 package net.strangled.dutta.securitycam;
 
+import com.getcapacitor.plugin.WebView;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -131,7 +132,8 @@ public class FCMService extends FirebaseMessagingService {
 
             if (config.has("server")) {
                 String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
-                String clientId = config.get("clientId").getAsString();
+                SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
+                String clientId = sharedPref.getString("clientId", null);
 
                 assert baseUrl != null;
                 assert clientId != null;
@@ -206,7 +208,10 @@ public class FCMService extends FirebaseMessagingService {
 
         if (config.has("server")) {
             String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
-            String clientId = config.get("clientId").getAsString();
+            String clientId = sharedPref.getString("clientId", null);
+
+            assert baseUrl != null;
+            assert clientId != null;
 
             Retrofit retrofit = new Retrofit.Builder()
                     .baseUrl(baseUrl)
@@ -224,13 +229,13 @@ public class FCMService extends FirebaseMessagingService {
 //            }
             JsonObject dummyDeviceInfoInner = new JsonObject();
             dummyDeviceInfoInner.addProperty("clientId", clientId);
+            dummyDeviceInfoInner.addProperty("userAgent", MainActivity.userAgent);
 
             JsonObject dummyDeviceInfo = new JsonObject();
             dummyDeviceInfo.add("deviceInfo", dummyDeviceInfoInner);
 
             JsonObject fcmSubscribeBody = new JsonObject();
             fcmSubscribeBody.addProperty("fcmToken", fcmToken);
-
 
             APIService service = retrofit.create(APIService.class);
 

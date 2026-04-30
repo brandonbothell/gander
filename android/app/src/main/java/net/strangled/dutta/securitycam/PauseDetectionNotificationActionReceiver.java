@@ -57,6 +57,7 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
 
         JsonObject dummyDeviceInfoInner = new JsonObject();
         dummyDeviceInfoInner.addProperty("clientId", clientId);
+        dummyDeviceInfoInner.addProperty("userAgent", MainActivity.userAgent);
 
         JsonObject dummyDeviceInfo = new JsonObject();
         dummyDeviceInfo.add("deviceInfo", dummyDeviceInfoInner);

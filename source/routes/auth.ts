@@ -57,6 +57,7 @@ export default function initializeAuthRoutes(
     }: { username: string; password: string; deviceInfo: DeviceInfo } = req.body
 
     console.log(JSON.stringify(req.headers, null, 2))
+    console.log(JSON.stringify(deviceInfo, null, 2))
 
     const ip =
       'x-real-ip' in req.headers ? String(req.headers['x-real-ip']) : req.ip
@@ -353,55 +354,55 @@ export default function initializeAuthRoutes(
       trustedDevices = []
     }
 
-    if (safeDeviceInfo.clientId !== process.env.CAPACITOR_CLIENT_ID) {
-      const ipIsTrusted = trustedDevices.some((device) => device.ip === ip)
-      const existingDeviceIndex = trustedDevices.findIndex((device) => {
-        if (device.deviceInfo.clientId && safeDeviceInfo.clientId) {
-          return device.deviceInfo.clientId === safeDeviceInfo.clientId
-        }
-        return ipIsTrusted
-          ? device.ip === ip
-          : device.deviceInfo.userAgent === safeDeviceInfo.userAgent
-      })
-      const now = new Date().toISOString()
+    const ipIsTrusted = trustedDevices.some((device) => device.ip === ip)
+    const existingDeviceIndex = trustedDevices.findIndex((device) => {
+      if (device.deviceInfo.clientId && safeDeviceInfo.clientId) {
+        return device.deviceInfo.clientId === safeDeviceInfo.clientId
+      }
+      return ipIsTrusted
+        ? device.ip === ip &&
+            device.deviceInfo.userAgent === safeDeviceInfo.userAgent
+        : device.deviceInfo.userAgent === safeDeviceInfo.userAgent
+    })
+    const now = new Date().toISOString()
 
-      if (existingDeviceIndex >= 0) {
-        // Existing device - update info
-        const device = trustedDevices[existingDeviceIndex]
-        device.lastSeen = now
-        device.loginCount++
+    if (existingDeviceIndex >= 0) {
+      // Existing device - update info
+      const device = trustedDevices[existingDeviceIndex]
+      device.lastSeen = now
+      device.loginCount++
 
-        // Update IP if it changed (network switching)
-        if (device.ip !== (ip ?? 'Unknown')) {
-          logAuth(
-            `[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${ip}`,
-            'warn',
-          )
-          device.ip = ip ?? 'Unknown'
-        }
-
-        // Update device info if provided
-        if (safeDeviceInfo) {
-          device.deviceInfo = { ...device.deviceInfo, ...safeDeviceInfo }
-        }
-      } else {
-        await notify(
-          dynamicStreams,
-          'login',
-          {
-            title: 'Suspicious Activity Detected',
-            body: `Unauthorized activity detected from IP: ${ip}`,
-            group: 'security_event',
-          },
-          user.username,
-        )
-        res.status(403).json({ error: 'Unauthorized activity detected' })
+      // Update IP if it changed (network switching)
+      if (device.ip !== (ip ?? 'Unknown')) {
         logAuth(
-          `[${user.username}] Unauthorized activity detected from IP: ${ip}`,
+          `[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${ip}`,
           'warn',
         )
-        return
+        device.ip = ip ?? 'Unknown'
       }
+
+      // Update device info if provided
+      if (safeDeviceInfo) {
+        device.deviceInfo = { ...device.deviceInfo, ...safeDeviceInfo }
+      }
+    } else {
+      await notify(
+        dynamicStreams,
+        'login',
+        {
+          title: 'Suspicious Activity Detected',
+          body: `Unauthorized activity detected from IP: ${ip}`,
+          group: 'security_event',
+        },
+        user.username,
+      )
+      res.status(403).json({ error: 'Unauthorized activity detected' })
+      logAuth(
+        `[${user.username}] Unauthorized activity detected from IP: ${ip}`,
+        'warn',
+      )
+      logAuth(JSON.stringify(req.headers, null, 2), 'warn')
+      return
     }
 
     await prisma.user.update({

@@ -138,7 +138,7 @@ export default function App() {
         localStorage.setItem('tokenRefreshInProgress', Date.now().toString())
       }
 
-      const deviceInfo = getDeviceFingerprint()
+      const deviceInfo = await getDeviceFingerprint()
       debugLog(`Making refresh token request to: ${API_BASE}/api/refresh-token`)
 
       const refreshStartTime = Date.now()
@@ -233,7 +233,7 @@ export default function App() {
             'Content-Type': 'application/json',
             'refresh-token': refreshToken,
           },
-          body: JSON.stringify({ clientId: localStorage.getItem('clientId') }),
+          body: JSON.stringify({ clientId: await SecureStorage.getClientId() }),
         }).catch(console.error)
       }
     } catch (error) {

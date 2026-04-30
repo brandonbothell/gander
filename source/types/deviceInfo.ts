@@ -40,30 +40,6 @@ export interface Session {
   geolocated?: boolean
 }
 
-export function getDeviceFingerprint(): DeviceInfo {
-  let clientId = localStorage.getItem('clientId')
-  if (!clientId) {
-    clientId = crypto.randomUUID
-      ? crypto.randomUUID()
-      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-          const r = (Math.random() * 16) | 0
-          const v = c === 'x' ? r : (r & 0x3) | 0x8
-          return v.toString(16)
-        })
-    localStorage.setItem('clientId', clientId)
-  }
-
-  return {
-    userAgent: navigator.userAgent,
-    platform: navigator.platform ?? 'Unknown',
-    vendor: navigator.vendor ?? 'Unknown',
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    screen: `${screen.width}x${screen.height}`,
-    clientId,
-  }
-}
-
 export function getDeviceDisplayName(deviceInfo: DeviceInfo): string {
   const { userAgent, platform } = deviceInfo
 
