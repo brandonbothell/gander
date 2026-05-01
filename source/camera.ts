@@ -321,127 +321,139 @@ export function saveMotionSegments(streamId: string) {
 
 // Load streams from DB on startup
 async function loadStreamsFromDb() {
-  const dbStreams = await prisma.stream.findMany()
-  for (const s of dbStreams) {
-    if (!dynamicStreams[s.id]) {
-      dynamicStreams[s.id] = await createStreamManager(s)
-      try {
-        dynamicStreams[s.id].startFFmpeg().catch((err) => {
-          console.warn(`[${s.id}] FFmpeg failed to start:`, err?.message || err)
-        })
-      } catch (err) {
-        console.error(`[${s.id}] Error starting FFmpeg:`, err)
-      }
-    }
-  }
-
-  // --- Monitor for FFmpeg cooldowns and alert ---
-  setInterval(() => {
-    for (const streamId in dynamicStreams) {
-      const stream = dynamicStreams[streamId]
-      if (
-        stream &&
-        stream.getFFmpegCooldownUntil() &&
-        Date.now() < stream.getFFmpegCooldownUntil()
-      ) {
-        logMotion(
-          `[${streamId}] FFmpeg restart cooldown active until ${new Date(stream.getFFmpegCooldownUntil()).toLocaleTimeString()}`,
-          'warn',
-        )
-        notify(dynamicStreams, streamId, {
-          title: 'Stream Restart Cooldown',
-          body: `Stream ${streamId} is in FFmpeg restart cooldown due to repeated failures.`,
-          tag: `server_event_${streamId}`,
-          group: `stream_event_${streamId}`,
-        })
-      }
-    }
-  }, 60000) // Check every minute
-
-  // Periodic disk-space check: run every 60 seconds
-  const diskSpaceCheck = () => {
-    for (const sId in dynamicStreams) {
-      if (!dynamicStreams[sId]) continue
-      checkDiskSpaceAndPurge(streamStates, dynamicStreams, sId).catch((err) => {
-        console.error(`[DiskCheck] Error checking disk for ${sId}:`, err)
-      })
-    }
-  }
-  diskSpaceCheck() // Initial check on startup
-  setInterval(() => {
-    diskSpaceCheck()
-  }, 60 * 1000)
-
-  // Periodically remove old HLS segments (runs independent of motion monitoring)
-  const SEGMENT_RETENTION_SECONDS = 300 // 5 minutes
-  async function cleanupOldStreamSegments() {
-    const retentionMs = SEGMENT_RETENTION_SECONDS * 1000
-    const now = Date.now()
-
-    for (const streamId of Object.keys(dynamicStreams)) {
-      const stream = dynamicStreams[streamId]
-      if (!stream) continue
-      const dir = stream.config.hlsDir
-      let files: string[] = []
-      try {
-        files = await fs.promises.readdir(dir)
-      } catch {
-        continue
-      }
-
-      const segmentFiles = files.filter((f) => /^segment_\d+\.ts$/.test(f))
-      for (const fname of segmentFiles) {
-        const fullPath = path.join(dir, fname)
-
-        try {
-          const stat = await fs.promises.stat(fullPath)
-          const age = now - stat.mtimeMs
-
-          // Skip files that are still recent enough
-          if (age <= retentionMs) continue
-
-          // Avoid deleting files that are currently referenced by motion state
-          const state = streamStates[streamId]
-          const isReferenced =
-            state &&
-            ((state.recentSegments || []).includes(fullPath) ||
-              (state.motionSegments || []).includes(fullPath) ||
-              (state.flushingSegments || []).includes(fullPath))
-          if (isReferenced) continue
-
-          // Delete the segment and its associated motion thumbnail if present
-          await safeUnlinkWithRetry(fullPath)
-
-          const motionJpg = fullPath.replace(/\.ts$/, '_motion.jpg')
+  return prisma.stream
+    .findMany()
+    .catch((err) => {
+      console.error('[Initialize DB] Failed to load streams', err)
+      throw err
+    })
+    .then(async (dbStreams) => {
+      for (const s of dbStreams!) {
+        if (!dynamicStreams[s.id]) {
+          dynamicStreams[s.id] = await createStreamManager(s)
           try {
-            await fs.promises.access(motionJpg)
-            const mjStat = await fs.promises.stat(motionJpg)
-            if (now - mjStat.mtimeMs > retentionMs) {
-              await safeUnlinkWithRetry(motionJpg)
-            }
-          } catch {
-            // not present — ignore
+            dynamicStreams[s.id].startFFmpeg().catch((err) => {
+              console.warn(
+                `[${s.id}] FFmpeg failed to start:`,
+                err?.message || err,
+              )
+            })
+          } catch (err) {
+            console.error(`[${s.id}] Error starting FFmpeg:`, err)
           }
-        } catch {
-          // ignore individual file errors and continue
         }
       }
-    }
-  }
 
-  // Run immediately and then every minute
-  cleanupOldStreamSegments().catch(() => {
-    /* ignore */
-  })
-  setInterval(
-    () =>
+      // --- Monitor for FFmpeg cooldowns and alert ---
+      setInterval(() => {
+        for (const streamId in dynamicStreams) {
+          const stream = dynamicStreams[streamId]
+          if (
+            stream &&
+            stream.getFFmpegCooldownUntil() &&
+            Date.now() < stream.getFFmpegCooldownUntil()
+          ) {
+            logMotion(
+              `[${streamId}] FFmpeg restart cooldown active until ${new Date(stream.getFFmpegCooldownUntil()).toLocaleTimeString()}`,
+              'warn',
+            )
+            notify(dynamicStreams, streamId, {
+              title: 'Stream Restart Cooldown',
+              body: `Stream ${streamId} is in FFmpeg restart cooldown due to repeated failures.`,
+              tag: `server_event_${streamId}`,
+              group: `stream_event_${streamId}`,
+            })
+          }
+        }
+      }, 60000) // Check every minute
+
+      // Periodic disk-space check: run every 60 seconds
+      const diskSpaceCheck = () => {
+        for (const sId in dynamicStreams) {
+          if (!dynamicStreams[sId]) continue
+          checkDiskSpaceAndPurge(streamStates, dynamicStreams, sId).catch(
+            (err) => {
+              console.error(`[DiskCheck] Error checking disk for ${sId}:`, err)
+            },
+          )
+        }
+      }
+      diskSpaceCheck() // Initial check on startup
+      setInterval(() => {
+        diskSpaceCheck()
+      }, 60 * 1000)
+
+      // Periodically remove old HLS segments (runs independent of motion monitoring)
+      const SEGMENT_RETENTION_SECONDS = 300 // 5 minutes
+      async function cleanupOldStreamSegments() {
+        const retentionMs = SEGMENT_RETENTION_SECONDS * 1000
+        const now = Date.now()
+
+        for (const streamId of Object.keys(dynamicStreams)) {
+          const stream = dynamicStreams[streamId]
+          if (!stream) continue
+          const dir = stream.config.hlsDir
+          let files: string[] = []
+          try {
+            files = await fs.promises.readdir(dir)
+          } catch {
+            continue
+          }
+
+          const segmentFiles = files.filter((f) => /^segment_\d+\.ts$/.test(f))
+          for (const fname of segmentFiles) {
+            const fullPath = path.join(dir, fname)
+
+            try {
+              const stat = await fs.promises.stat(fullPath)
+              const age = now - stat.mtimeMs
+
+              // Skip files that are still recent enough
+              if (age <= retentionMs) continue
+
+              // Avoid deleting files that are currently referenced by motion state
+              const state = streamStates[streamId]
+              const isReferenced =
+                state &&
+                ((state.recentSegments || []).includes(fullPath) ||
+                  (state.motionSegments || []).includes(fullPath) ||
+                  (state.flushingSegments || []).includes(fullPath))
+              if (isReferenced) continue
+
+              // Delete the segment and its associated motion thumbnail if present
+              await safeUnlinkWithRetry(fullPath)
+
+              const motionJpg = fullPath.replace(/\.ts$/, '_motion.jpg')
+              try {
+                await fs.promises.access(motionJpg)
+                const mjStat = await fs.promises.stat(motionJpg)
+                if (now - mjStat.mtimeMs > retentionMs) {
+                  await safeUnlinkWithRetry(motionJpg)
+                }
+              } catch {
+                // not present — ignore
+              }
+            } catch {
+              // ignore individual file errors and continue
+            }
+          }
+        }
+      }
+
+      // Run immediately and then every minute
       cleanupOldStreamSegments().catch(() => {
         /* ignore */
-      }),
-    60 * 1000,
-  )
+      })
+      setInterval(
+        () =>
+          cleanupOldStreamSegments().catch(() => {
+            /* ignore */
+          }),
+        60 * 1000,
+      )
 
-  setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000)
+      setInterval(() => cleanFrameCache(dynamicStreams, streamStates), 5000)
+    })
 }
 
 loadStreamsFromDb()
