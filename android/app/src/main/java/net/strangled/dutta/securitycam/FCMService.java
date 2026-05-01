@@ -112,11 +112,12 @@ public class FCMService extends FirebaseMessagingService {
 
         // 2. Build the notification
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelIdFinal)
-                .setSmallIcon(android.R.drawable.ic_menu_camera)
+                // .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setSmallIcon(getApplicationInfo().icon)
                 .setColor(Color.parseColor(color))
+                .setGroup("detection_info")
                 .setLights(Color.parseColor(color), 500, 500)
                 .setVibrate(vibrateTimingsMillisArray)
                 .addExtras(extras)
@@ -124,6 +125,14 @@ public class FCMService extends FirebaseMessagingService {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent);
+
+        if (title.equals("Motion Detected!")) {
+            builder.setCategory(NotificationCompat.CATEGORY_ALARM);
+            builder.setGroup("motion_event");
+            builder.setSound(Uri.parse("android.resource://" + getPackageName() + "/raw/motion_alert"));
+            // res/drawable/push_icon.png
+            builder.setSmallIcon(R.drawable.push_icon);
+        }
 
         if (group != null) builder.setGroup(group);
         if (actions.equals("true")) {

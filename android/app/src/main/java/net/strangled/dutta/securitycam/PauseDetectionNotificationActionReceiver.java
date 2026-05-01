@@ -74,7 +74,8 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
                         startIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                if (ActivityCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                if (ActivityCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
                     // TODO: Consider calling
                     //    ActivityCompat#requestPermissions
                     // here to request the missing permissions, and then overriding
@@ -85,6 +86,12 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
                     return;
                 }
                 NotificationManagerCompat.from(ctx).notify(notificationId, notificationObj);
+
+                Log.d("NotificationActionReceiver", "Notification action updated");
+
+                NotificationManagerCompat.from(ctx).getActiveNotifications().stream()
+                        .filter(n -> n.getId() != notificationId)
+                        .forEach(n -> NotificationManagerCompat.from(ctx).cancel(n.getId()));
             }
         } else {
             NotificationManagerCompat.from(ctx).cancel(notificationId);
