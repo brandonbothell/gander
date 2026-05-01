@@ -146,6 +146,7 @@ public class FCMService extends FirebaseMessagingService {
                 pauseIntent.putExtra(getPackageName() + ".baseUrl", baseUrl);
                 pauseIntent.putExtra(getPackageName() + ".notificationId", notificationId);
                 pauseIntent.putExtra(getPackageName() + ".clientId", clientId);
+                pauseIntent.putExtra(getPackageName() + ".pause", true);
 
                 // Use getBroadcast because we are targeting a BroadcastReceiver
                 PendingIntent pausePendingIntent = PendingIntent.getBroadcast(

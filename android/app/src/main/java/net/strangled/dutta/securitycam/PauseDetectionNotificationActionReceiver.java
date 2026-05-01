@@ -45,6 +45,7 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
         String cameraId = intent.getStringExtra(ctx.getPackageName() + ".cameraId");
         String baseUrl = intent.getStringExtra(ctx.getPackageName() + ".baseUrl");
         String clientId = intent.getStringExtra(ctx.getPackageName() + ".clientId");
+        boolean pause = intent.getBooleanExtra(ctx.getPackageName() + ".pause", true);
         SharedPreferences sharedPref = ctx.getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
         String refreshToken = sharedPref.getString("refreshToken", null);
         int notificationId = intent.getIntExtra(ctx.getPackageName() + ".notificationId", 0);
@@ -57,15 +58,16 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
                     .filter(n -> n.getId() == notificationId)
                     .findFirst();
             if (notificationOptional.isPresent()) {
-                Intent startIntent = new Intent(ctx, StartDetectionNotificationActionReceiver.class)
+                Intent startIntent = new Intent(ctx, PauseDetectionNotificationActionReceiver.class)
                     .putExtra(ctx.getPackageName() + ".cameraId", cameraId)
                     .putExtra(ctx.getPackageName() + ".baseUrl", baseUrl)
                     .putExtra(ctx.getPackageName() + ".notificationId", notificationId)
-                    .putExtra(ctx.getPackageName() + ".clientId", clientId);
+                    .putExtra(ctx.getPackageName() + ".clientId", clientId)
+                    .putExtra(ctx.getPackageName() + ".pause", !pause);
 
                 StatusBarNotification notification = notificationOptional.get();
                 Notification notificationObj = notification.getNotification();
-                notificationObj.actions[0].title = "Start Detection";
+                notificationObj.actions[0].title = pause ? "Start Detection" : "Pause Detection";
                 notificationObj.actions[0].actionIntent = PendingIntent.getBroadcast(
                         ctx,
                         notificationId + 1, // Unique request code
@@ -98,7 +100,7 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
 
         APIService service = retrofit.create(APIService.class);
         JsonObject motionPauseBody = new JsonObject();
-        motionPauseBody.addProperty("paused", true);
+        motionPauseBody.addProperty("paused", pause);
 
         JsonObject dummyDeviceInfoInner = new JsonObject();
         dummyDeviceInfoInner.addProperty("clientId", clientId);

@@ -46,10 +46,9 @@
         <service
             android:name=".plugins.MotionService.MotionForegroundService"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="dataSync" />
 
         <receiver android:name=".PauseDetectionNotificationActionReceiver" android:exported="false" />
-        <receiver android:name=".StartDetectionNotificationActionReceiver" android:exported="false" />
 
     </application>
 
@@ -59,7 +58,7 @@
         tools:ignore="ManifestOrder" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- Required to keep the app running in the background without any resource limitations -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Required to request the manage overlay permission -->
