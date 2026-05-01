@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken'
 import express from 'express'
 import cors from 'cors'
 import * as chokidar from 'chokidar'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import config from '../config.json'
 import { StreamMotionState } from './types/stream'
 import { TrustedDevice } from './types/deviceInfo'
@@ -25,7 +26,7 @@ import initializeAuthRoutes from './routes/auth'
 import { detectMotion, cleanFrameCache, debugLog } from './motionDetector'
 import { jwtAuth } from './middleware/jwtAuth'
 import { logAuth, logMotion } from './logMotion'
-import { PrismaClient } from './generated/prisma'
+import { PrismaClient } from './generated/prisma/client'
 import { initializeCredentials, JWT_SECRET } from './credentials'
 import { initializeConsole } from './console'
 import open from 'open'
@@ -34,7 +35,8 @@ import { rateLimit } from 'express-rate-limit'
 initializeConsole()
 initializeCredentials()
 
-export const prisma = new PrismaClient()
+const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL })
+export const prisma = new PrismaClient({ adapter })
 
 // Motion logging setup
 const apiStartTime = new Date().toISOString().replace(/[:.]/g, '-')

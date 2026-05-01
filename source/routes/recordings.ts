@@ -3,7 +3,7 @@ import fs from 'fs/promises'
 import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
-import { MotionRecording, Prisma } from '../generated/prisma'
+import { MotionRecording, Prisma } from '../generated/prisma/client'
 import { prisma, RequestWithUser } from '../camera'
 import { rateLimit } from 'express-rate-limit'
 
