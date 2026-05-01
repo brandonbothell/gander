@@ -141,7 +141,9 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
         if (retryResponse.status === 401) {
           console.log('Retry request also failed with 401, logging out...')
           await globalLogout()
-          throw new Error('Authentication failed after refresh - logged out')
+          throw new Error(
+            'Authentication failed after attempting token refresh - logged out',
+          )
         }
 
         return retryResponse

@@ -57,13 +57,15 @@ export default function initializeAuthRoutes(
       deviceInfo,
     }: { username: string; password: string; deviceInfo: DeviceInfo } = req.body
 
-    console.log(JSON.stringify(req.headers, null, 2))
-    console.log(JSON.stringify(deviceInfo, null, 2))
+    logAuth(`[Login] Device info: ${JSON.stringify(deviceInfo, null, 2)}`)
 
     const ip =
       'x-real-ip' in req.headers ? String(req.headers['x-real-ip']) : req.ip
 
-    console.log(`[Login] User ${username} attempting log in from IP: ${ip}`)
+    logAuth(
+      `[Login] Attempting login as user '${username}' from IP: '${ip}'`,
+      'warn',
+    )
 
     if (!username || !password || !deviceInfo) {
       res.status(400).json({ error: 'Missing required fields' })
@@ -98,6 +100,11 @@ export default function initializeAuthRoutes(
           : 'Unknown',
     }
 
+    logAuth(
+      `[Login] User agent: '${safeDeviceInfo.userAgent}'\nClient ID: '${safeDeviceInfo.clientId}'`,
+      'warn',
+    )
+
     const refreshTokenExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
 
     if (
@@ -115,7 +122,15 @@ export default function initializeAuthRoutes(
         JWT_SECRET,
       )
 
-      let user = await prisma.user.findUnique({ where: { username } })
+      let user = await prisma.user.findUnique({
+        where: { username },
+        select: {
+          trustedIps: true,
+          username: true,
+          jwts: true,
+          refreshTokens: true,
+        },
+      })
 
       // Create user if not exists, or update tokens if exists
       if (!user) {
@@ -145,21 +160,24 @@ export default function initializeAuthRoutes(
         }
 
         // Find existing device or create new one
-        const ipIsTrusted = trustedDevices.some((device) => device.ip === ip)
-        const existingDeviceIndex = trustedDevices.findIndex((device) => {
-          // Primary match: same client ID
-          if (device.deviceInfo.clientId && safeDeviceInfo.clientId) {
-            return device.deviceInfo.clientId === safeDeviceInfo.clientId
-          }
-          // Fallback match: same IP and userAgent (for migration)
-          return ipIsTrusted
-            ? device.ip === ip &&
-                device.deviceInfo.userAgent === safeDeviceInfo.userAgent
-            : device.deviceInfo.userAgent === safeDeviceInfo.userAgent
-        })
+        // const ipIsTrusted = trustedDevices.some((device) => device.ip === ip)
+        const existingDeviceIndex = trustedDevices.findIndex(
+          (device) => device.deviceInfo.clientId === safeDeviceInfo.clientId,
+        )
         const now = new Date().toISOString()
 
         if (existingDeviceIndex >= 0) {
+          await notify(
+            dynamicStreams,
+            'login',
+            {
+              title: 'Login Detected',
+              body: `A trusted ${getDeviceDisplayName(safeDeviceInfo)} device logged in from IP address: ${ip}`,
+              group: 'security_event',
+            },
+            username,
+          )
+
           // Existing device - update info
           const device = trustedDevices[existingDeviceIndex]
           device.lastSeen = now
@@ -167,8 +185,9 @@ export default function initializeAuthRoutes(
 
           // Update IP if it changed (network switching)
           if (device.ip !== (ip ?? 'Unknown')) {
-            console.log(
-              `[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${ip}`,
+            logAuth(
+              `[Login] [${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${ip}`,
+              'warn',
             )
             device.ip = ip ?? 'Unknown'
           }
@@ -182,8 +201,8 @@ export default function initializeAuthRoutes(
             dynamicStreams,
             'login',
             {
-              title: 'New Device Detected',
-              body: `A login from a new ${getDeviceDisplayName(safeDeviceInfo)} device was detected from IP: ${ip}`,
+              title: 'New Browser/Device Detected',
+              body: `A login from a new ${getDeviceDisplayName(safeDeviceInfo)} client was detected from IP: ${ip}`,
               group: 'security_event',
             },
             user.username,
@@ -224,18 +243,9 @@ export default function initializeAuthRoutes(
         expires: new Date(refreshTokenExp * 1000),
       })
 
-      console.log(
+      logAuth(
         `[Login] User ${username} logged in successfully from IP: ${ip}`,
-      )
-      await notify(
-        dynamicStreams,
-        'login',
-        {
-          title: 'Login Detected',
-          body: `New log in from IP: ${ip}`,
-          group: 'security_event',
-        },
-        username,
+        'warn',
       )
 
       res.json({ success: true, token, refreshToken })
@@ -245,18 +255,19 @@ export default function initializeAuthRoutes(
   })
 
   app.post('/api/refresh-token', refreshTokenLimiter, async (req, res) => {
-    let refreshToken = req.cookies['_rt']
+    let refreshToken = req.headers['refresh-token'] ?? req.cookies['_rt']
+
     if (refreshToken) {
-      logAuth('[Refresh Token] Refresh token retrieved from cookie')
+      logAuth('[Refresh Token] Refresh token retrieved from cookie/header')
     } else {
-      console.error('No refresh token provided')
+      logAuth('[Refresh Token] No refresh token provided', 'error')
       res.status(401).json({ error: 'No refresh token provided' })
     }
 
     const { deviceInfo }: { deviceInfo?: DeviceInfo } = req.body
 
     if (!deviceInfo) {
-      console.error('No device info provided')
+      logAuth('[Refresh Token] No device info provided', 'error')
       res.status(401).json({ error: 'No device info provided' })
       return
     }
@@ -299,7 +310,13 @@ export default function initializeAuthRoutes(
     })
 
     if (!user) {
-      console.error('Refresh token not found for any user:', refreshToken)
+      logAuth(
+        `[Refresh Token] Refresh token not found for any user: ${refreshToken}`,
+        'error',
+      )
+      logAuth(
+        `[Refresh Token] Bad Refresh Request Headers: ${JSON.stringify(req.headers, null, 2)}`,
+      )
       res.status(401).json({ error: 'Invalid refresh token' })
       return
     }
@@ -375,16 +392,10 @@ export default function initializeAuthRoutes(
       trustedDevices = []
     }
 
-    const ipIsTrusted = trustedDevices.some((device) => device.ip === ip)
-    const existingDeviceIndex = trustedDevices.findIndex((device) => {
-      if (device.deviceInfo.clientId && safeDeviceInfo.clientId) {
-        return device.deviceInfo.clientId === safeDeviceInfo.clientId
-      }
-      return ipIsTrusted
-        ? device.ip === ip &&
-            device.deviceInfo.userAgent === safeDeviceInfo.userAgent
-        : device.deviceInfo.userAgent === safeDeviceInfo.userAgent
-    })
+    // const ipIsTrusted = trustedDevices.some((device) => device.ip === ip)
+    const existingDeviceIndex = trustedDevices.findIndex(
+      (device) => device.deviceInfo.clientId === safeDeviceInfo.clientId,
+    )
     const now = new Date().toISOString()
 
     if (existingDeviceIndex >= 0) {
@@ -398,6 +409,9 @@ export default function initializeAuthRoutes(
         logAuth(
           `[${user.username}] Device ${device.deviceInfo.clientId} switched IP: ${device.ip} -> ${ip}`,
           'warn',
+        )
+        logAuth(
+          `[Refresh Token] IP Change Device Info for ${user.username}: ${JSON.stringify(safeDeviceInfo, null, 2)}`,
         )
         device.ip = ip ?? 'Unknown'
       }
@@ -422,7 +436,10 @@ export default function initializeAuthRoutes(
         `[${user.username}] Unauthorized activity detected from IP: ${ip}`,
         'warn',
       )
-      logAuth(JSON.stringify(req.headers, null, 2), 'warn')
+      logAuth(
+        `[Refresh Token] Unauthorized Refresh Request Headers for ${user.username}: ${JSON.stringify(req.headers, null, 2)}`,
+        'warn',
+      )
       return
     }
 
@@ -479,7 +496,7 @@ export default function initializeAuthRoutes(
     if (refreshToken) {
       logAuth('[Logout] Refresh token retrieved from cookie')
     } else {
-      console.error('No refresh token provided')
+      logAuth('[Logout] No refresh token provided', 'warn')
       res.status(401).json({ error: 'No refresh token provided' })
     }
 
@@ -500,14 +517,6 @@ export default function initializeAuthRoutes(
             where: { username: user.username },
             data: {
               refreshTokens: JSON.stringify(newTokens),
-              trustedIps: JSON.stringify(
-                (JSON.parse(user.trustedIps ?? '[]') as TrustedDevice[]).filter(
-                  (device) =>
-                    device.deviceInfo.clientId
-                      ? device.deviceInfo.clientId !== clientId
-                      : true,
-                ),
-              ),
             },
           })
 

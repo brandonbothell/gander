@@ -1,10 +1,11 @@
+import { Preferences } from '@capacitor/preferences'
 import {
   type TrustedDevice,
   type DeviceInfo,
   type Session,
 } from '../../../source/types/deviceInfo'
 import { fetchWithRetry } from '../main'
-import SecureStorage from './secureStorage'
+import { Capacitor } from '@capacitor/core'
 
 // Helper function to create a unique session identifier
 export const getSessionId = (_: string, deviceInfo: DeviceInfo): string => {
@@ -17,13 +18,10 @@ export const geolocateIP = async (
 ) => {
   const ip = device?.ip || null
   try {
-    // console.log(`Geolocating IP ${ip || 'local'}...`);
     const geoResponse = await fetchWithRetry(() =>
       fetch(`https://ipinfo.io/${ip ? ip + '/' : ''}json`),
     )
     const geoData = await geoResponse.json()
-
-    // console.log(`Geolocation data for ${ip || 'local'}:`, geoData);
 
     if (geoData.error) {
       throw new Error(`API Error: ${geoData.error.message || 'Unknown error'}`)
@@ -61,7 +59,6 @@ export const geolocateIP = async (
         geolocated: true,
         isGeolocating: false,
       }
-      // console.log(`Successfully created session for ${ip}`);
       return session
     } else {
       console.warn(`No valid coordinates found for IP ${ip}`)
@@ -98,7 +95,7 @@ export const geolocateIP = async (
 }
 
 export async function getDeviceFingerprint(): Promise<DeviceInfo> {
-  let clientId = await SecureStorage.getClientId()
+  let clientId = localStorage.getItem('clientId')
   if (!clientId) {
     clientId = crypto.randomUUID
       ? crypto.randomUUID()
@@ -107,7 +104,14 @@ export async function getDeviceFingerprint(): Promise<DeviceInfo> {
           const v = c === 'x' ? r : (r & 0x3) | 0x8
           return v.toString(16)
         })
-    SecureStorage.setClientId(clientId)
+    localStorage.setItem('clientId', clientId)
+  }
+
+  if (
+    Capacitor.isNativePlatform() &&
+    !(await Preferences.get({ key: 'clientId' })).value
+  ) {
+    await Preferences.set({ key: 'clientId', value: clientId })
   }
 
   return {

@@ -106,8 +106,9 @@ class SecureStorageService {
       // Fallback to base64 decoding for legacy tokens
       try {
         return atob(encryptedText)
-      } catch (_) {
+      } catch (error2) {
         console.error('Failed to decrypt token:', error)
+        console.error(error2)
         throw new Error('Failed to decrypt token')
       }
     }
@@ -149,37 +150,6 @@ class SecureStorageService {
       await Preferences.remove({ key: 'refreshToken' })
     } else {
       localStorage.removeItem('_rt')
-    }
-  }
-
-  async setClientId(clientId: string): Promise<void> {
-    if (Capacitor.isNativePlatform()) {
-      await Preferences.set({
-        key: 'clientId',
-        value: clientId,
-      })
-    } else {
-      const encrypted = await this.encrypt(clientId)
-      localStorage.setItem('_cid', encrypted)
-    }
-  }
-
-  async getClientId(): Promise<string | null> {
-    if (Capacitor.isNativePlatform()) {
-      const result = await Preferences.get({ key: 'clientId' })
-      return result.value
-    } else {
-      const encrypted = localStorage.getItem('_cid')
-      if (!encrypted) return null
-
-      try {
-        return await this.decrypt(encrypted)
-      } catch (error) {
-        console.error('Failed to decrypt client ID:', error)
-        // Clear corrupted token
-        localStorage.removeItem('_cid')
-        return null
-      }
     }
   }
 

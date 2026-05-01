@@ -27,6 +27,7 @@ import { DebugInfo } from './components/DebugInfo'
 import RecordingsListContent from './components/RecordingsListContent'
 import StreamControls from './components/StreamControls'
 import ErrorModal from './components/ErrorModal'
+import { getDeviceFingerprint } from './utils/session'
 
 export type ClientMask = StreamMask & {
   pendingUpdate?: boolean
@@ -265,6 +266,10 @@ export default function StreamPage({
       }
     }
   }
+
+  useEffect(() => {
+    getDeviceFingerprint().then(() => console.info('Client ID cached'))
+  }, [])
 
   // Simplify the search worker initialization (remove the test message):
   useEffect(() => {
@@ -1613,7 +1618,7 @@ export default function StreamPage({
     function updateSticky() {
       if (keyboardTransitioningRef.current || isMobileWidth) {
         // console.warn(`Skipping sticky update ${keyboardTransitioningRef.current ? 'due to keyboard transition' : 'on mobile'}`);
-        return // Add isMobile check
+        return
       }
 
       const sentinel = searchStickySentinelRef.current

@@ -10,7 +10,7 @@ export const debugLog = (
   const timestamp = new Date().toISOString()
   const logEntry = `[${timestamp}] [${level.toUpperCase()}] ${message}`
 
-  // Always console.log (works in web dev)
+  // Always console.log (shows in devtools)
   if (level === 'error') {
     console.error(logEntry)
   } else if (level === 'warn') {

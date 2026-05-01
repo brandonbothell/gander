@@ -13,6 +13,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -161,7 +162,7 @@ public class FCMService extends FirebaseMessagingService {
         }
 
         Notification notif = builder.build();
-        Log.d("FCMService", "Notification built: ".concat(notif.toString()));
+        Log.d("FCMService", "Notification built");
 
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         // Use a unique ID (like current time) so notifications don't overwrite each other
@@ -186,7 +187,6 @@ public class FCMService extends FirebaseMessagingService {
      */
     @Override
     public void onNewToken(@NonNull String fcmToken) {
-        Log.d("FCMService", "Refreshed token: " + fcmToken);
         SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
         String refreshToken = sharedPref.getString("refreshToken", null);
 

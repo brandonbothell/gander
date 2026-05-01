@@ -143,7 +143,7 @@ export const SessionMonitor: React.FC<SessionMonitorProps> = ({
     if (currentSession.geolocated || currentSession.isGeolocating) return
 
     const geolocateCurrentSession = async () => {
-      console.log(`Geolocating current session: ${currentSession.ip}`)
+      console.log('Geolocating current session')
 
       // Mark as geolocating
       setSessions((prev) =>

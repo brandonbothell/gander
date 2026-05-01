@@ -51,18 +51,6 @@ export async function setupPushNotifications() {
         'pushNotificationReceived',
         async (notification: PushNotificationSchema) => {
           console.log('Push notification received:', notification)
-
-          /* await LocalNotifications.schedule({
-            notifications: [
-              {
-                title: notification.title ?? 'Notification',
-                body: notification.body ?? '',
-                id: Math.floor(Date.now() % 100000),
-                extra: notification.data,
-                group: notification.data.group,
-              },
-            ],
-          }) */
         },
       )
 

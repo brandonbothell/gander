@@ -109,8 +109,6 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
         JsonObject dummyDeviceInfo = new JsonObject();
         dummyDeviceInfo.add("deviceInfo", dummyDeviceInfoInner);
 
-        Log.d("NotificationActionReceiver", "Device info: " + dummyDeviceInfo);
-
         assert refreshToken != null;
         service.refreshToken("_rt=".concat(refreshToken), dummyDeviceInfo).enqueue(new Callback<>() {
             @Override
@@ -138,7 +136,12 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
                 if (body.refreshToken != null) {
                     SharedPreferences.Editor editor = sharedPref.edit();
                     editor.putString("refreshToken", body.refreshToken);
-                    editor.apply();
+                    boolean success = editor.commit();
+                    if (!success) {
+                        Log.e("NotificationActionReceiver", "Failed to save refresh token");
+                    } else {
+                        Log.d("NotificationActionReceiver", "Saved refresh token!");
+                    }
                 }
 
                 if (body.token != null) {

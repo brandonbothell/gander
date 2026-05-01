@@ -149,20 +149,20 @@ export default function App() {
         : null
 
       const deviceInfo = await getDeviceFingerprint()
-      debugLog(`Making refresh token request to: ${API_BASE}/api/refresh-token`)
+      const data = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // On android, we have to supply the cookie ourselves
+          ...(refreshToken ? { 'refresh-token': refreshToken } : {}),
+        },
+        body: JSON.stringify({ deviceInfo }),
+      }
 
       const refreshStartTime = Date.now()
       // The current refresh token will be sent in the http only cookie
       const res = await Promise.race([
-        fetch(`${API_BASE}/api/refresh-token`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // On android, we have to supply the cookie ourselves
-            ...(refreshToken ? { Cookie: `_rt=${refreshToken}` } : {}),
-          },
-          body: JSON.stringify({ deviceInfo }),
-        }),
+        fetch(`${API_BASE}/api/refresh-token`, data),
         new Promise<Response>((_, reject) =>
           setTimeout(
             () => reject(new Error('Token refresh request timeout')),
@@ -253,6 +253,8 @@ export default function App() {
         ? await SecureStorage.getRefreshToken()
         : null
 
+      const fingerprint = await getDeviceFingerprint()
+
       // Notify server of logout - use fetch directly to avoid recursive authFetch calls
       await fetch(`${API_BASE}/api/logout`, {
         method: 'POST',
@@ -260,7 +262,7 @@ export default function App() {
           'Content-Type': 'application/json',
           ...(refreshToken ? { Cookie: `_rt=${refreshToken}` } : {}),
         },
-        body: JSON.stringify({ clientId: await SecureStorage.getClientId() }),
+        body: JSON.stringify({ clientId: fingerprint.clientId }),
       }).catch(console.error)
     } catch (error) {
       console.error('Error during logout:', error)
@@ -290,7 +292,7 @@ export default function App() {
     const tokenChannel = new BroadcastChannel('tokenUpdates')
 
     const handleTokenUpdate = (event: MessageEvent) => {
-      console.log('Token update received via broadcast:', event.data)
+      console.log('Token update received via broadcast: ' + event.data.type)
 
       if (event.data.type === 'TOKEN_UPDATED') {
         const newToken = event.data.token

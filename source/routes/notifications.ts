@@ -202,7 +202,7 @@ export async function notify(
           typeof err === 'object' &&
           err !== null &&
           'statusCode' in err &&
-          err.statusCode === 404 &&
+          [404, 410].includes(err.statusCode as number) &&
           sub.sid
         ) {
           await prisma.pushSubscription
