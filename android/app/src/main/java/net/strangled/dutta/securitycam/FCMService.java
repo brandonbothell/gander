@@ -240,10 +240,9 @@ public class FCMService extends FirebaseMessagingService {
 
             APIService service = retrofit.create(APIService.class);
 
-            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken(refreshToken, dummyDeviceInfo);
-            APIService.RefreshTokenResponse response = refreshTokenResponse.execute().body();
+            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(refreshToken), dummyDeviceInfo);
 
-            service.refreshToken(refreshToken, dummyDeviceInfo).enqueue(new Callback<>() {
+            refreshTokenResponse.enqueue(new Callback<>() {
                 @Override
                 @EverythingIsNonNull
                 public void onResponse(Call<APIService.RefreshTokenResponse> call, Response<APIService.RefreshTokenResponse> response) {

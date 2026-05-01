@@ -98,6 +98,8 @@ export default function initializeAuthRoutes(
           : 'Unknown',
     }
 
+    const refreshTokenExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
+
     if (
       config.users.some(
         (user) => user.username === username && user.password === password,
@@ -108,7 +110,7 @@ export default function initializeAuthRoutes(
         {
           username,
           type: 'refresh',
-          exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+          exp: refreshTokenExp,
         },
         JWT_SECRET,
       )
@@ -211,6 +213,17 @@ export default function initializeAuthRoutes(
         })
       }
 
+      res.cookie('_rt', refreshToken, {
+        httpOnly: true,
+        secure: process.env.API_ENV !== 'development',
+        expires: new Date(refreshTokenExp * 1000),
+      })
+
+      res.cookie('_rtexists', '1', {
+        secure: process.env.API_ENV !== 'development',
+        expires: new Date(refreshTokenExp * 1000),
+      })
+
       console.log(
         `[Login] User ${username} logged in successfully from IP: ${ip}`,
       )
@@ -232,14 +245,19 @@ export default function initializeAuthRoutes(
   })
 
   app.post('/api/refresh-token', refreshTokenLimiter, async (req, res) => {
-    const refreshToken = String(req.headers['refresh-token'] ?? '')
+    let refreshToken = req.cookies['_rt']
+    if (refreshToken) {
+      logAuth('[Refresh Token] Refresh token retrieved from cookie')
+    } else {
+      console.error('No refresh token provided')
+      res.status(401).json({ error: 'No refresh token provided' })
+    }
+
     const { deviceInfo }: { deviceInfo?: DeviceInfo } = req.body
 
-    if (!refreshToken || !deviceInfo) {
-      console.error('No refresh token and/or device info provided')
-      res
-        .status(401)
-        .json({ error: 'No refresh token and/or device info provided' })
+    if (!deviceInfo) {
+      console.error('No device info provided')
+      res.status(401).json({ error: 'No device info provided' })
       return
     }
 
@@ -305,6 +323,8 @@ export default function initializeAuthRoutes(
       return
     }
 
+    const refreshTokenExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
+
     const newRefreshToken = (() => {
       try {
         const decoded = jwt.verify(refreshToken, JWT_SECRET) as {
@@ -320,7 +340,7 @@ export default function initializeAuthRoutes(
           {
             username: user.username,
             type: 'refresh',
-            exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+            exp: refreshTokenExp,
           },
           JWT_SECRET,
         )
@@ -416,6 +436,12 @@ export default function initializeAuthRoutes(
       },
     })
 
+    res.cookie('_rt', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.API_ENV !== 'development',
+      expires: new Date(refreshTokenExp * 1000),
+    })
+
     const token = jwt.sign({ username: user.username }, JWT_SECRET, {
       expiresIn: '5m',
     })
@@ -449,50 +475,56 @@ export default function initializeAuthRoutes(
     },
   )
   app.post('/api/logout', logoutLimiter, async (req, res) => {
-    const refreshToken = req.headers['refresh-token']
+    let refreshToken = req.cookies['_rt']
+    if (refreshToken) {
+      logAuth('[Logout] Refresh token retrieved from cookie')
+    } else {
+      console.error('No refresh token provided')
+      res.status(401).json({ error: 'No refresh token provided' })
+    }
+
     const { clientId }: { clientId?: string } = req.body
 
-    if (refreshToken) {
-      // Remove the refreshToken from the user's refreshTokens array
-      const users = await prisma.user.findMany({
-        where: { refreshTokens: { contains: `"${refreshToken}"` } },
-      })
-      for (const user of users) {
-        try {
-          const tokens = JSON.parse(user.refreshTokens ?? '[]')
-          if (Array.isArray(tokens) && tokens.includes(refreshToken)) {
-            const newTokens = tokens.filter((t: string) => t !== refreshToken)
-            await prisma.user.update({
-              where: { username: user.username },
-              data: {
-                refreshTokens: JSON.stringify(newTokens),
-                trustedIps: JSON.stringify(
-                  (
-                    JSON.parse(user.trustedIps ?? '[]') as TrustedDevice[]
-                  ).filter((device) =>
+    res.clearCookie('_rt').clearCookie('_rtexists')
+
+    // Remove the refreshToken from the user's refreshTokens array
+    const users = await prisma.user.findMany({
+      where: { refreshTokens: { contains: `"${refreshToken}"` } },
+    })
+    for (const user of users) {
+      try {
+        const tokens = JSON.parse(user.refreshTokens ?? '[]')
+        if (Array.isArray(tokens) && tokens.includes(refreshToken)) {
+          const newTokens = tokens.filter((t: string) => t !== refreshToken)
+          await prisma.user.update({
+            where: { username: user.username },
+            data: {
+              refreshTokens: JSON.stringify(newTokens),
+              trustedIps: JSON.stringify(
+                (JSON.parse(user.trustedIps ?? '[]') as TrustedDevice[]).filter(
+                  (device) =>
                     device.deviceInfo.clientId
                       ? device.deviceInfo.clientId !== clientId
                       : true,
-                  ),
                 ),
-              },
-            })
+              ),
+            },
+          })
 
-            const ip =
-              'x-real-ip' in req.headers
-                ? String(req.headers['x-real-ip'])
-                : req.ip
-            logAuth(`[Logout] User ${user.username} logged out from IP: ${ip}`)
-            res.json({ success: true })
-            return
-          }
-        } catch {
-          logAuth(
-            `Failed to parse refreshTokens for user ${user.username}, skipping logout.`,
-            'error',
-          )
-          res.status(500).json({ error: 'Failed to logout' })
+          const ip =
+            'x-real-ip' in req.headers
+              ? String(req.headers['x-real-ip'])
+              : req.ip
+          logAuth(`[Logout] User ${user.username} logged out from IP: ${ip}`)
+          res.json({ success: true })
+          return
         }
+      } catch {
+        logAuth(
+          `Failed to parse refreshTokens for user ${user.username}, skipping logout.`,
+          'error',
+        )
+        res.status(500).json({ error: 'Failed to logout' })
       }
     }
   })

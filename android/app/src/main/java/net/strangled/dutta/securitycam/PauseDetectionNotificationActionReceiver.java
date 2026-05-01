@@ -109,7 +109,8 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
 
         Log.d("NotificationActionReceiver", "Device info: " + dummyDeviceInfo);
 
-        service.refreshToken(refreshToken, dummyDeviceInfo).enqueue(new Callback<>() {
+        assert refreshToken != null;
+        service.refreshToken("_rt=".concat(refreshToken), dummyDeviceInfo).enqueue(new Callback<>() {
             @Override
             @EverythingIsNonNull
             public void onResponse(Call<APIService.RefreshTokenResponse> call, Response<APIService.RefreshTokenResponse> response) {

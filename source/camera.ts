@@ -6,6 +6,7 @@ import webpush from 'web-push'
 import jwt from 'jsonwebtoken'
 import express from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import * as chokidar from 'chokidar'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import config from '../config.json'
@@ -565,6 +566,8 @@ async function cleanupExpiredTokensAndDevices() {
   // Run every hour
   setTimeout(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
 }
+
+app.use(cookieParser(JWT_SECRET))
 
 // --- CORS ---
 app.use(

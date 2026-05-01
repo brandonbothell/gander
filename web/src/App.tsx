@@ -10,7 +10,7 @@ import SecureStorage from './utils/secureStorage'
 import { getDeviceFingerprint, getSessionId } from './utils/session'
 import { SessionMonitor } from './components/SessionMonitor'
 import { type TrustedDevice, type Session } from '../../source/types/deviceInfo'
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, CapacitorCookies } from '@capacitor/core'
 import { debugLog } from './utils/debugLog'
 import type { RecordingType } from './components/Recording'
 
@@ -56,10 +56,15 @@ export default function App() {
 
     try {
       debugLog('Attempting to get refresh token from storage')
-      const refreshToken = await SecureStorage.getRefreshToken()
 
-      if (!refreshToken) {
-        debugLog('No refresh token available for refresh attempt', 'warn')
+      const rtExists = Capacitor.isNativePlatform()
+        ? (await CapacitorCookies.getCookies())['_rtexists']
+        : (await cookieStore.get('_rtexists'))?.value
+      if (!rtExists) {
+        debugLog(
+          `No refresh token available for refresh attempt, _rtexists: '${rtExists}'`,
+          'warn',
+        )
         setAuthenticated(false)
         return false
       }
@@ -138,16 +143,23 @@ export default function App() {
         localStorage.setItem('tokenRefreshInProgress', Date.now().toString())
       }
 
+      // Get the refresh token from SecureStorage on Android
+      const refreshToken = Capacitor.isNativePlatform()
+        ? await SecureStorage.getRefreshToken()
+        : null
+
       const deviceInfo = await getDeviceFingerprint()
       debugLog(`Making refresh token request to: ${API_BASE}/api/refresh-token`)
 
       const refreshStartTime = Date.now()
+      // The current refresh token will be sent in the http only cookie
       const res = await Promise.race([
         fetch(`${API_BASE}/api/refresh-token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'refresh-token': refreshToken,
+            // On android, we have to supply the cookie ourselves
+            ...(refreshToken ? { Cookie: `_rt=${refreshToken}` } : {}),
           },
           body: JSON.stringify({ deviceInfo }),
         }),
@@ -169,12 +181,13 @@ export default function App() {
         if (data && data.token && data.refreshToken) {
           debugLog('Token refresh successful, storing new tokens')
 
-          await SecureStorage.setRefreshToken(data.refreshToken)
           localStorage.setItem('jwt', data.token)
 
           // Clear refresh flag (only on web)
           if (!Capacitor.isNativePlatform()) {
             localStorage.removeItem('tokenRefreshInProgress')
+          } else {
+            await SecureStorage.setRefreshToken(data.refreshToken)
           }
 
           // Broadcast to all tabs (only on web)
@@ -224,18 +237,31 @@ export default function App() {
   // Enhanced logout function - PREVENT INFINITE LOOP
   const logout = async (skipBroadcast = false): Promise<void> => {
     try {
-      const refreshToken = await SecureStorage.getRefreshToken()
-      if (refreshToken) {
-        // Notify server of logout - use fetch directly to avoid recursive authFetch calls
-        await fetch(`${API_BASE}/api/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'refresh-token': refreshToken,
-          },
-          body: JSON.stringify({ clientId: await SecureStorage.getClientId() }),
-        }).catch(console.error)
+      const rtExists = Capacitor.isNativePlatform()
+        ? (await CapacitorCookies.getCookies())['_rtexists']
+        : (await cookieStore.get('_rtexists'))?.value
+      if (!rtExists) {
+        debugLog(
+          `No refresh token available for logout attempt, _rtexists: '${rtExists}'`,
+          'warn',
+        )
+        setAuthenticated(false)
+        return
       }
+
+      const refreshToken = Capacitor.isNativePlatform()
+        ? await SecureStorage.getRefreshToken()
+        : null
+
+      // Notify server of logout - use fetch directly to avoid recursive authFetch calls
+      await fetch(`${API_BASE}/api/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(refreshToken ? { Cookie: `_rt=${refreshToken}` } : {}),
+        },
+        body: JSON.stringify({ clientId: await SecureStorage.getClientId() }),
+      }).catch(console.error)
     } catch (error) {
       console.error('Error during logout:', error)
     } finally {
@@ -322,12 +348,12 @@ export default function App() {
         )
 
         try {
-          const refreshToken = await SecureStorage.getRefreshToken()
+          const rtExists = (await CapacitorCookies.getCookies())['_rtexists']
           debugLog(
-            `Refresh token check result: ${refreshToken ? 'EXISTS' : 'NOT_FOUND'}`,
+            `Refresh token check result: ${rtExists ? 'EXISTS' : 'NOT_FOUND'}`,
           )
 
-          if (refreshToken) {
+          if (rtExists) {
             if (token) {
               debugLog(
                 'Found both JWT and refresh token, testing JWT validity with server',
@@ -604,7 +630,9 @@ export default function App() {
     }
 
     try {
-      await SecureStorage.setRefreshToken(refreshToken)
+      if (Capacitor.isNativePlatform()) {
+        await SecureStorage.setRefreshToken(refreshToken)
+      }
       localStorage.setItem('jwt', token)
       setAuthenticated(true)
     } catch (error) {
@@ -613,7 +641,7 @@ export default function App() {
       // Still try to authenticate even if secure storage fails
       localStorage.setItem('jwt', token)
       // Store refresh token as base64 fallback
-      localStorage.setItem('_rt', btoa(refreshToken))
+      // localStorage.setItem('_rt', btoa(refreshToken))
       setAuthenticated(true)
     }
   }

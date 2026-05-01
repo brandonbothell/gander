@@ -260,6 +260,7 @@ export default function StreamPage({
         if (Capacitor.isNativePlatform()) {
           await Preferences.remove({ key: 'refreshToken' })
         } else await SecureStorage.removeRefreshToken()
+
         window.location.reload()
       }
     }
