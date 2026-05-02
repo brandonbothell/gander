@@ -115,6 +115,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         cancelFlush: false,
         lowSpaceNotified: false,
         lastNotifiedRestartCooldownAt: 0,
+        currentRecordingMotionTimestamps: [],
       }
     }
 
@@ -156,10 +157,8 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
           }
           setTimeout(async () => {
             if (state.motionPaused) return
-            if (
-              (Date.now() - state.startupTime) / 1000 <
-              STARTUP_GRACE_PERIOD
-            ) {
+            const now = Date.now()
+            if ((now - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD) {
               return
             }
             const motionStatus = await detectMotion(
@@ -184,7 +183,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                   // Start a new recording
                   state.nextFlushNumber = 1
                   state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`
-                  state.startedRecordingAt = Date.now()
+                  state.startedRecordingAt = now
                   state.notificationSent = false
                 }
 
@@ -204,6 +203,13 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                     streamId,
                   )
                 }, 10000) // flush every 10 seconds
+              } else {
+                state.currentRecordingMotionTimestamps.push(
+                  now - state.startedRecordingAt,
+                )
+                logMotion(
+                  `Updated motion timestamps in state: ${JSON.stringify(state.currentRecordingMotionTimestamps)}`,
+                )
               }
 
               // --- If motion is detected, add the segment to motion segments ---
@@ -783,6 +789,7 @@ export async function createStreamManager(stream: {
     cancelFlush: false,
     lowSpaceNotified: false,
     lastNotifiedRestartCooldownAt: 0,
+    currentRecordingMotionTimestamps: [],
   }
 
   return new StreamManager(

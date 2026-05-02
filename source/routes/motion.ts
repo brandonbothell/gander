@@ -363,6 +363,7 @@ export async function checkDiskSpaceAndPurge(
       state.motionSegments = []
       state.flushedSegments = []
       state.flushRecordings = []
+      state.currentRecordingMotionTimestamps = []
       state.savingInProgress = false
       if (state.currentSaveProcess) {
         try {
@@ -533,6 +534,7 @@ async function saveMotionSegments(
     state.motionSegments = []
     state.flushedSegments = []
     state.flushRecordings = []
+    state.currentRecordingMotionTimestamps = []
     return
   }
 
@@ -612,6 +614,7 @@ async function saveMotionSegments(
     state.savingInProgress = false
     state.motionSegments = []
     state.flushedSegments = []
+    state.currentRecordingMotionTimestamps = []
     return
   }
 
@@ -649,6 +652,7 @@ async function saveMotionSegments(
         state.motionSegments = []
         state.flushedSegments = []
         state.flushRecordings = []
+        state.currentRecordingMotionTimestamps = []
         state.nextFlushNumber = 1
         state.notificationSent = false
         state.startedRecordingAt = 0
@@ -685,7 +689,7 @@ async function saveMotionSegments(
           state.savingInProgress = false
           state.currentSaveProcess = null
 
-          // Save to DB as before...
+          // Save to DB
           try {
             const duration = await getVideoDuration(outFile)
             const filename = path.basename(outFile)
@@ -695,15 +699,26 @@ async function saveMotionSegments(
 
             await prisma.motionRecording.upsert({
               where: { streamId_filename: { streamId, filename } },
-              update: { duration, updatedAt: new Date() },
+              update: {
+                duration,
+                motionTimestamps: JSON.stringify(
+                  state.currentRecordingMotionTimestamps,
+                ),
+                updatedAt: new Date(),
+              },
               create: {
                 streamId,
                 filename,
                 duration,
+                motionTimestamps: JSON.stringify(
+                  state.currentRecordingMotionTimestamps,
+                ),
                 recordedAt,
                 updatedAt: new Date(),
               },
             })
+
+            state.currentRecordingMotionTimestamps = []
 
             logMotion(
               `[${streamId}] Successfully saved ${filename} (${duration}s, ${concatList.length} items)`,
@@ -738,6 +753,7 @@ async function saveMotionSegments(
         state.startedRecordingAt = 0
         state.savingInProgress = false
         state.currentSaveProcess = null
+        state.currentRecordingMotionTimestamps = []
         resolve()
       }
     }, 60000)

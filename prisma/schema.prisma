@@ -75,6 +75,7 @@ model MotionRecording {
   duration   Int
   nickname   String?
   recordedAt String
+  motionTimestamps String @default("[]")
   updatedAt  DateTime @default(now())
 
   @@id([streamId, filename])

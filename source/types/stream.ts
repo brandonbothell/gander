@@ -25,6 +25,10 @@ export interface StreamMotionState {
   cancelFlush: boolean // Whether to cancel the current flush operation
   lowSpaceNotified: boolean // Flag to avoid spamming notifications
   lastNotifiedRestartCooldownAt: number // Same as above
+  /**
+   * Array of times in milliseconds since start the of a recording that motion was detected, excluding the first.
+   */
+  currentRecordingMotionTimestamps: number[]
 }
 
 export type SignedUrl = {
