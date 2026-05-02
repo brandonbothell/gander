@@ -61,7 +61,7 @@
     "eslint-plugin-prettier": "5.5.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-unused-imports": "4.4.1",
-    "globals": "17.5.0",
+    "globals": "17.6.0",
     "jiti": "2.6.1",
     "nodemon": "3.1.14",
     "pm2": "6.0.14",
