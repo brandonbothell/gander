@@ -206,7 +206,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
               } else {
                 state.currentRecordingMotionTimestamps.push(
                   state.currentRecordingMotionTimestamps.length
-                    ? now - state.startedRecordingAt
+                    ? state.lastSegmentProcessAt! - state.startedRecordingAt
                     : Math.max(0, now - state.startedRecordingAt - 1000),
                 )
                 logMotion(
