@@ -205,7 +205,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                 }, 10000) // flush every 10 seconds
               } else {
                 state.currentRecordingMotionTimestamps.push(
-                  now - state.startedRecordingAt,
+                  Math.max(0, now - state.startedRecordingAt - 1000),
                 )
                 logMotion(
                   `Updated motion timestamps in state: ${JSON.stringify(state.currentRecordingMotionTimestamps)}`,
