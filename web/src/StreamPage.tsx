@@ -1878,7 +1878,7 @@ export default function StreamPage({
       const newRecs: RecordingType[] = (data.recordings || []).map(
         ({ filename, motionTimestamps }: { [key: string]: string }) => ({
           filename,
-          motionTimestamps,
+          motionTimestamps: JSON.parse(motionTimestamps),
           streamId: stream.id,
         }),
       )
