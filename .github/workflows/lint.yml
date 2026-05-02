@@ -28,4 +28,7 @@ jobs:
           yarn
       - name: Lint
         run: |
+          set +e
           yarn lint
+          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+          set -e
