@@ -256,7 +256,10 @@ export default function initializeRecordingRoutes(
         select: { streamId: true, filename: true, motionTimestamps: true },
       })
 
-      const newRecordings = recordings.map((r) => r.filename)
+      const newRecordings = recordings.map((r) => ({
+        filename: r.filename,
+        motionTimestamps: r.motionTimestamps,
+      }))
 
       // Get deleted recordings since lastSeen
       let deletedRecordings: string[] = []
@@ -281,8 +284,8 @@ export default function initializeRecordingRoutes(
       if (newRecordings.length > 0) {
         await prisma.userLastSeenRecording.upsert({
           where: { username_streamId: { username, streamId } },
-          update: { lastSeen: newRecordings[0] },
-          create: { username, streamId, lastSeen: newRecordings[0] },
+          update: { lastSeen: newRecordings[0].filename },
+          create: { username, streamId, lastSeen: newRecordings[0].filename },
         })
       }
     },
