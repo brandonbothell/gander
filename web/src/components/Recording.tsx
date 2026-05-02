@@ -12,15 +12,20 @@ import { Capacitor } from '@capacitor/core'
 import { ScreenOrientation } from '@capacitor/screen-orientation'
 import { formatTimestamp } from '../utils/format'
 
-export type RecordingType = { streamId: string; filename: string }
+export type RecordingType = {
+  streamId: string
+  filename: string
+  motionTimestamps: number[]
+}
 
 interface RecordingProps {
   open: boolean
   streamId: string
   filename: string
+  motionTimestamps: number[]
   onClose: () => void
   cachedRecordings: RecordingType[]
-  onNavigate: (filename: string) => void
+  onNavigate: (filename: string, motionTimestamps: number[]) => void
   setNicknames: React.Dispatch<
     React.SetStateAction<{
       [filename: string]: string
@@ -34,6 +39,7 @@ export function Recording({
   open,
   streamId,
   filename,
+  motionTimestamps,
   onClose,
   cachedRecordings,
   onNavigate,
@@ -46,6 +52,7 @@ export function Recording({
   const [editing, setEditing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(externalVideoRef?.current || null)
+  const seekbarRef = useRef<HTMLDivElement>(null)
   // Controls fade-away logic
   const [isControlBarVisible, setIsControlBarVisible] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -276,23 +283,26 @@ export function Recording({
     handleShowControls()
   }
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomSeek = (e: React.PointerEvent | React.MouseEvent) => {
     const video = videoRef.current
-    if (!video) return
+    const seekbar = seekbarRef.current
+    if (!video || !seekbar) return
 
-    const value = Number(e.target.value)
+    const rect = seekbar.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const percentage = Math.max(0, Math.min(1, x / rect.width))
+    const newTime = percentage * duration
+
     if (!isSeeking) setIsSeeking(true)
-    setCurrentTime(value)
-    video.currentTime = value
+    setCurrentTime(newTime)
+    video.currentTime = newTime
     setIsSeeking(false)
   }
 
-  const handleSeekPointerDown = () => {
-    const video = videoRef.current
-    if (!video) return
-
+  const handleSeekPointerDown = (e: React.PointerEvent) => {
+    handleCustomSeek(e) // Seek immediately on click
     setIsSeeking(true)
-    video.pause()
+    videoRef.current?.pause()
     setIsPaused(true)
   }
 
@@ -360,6 +370,9 @@ export function Recording({
       videoRef.current.pause()
       videoRef.current.src = ''
     } else if (open && videoUrl && videoRef.current) {
+      console.log(
+        `Recording opened. Motion timestamps: ${JSON.stringify(motionTimestamps)}`,
+      )
       videoRef.current.src = videoUrl
       videoRef.current.load()
 
@@ -395,6 +408,41 @@ export function Recording({
       .then((data) => setNickname(data.nickname || ''))
       .catch(() => setNickname(''))
   }, [filename, streamId])
+
+  useEffect(() => {
+    if (!isSeeking) return
+
+    const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
+      if (!seekbarRef.current || !videoRef.current || duration === 0) return
+      const rect = seekbarRef.current.getBoundingClientRect()
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+      const x = clientX - rect.left
+      const percentage = Math.max(0, Math.min(1, x / rect.width))
+
+      const newTime = percentage * duration
+      setCurrentTime(newTime)
+      videoRef.current.currentTime = newTime
+    }
+
+    const handleGlobalUp = () => {
+      setIsSeeking(false)
+      videoRef.current?.play()
+      setIsPaused(false)
+      scheduleHide()
+    }
+
+    window.addEventListener('mousemove', handleGlobalMove)
+    window.addEventListener('touchmove', handleGlobalMove)
+    window.addEventListener('mouseup', handleGlobalUp)
+    window.addEventListener('touchend', handleGlobalUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMove)
+      window.removeEventListener('touchmove', handleGlobalMove)
+      window.removeEventListener('mouseup', handleGlobalUp)
+      window.removeEventListener('touchend', handleGlobalUp)
+    }
+  }, [isSeeking, duration])
 
   // Save nickname to server
   const saveNickname = (newName: string) => {
@@ -594,7 +642,7 @@ export function Recording({
             background:
               'linear-gradient(180deg, transparent 60%, #232b4a 100%)',
             opacity: isControlBarVisible ? 1 : 0,
-            height: isControlBarVisible ? 44 : 0, // 44px when visible, 0 when hidden
+            height: isControlBarVisible ? 44 : 0,
             padding: isControlBarVisible ? '8px 18px' : '0px 18px',
             boxSizing: 'border-box',
             borderRadius: 8,
@@ -618,57 +666,124 @@ export function Recording({
           >
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
-          {/* Overlay for seek bar input to allow pointer events only on input */}
+
+          {/* Custom Seek Bar Container */}
           <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              width: '100%',
-              height: '100%',
-              pointerEvents: 'none',
-              zIndex: 11,
-            }}
-          />
-          <input
-            type="range"
-            min={0}
-            max={duration || 0}
-            step={1}
-            value={currentTime}
-            onChange={handleSeek}
+            ref={seekbarRef}
             onPointerDown={handleSeekPointerDown}
             onPointerUp={handleSeekPointerUp}
             style={{
-              width: '100%',
-              accentColor: '#1cf1d1',
-              height: 4,
+              position: 'relative',
+              flex: 1,
+              height: 8,
               paddingTop: 2,
               paddingBottom: 2,
-              borderRadius: 2,
-              background: '#232b4a',
-              position: 'relative',
-              zIndex: 12,
-              pointerEvents: 'auto',
-              transition: 'opacity 0.3s',
-              opacity: isControlBarVisible ? 1 : 0,
-            }}
-            aria-label="Seek"
-          />
-          <span
-            style={{
-              marginLeft: 12,
-              color: '#8ef',
-              fontSize: '0.95em',
-              fontFamily: 'Orbitron, Roboto, Arial, sans-serif',
-              minWidth: 60,
-              textAlign: 'right',
-              transition: 'opacity 0.3s',
-              opacity: isControlBarVisible ? 1 : 0,
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+              touchAction: 'none', // Prevents scrolling while seeking
             }}
           >
-            {formatTimestamp(filename)}
-          </span>
+            {/* 1. Background Track */}
+            <div
+              style={{
+                width: '100%',
+                height: 4,
+                background: '#dddddd',
+                borderRadius: 2,
+                position: 'absolute',
+                zIndex: 10,
+              }}
+            />
+
+            {/* 2. Motion Dots (Middle Layer) */}
+            {isControlBarVisible &&
+              duration > 0 &&
+              motionTimestamps
+                .reduce((acc: number[][], ms: number) => {
+                  const timeSec = ms / 1000
+                  const lastGroup = acc[acc.length - 1]
+                  if (
+                    lastGroup &&
+                    timeSec - lastGroup[lastGroup.length - 1] <= 5
+                  ) {
+                    lastGroup.push(timeSec)
+                  } else {
+                    acc.push([timeSec])
+                  }
+                  return acc
+                }, [])
+                .map((group, idx) => {
+                  const startSec = group[0]
+                  const endSec = group[group.length - 1]
+                  const left = (startSec / duration) * 100
+                  const width = ((endSec - startSec) / duration) * 100
+
+                  return (
+                    <div
+                      key={idx}
+                      onPointerDown={(e) => {
+                        if (!isSeeking) e.stopPropagation()
+                      }}
+                      onClick={(e) => {
+                        // If we're scrubbing, don't let the dot click interrupt
+                        if (isSeeking) return
+
+                        e.stopPropagation()
+                        if (videoRef.current) {
+                          setCurrentTime(startSec)
+                          videoRef.current.currentTime = startSec
+                        }
+                      }}
+                      style={{
+                        position: 'absolute',
+                        left: `${left}%`,
+                        width: width > 0 ? `${width}%` : 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: '#1cf1d1',
+                        paddingBottom: 2,
+                        zIndex: 15,
+                        border: '1px solid #1a1f35',
+                        boxShadow: '0 0 6px rgba(28, 241, 209, 0.9)',
+                        pointerEvents: isSeeking ? 'none' : 'auto', // Prevent dots from "stealing" mouse focus during a drag
+                        transform:
+                          width > 0
+                            ? 'translateY(-50%)'
+                            : 'translate(-50%, -50%)',
+                        top: '50%',
+                      }}
+                    />
+                  )
+                })}
+
+            {/* 3. The Draggable Thumb (Top Layer) */}
+            <div
+              onPointerDown={(e) => {
+                // 1. Prevent the dot underneath from seeing the click
+                e.stopPropagation()
+                // 2. Start the normal scrubbing logic
+                handleSeekPointerDown(e)
+              }}
+              style={{
+                position: 'absolute',
+                left: `${(currentTime / duration) * 100}%`,
+                width: 16,
+                height: 16,
+                backgroundColor: '#1cf1d1',
+                borderRadius: '50%',
+                transform: 'translate(-50%, -50%)',
+                top: '50%',
+                zIndex: 30, // Higher than the dots (25)
+                boxShadow: isSeeking
+                  ? '0 0 15px #1cf1d1'
+                  : '0 0 8px rgba(28, 241, 209, 0.8)',
+                cursor: 'pointer',
+                pointerEvents: 'auto', // Now it's a solid hit-target
+                transition: 'width 0.1s, height 0.1s',
+              }}
+            />
+          </div>
         </div>
       </div>
       {/* Close Button - themed like StreamControlBar */}
@@ -850,7 +965,7 @@ export function Recording({
       >
         {prev && (
           <button
-            onClick={() => onNavigate(prev.filename)}
+            onClick={() => onNavigate(prev.filename, prev.motionTimestamps)}
             style={{
               background: 'transparent',
               color: '#fff',
@@ -904,7 +1019,7 @@ export function Recording({
         </button>
         {next && (
           <button
-            onClick={() => onNavigate(next.filename)}
+            onClick={() => onNavigate(next.filename, next.motionTimestamps)}
             style={{
               background: 'transparent',
               marginBottom: window.innerWidth <= 600 ? 12 : 0,

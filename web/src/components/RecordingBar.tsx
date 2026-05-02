@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Recording } from './Recording'
+import { Recording, type RecordingType } from './Recording'
 
 interface RecordingBarProps {
   open: boolean
   streamId: string
   filename: string
+  motionTimestamps: number[]
   onClose: () => void
-  cachedRecordings: { streamId: string; filename: string }[]
-  onNavigate: (filename: string) => void
+  cachedRecordings: RecordingType[]
+  onNavigate: (filename: string, motionTimestamps: number[]) => void
   setAutoScrollUntilRef: (until: number) => void
   setNicknames: React.Dispatch<
     React.SetStateAction<{

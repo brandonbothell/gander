@@ -183,6 +183,7 @@ export default function StreamPage({
   const [recordingBeingViewed, setRecordingBeingViewed] = useState<{
     streamId: string
     filename: string
+    motionTimestamps: number[]
   } | null>(null)
   const [recordingsListInView, setRecordingsListInView] = useState(true)
   const [lastVideoSize, setLastVideoSize] = useLocalStorageState(
@@ -1224,9 +1225,14 @@ export default function StreamPage({
       if (!res.ok) return
       const data = await res.json()
       const newRecs: RecordingType[] = (data.recordings || []).map(
-        (rec: RecordingType) => ({
+        (rec: {
+          streamId: string
+          filename: string
+          motionTimestamps: string
+        }) => ({
           filename: rec.filename,
-          streamId: stream.id,
+          motionTimestamps: JSON.parse(rec.motionTimestamps),
+          streamId: rec.streamId,
         }),
       )
 
@@ -2149,9 +2155,10 @@ export default function StreamPage({
       }
 
       if (state.recordingBeingViewed) {
-        const { streamId, filename } = state.recordingBeingViewed
+        const { streamId, filename, motionTimestamps } =
+          state.recordingBeingViewed
         setOpeningRecording(true)
-        setRecordingBeingViewed({ streamId, filename })
+        setRecordingBeingViewed({ streamId, filename, motionTimestamps })
         setOpeningRecording(false)
         if (
           !viewed.find(
@@ -2197,11 +2204,15 @@ export default function StreamPage({
     lastMobileStickyRef.current = false
   }, [isMobileWidth])
 
-  const handleView = (filename: string) => {
+  const handleView = (filename: string, motionTimestamps: number[]) => {
     if (!activeStream) return
     const recordingsStream = viewingRecordingsFrom ?? activeStream
     setOpeningRecording(true)
-    setRecordingBeingViewed({ streamId: recordingsStream.id, filename })
+    setRecordingBeingViewed({
+      streamId: recordingsStream.id,
+      filename,
+      motionTimestamps,
+    })
     autoScrollUntilRef.current = Date.now() + 1000
     setTimeout(() => {
       setOpeningRecording(false)
@@ -2429,10 +2440,13 @@ export default function StreamPage({
       .then(
         (nicknamedRecordings: Array<{ filename: string; nickname: string }>) =>
           setNicknames(
-            nicknamedRecordings.reduce((acc: Record<string, string>, rec) => {
-              acc[rec.filename] = rec.nickname
-              return acc
-            }, {}),
+            nicknamedRecordings.reduce(
+              (nicknames: Record<string, string>, rec) => {
+                nicknames[rec.filename] = rec.nickname
+                return nicknames
+              },
+              {},
+            ),
           ),
       )
       .catch(() => setNicknames({}))
@@ -2906,18 +2920,23 @@ export default function StreamPage({
             open={!!recordingBeingViewed}
             streamId={recordingBeingViewed?.streamId ?? ''}
             filename={recordingBeingViewed?.filename ?? ''}
+            motionTimestamps={recordingBeingViewed?.motionTimestamps ?? []}
             onClose={() => setRecordingBeingViewed(null)}
             cachedRecordings={
               recordingBeingViewed
                 ? (cachedRecordings[recordingBeingViewed.streamId] ?? [])
                 : []
             }
-            onNavigate={(filename) => {
+            onNavigate={(filename: string, motionTimestamps: number[]) => {
               if (!activeStream) return
               setOpeningRecording(true)
               setRecordingBeingViewed(
                 recordingBeingViewed
-                  ? { streamId: recordingBeingViewed.streamId, filename }
+                  ? {
+                      streamId: recordingBeingViewed.streamId,
+                      filename,
+                      motionTimestamps,
+                    }
                   : null,
               )
               setOpeningRecording(false)

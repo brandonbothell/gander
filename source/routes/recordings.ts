@@ -166,6 +166,7 @@ export default function initializeRecordingRoutes(
       const recordings = await prisma.motionRecording.findMany({
         where: { streamId },
         orderBy: { filename: 'desc' },
+        select: { streamId: true, filename: true, motionTimestamps: true },
         skip: (pageNum - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
       })
@@ -252,7 +253,7 @@ export default function initializeRecordingRoutes(
           ...(lastSeen && { filename: { gt: lastSeen } }),
         },
         orderBy: { filename: 'desc' },
-        select: { filename: true },
+        select: { streamId: true, filename: true, motionTimestamps: true },
       })
 
       const newRecordings = recordings.map((r) => r.filename)

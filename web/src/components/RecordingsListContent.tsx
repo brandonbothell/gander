@@ -49,7 +49,7 @@ interface RecordingsListContentProps {
   handleTouchStart: (filename: string, checked: boolean) => void
   handleTouchMove: (e: React.TouchEvent) => void
   handleTouchEnd: () => void
-  handleView: (filename: string) => void
+  handleView: (filename: string, motionTimestamps: number[]) => void
   handleCheckboxChange: (filename: string, checked: boolean) => void
   nicknames: Record<string, string>
   viewed: Array<{ filename: string; streamId: string }>
@@ -93,7 +93,7 @@ const Cell = ({
     handleTouchStart: (filename: string, checked: boolean) => void
     handleTouchMove: (e: React.TouchEvent) => void
     handleTouchEnd: () => void
-    handleView: (filename: string) => void
+    handleView: (filename: string, motionTimestamps: number[]) => void
     handleCheckboxChange: (filename: string, checked: boolean) => void
     nicknames: Record<string, string>
     viewed: Array<{ filename: string; streamId: string }>
@@ -156,7 +156,7 @@ const Cell = ({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
-          onClick={() => handleView(rec.filename)}
+          onClick={() => handleView(rec.filename, rec.motionTimestamps)}
           onCheckboxChange={(checked) =>
             handleCheckboxChange(rec.filename, checked)
           }
