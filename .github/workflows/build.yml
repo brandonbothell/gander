@@ -31,6 +31,12 @@ jobs:
           mv config.example.json config.json
           mv .env.example .env
           mv web/config.example.json web/config.json
-      - name: Build
+      - name: Generate database ORM
         run: |
-          yarn build
+          yarn db:generate
+      - name: Build server
+        run: |
+          yarn build:server
+      - name: Build client
+        run: |
+          yarn build:client
