@@ -23,7 +23,8 @@ export interface StreamMotionState {
   recordingTitle: string // Title for the current recording
   cleaningUp: boolean // Whether HLS/flush directory cleanup is in progress
   cancelFlush: boolean // Whether to cancel the current flush operation
-  lowSpaceNotified: boolean // new flag to avoid spamming notifications
+  lowSpaceNotified: boolean // Flag to avoid spamming notifications
+  lastNotifiedRestartCooldownAt: number // Same as above
 }
 
 export type SignedUrl = {

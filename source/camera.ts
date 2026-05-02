@@ -114,6 +114,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         cleaningUp: false,
         cancelFlush: false,
         lowSpaceNotified: false,
+        lastNotifiedRestartCooldownAt: 0,
       }
     }
 
@@ -349,11 +350,15 @@ async function loadStreamsFromDb() {
       setInterval(() => {
         for (const streamId in dynamicStreams) {
           const stream = dynamicStreams[streamId]
+          const state = streamStates[streamId]
+          const now = Date.now()
           if (
             stream &&
             stream.getFFmpegCooldownUntil() &&
-            Date.now() < stream.getFFmpegCooldownUntil()
+            now < stream.getFFmpegCooldownUntil() &&
+            now - state.lastNotifiedRestartCooldownAt > 5 * 60 * 1000 // 5 minutes
           ) {
+            state.lastNotifiedRestartCooldownAt = now
             logMotion(
               `[${streamId}] FFmpeg restart cooldown active until ${new Date(stream.getFFmpegCooldownUntil()).toLocaleTimeString()}`,
               'warn',
@@ -777,6 +782,7 @@ export async function createStreamManager(stream: {
     cleaningUp: false,
     cancelFlush: false,
     lowSpaceNotified: false,
+    lastNotifiedRestartCooldownAt: 0,
   }
 
   return new StreamManager(
