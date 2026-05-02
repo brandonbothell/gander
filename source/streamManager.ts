@@ -111,23 +111,31 @@ export class StreamManager {
 
     const webrtcArgs = [
       '-y',
+
       '-fflags',
       '+genpts',
+
       '-analyzeduration',
       '1000000',
+
       '-probesize',
       '1000000',
+
       ...(inputIsRtsp
         ? ['-rtsp_transport', 'udp', '-i', inputUrl]
         : [
             '-f',
             'v4l2',
+
             '-input_format',
             'mjpeg',
+
             '-video_size',
             '640x360',
+
             '-framerate',
             '10',
+
             '-i',
             inputUrl,
           ]),
@@ -135,46 +143,63 @@ export class StreamManager {
       // Balanced encoding for WebRTC
       '-c:v',
       'libx264',
+
       '-preset',
-      'faster', // Less aggressive than ultrafast
+      'faster',
+
       '-tune',
       'zerolatency',
+
       '-profile:v',
       'baseline',
+
       '-level',
       '3.0',
+
       '-pix_fmt',
       'yuv420p',
+
       '-b:v',
       '400k',
+
       '-maxrate',
       '500k',
+
       '-bufsize',
       '1000k',
+
       '-g',
       '25',
+
       '-keyint_min',
       '25',
+
       '-x264opts',
       'keyint=25:min-keyint=25:no-scenecut:threads=3', // More threads
+
       '-vf',
       'scale=640:360',
 
       // Audio
       '-c:a',
       'libopus',
+
       '-ar',
       '24000',
+
       '-ac',
       '1',
+
       '-b:a',
       '48k',
 
       // WebM output
       '-f',
       'webm',
+
       '-deadline',
       'realtime',
+
       '-cpu-used',
       '6', // Less aggressive than 8
       '-',
@@ -272,7 +297,7 @@ export class StreamManager {
       )
       return
     }
-    if (now - this.lastRestartTimestamp < 10000) {
+    if (now - this.lastRestartTimestamp < 4000) {
       logMotion(
         `[${this.config.id}] Restart requested too soon after previous (${now - this.lastRestartTimestamp}ms), skipping.`,
         'warn',
@@ -323,44 +348,65 @@ export class StreamManager {
     if (inputIsRtsp) {
       ffmpegArgs = [
         '-y',
+
         '-fflags',
         '+genpts+discardcorrupt',
+
         '-rtsp_transport',
         'udp',
+
         '-analyzeduration',
         '2000000',
+
         '-probesize',
         '2000000',
+
         '-i',
         inputUrl,
+
         '-c:v',
         'copy',
+
         '-map',
         '0:v:0',
+
         '-map',
         '0:a:0?',
+
         '-c:a',
         'aac',
+
         '-ar',
         '44100',
+
         '-ac',
         '2',
+
         '-b:a',
         '128k',
+
         '-avoid_negative_ts',
         'make_zero',
+
         '-copyts',
+
         '-start_at_zero',
+
         '-muxdelay',
         '0',
+
         '-f',
         'hls',
+
         '-hls_time',
         '0.5',
+
         '-hls_list_size',
         '6',
+
         '-hls_flags',
         'independent_segments',
+
         '-hls_segment_filename',
         path.join(this.config.hlsDir, 'segment_%03d.ts'),
         path.join(this.config.hlsDir, 'stream.m3u8'),
@@ -368,47 +414,69 @@ export class StreamManager {
     } else {
       ffmpegArgs = [
         '-y',
+
         '-f',
         'v4l2',
+
         '-input_format',
         'mjpeg',
+
         '-video_size',
         '1280x720',
+
         '-framerate',
         '15',
+
         '-i',
         inputUrl,
+
         '-c:v',
         'libx264',
+
         '-preset',
         'faster',
+
         '-tune',
         'zerolatency',
+
         '-profile:v',
         'main',
+
         '-level',
         '3.1',
+
         '-pix_fmt',
         'yuv420p',
+
         '-b:v',
         '1000k',
+
         '-maxrate',
         '1200k',
+
         '-bufsize',
         '2400k',
+
         '-g',
         '30',
+
         '-x264opts',
         'keyint=30:min-keyint=30:no-scenecut:threads=3',
+
         '-an',
+
         '-f',
         'hls',
+
         '-hls_time',
         '0.5',
+
         '-hls_list_size',
         '6',
+
         '-hls_flags',
         'independent_segments',
+
         '-hls_segment_filename',
         path.join(this.config.hlsDir, 'segment_%03d.ts'),
         path.join(this.config.hlsDir, 'stream.m3u8'),
