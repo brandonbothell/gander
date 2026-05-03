@@ -255,7 +255,7 @@ export async function notify(
             cameraId: streamId,
             title,
             body,
-            ...(withOptional ? { withOptional } : {}),
+            ...(withOptional ?? {}),
           })
         } catch (err) {
           console.error('[Notify] Socket notification emit error', err)
