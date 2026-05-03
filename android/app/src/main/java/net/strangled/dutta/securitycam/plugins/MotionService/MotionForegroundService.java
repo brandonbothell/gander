@@ -60,103 +60,139 @@ public class MotionForegroundService extends Service {
     public void onCreate() {
         super.onCreate();
 
-        // 1. Setup Foreground UI
+        // Start Foreground service
         MotionForegroundService.createNotificationChannels(getApplicationContext());
         startForeground(43253643, getStickyNotification());
 
-        // 2. Initialize Socket.io
-        try {
-            InputStream is = getAssets().open("capacitor.config.json");
-            InputStreamReader reader = new InputStreamReader(is);
-            JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
-            if (config.has("server")) {
-                String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
-                SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
-                String clientId = sharedPref.getString("clientId", null);
-                String refreshToken = sharedPref.getString("refreshToken", null);
-                // We need the token to authenticate the socket connection, so we have to call .authenticate() first
-                HTTP.authenticate(baseUrl, refreshToken, clientId, new HTTP.RefreshTokenCallback() {
-                    @Override
-                    public void onSuccess(String refreshToken, String token) {
-                        SharedPreferences.Editor editor = sharedPref.edit();
-                        editor.putString("refreshToken", refreshToken);
-                        boolean success = editor.commit();
-                        if (!success) {
-                            Log.e("NotificationActionReceiver", "Failed to save refresh token");
-                        } else {
-                            Log.d("NotificationActionReceiver", "Saved refresh token!");
-                        }
+        // Initialize Socket.io
+        startSocket();
+    }
 
-                        Map<String, String> auth = new HashMap<>();
-                        auth.put("clientId", clientId);
-                        auth.put("token", token);
+    private boolean isConnecting = false;
 
-                        IO.Options socketOptions = IO.Options.builder()
-                                .setAuth(auth)
-                                .setTransports(new String[]{"polling", "websocket"})
-                                .build();
-                        try {
-                            mSocket = IO.socket(baseUrl, socketOptions);
-                            // 3. Listen for "notification" events
-                            mSocket.on("notification", args -> {
-                                try {
-                                    if (args.length > 0 && args[0] instanceof JSONObject data) {
-                                        String streamUrl = data.getString("streamUrl");
-                                        String cameraId = data.getString("cameraId");
-                                        String title = data.getString("title");
-                                        String body = data.getString("body");
-                                        String icon = data.optString("icon", null);
-                                        String sound = data.optString("sound", null);
-                                        String channelId = data.optString("channelId", EVENT_CHANNEL_ID);
-                                        String group = data.optString("group", null);
+    private void startSocket() {
+        // Prevent overlapping refresh attempts
+        if (isConnecting) return;
+        isConnecting = true;
 
-                                        try {
-                                            showSecurityAlert(streamUrl, cameraId, title, body, icon, sound, channelId, group);
-                                        } catch (IOException e) {
-                                            Log.e("MotionService", "Error showing security alert: " + e.getMessage());
-                                        }
-                                    }
-                                } catch (JSONException e) {
-                                    Log.e("MotionService", "Error parsing socket data: " + e.getMessage());
-                                }
-                            });
-
-                            // 4. Listen for standard socket events
-                            mSocket.on(Socket.EVENT_CONNECT, args -> {
-                                Log.d("MotionForegroundService", "Socket connected");
-                                setIsSocketConnected(true);
-                            });
-                            mSocket.on(Socket.EVENT_DISCONNECT, args -> {
-                                Log.d("MotionForegroundService", "Socket disconnected");
-                                setIsSocketConnected(false);
-                            });
-                            mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
-                                if (args[0] instanceof EngineIOException exception) {
-                                    Log.e("MotionForegroundService", "Socket connect error: " + exception.getMessage());
-                                } else if (args[0] instanceof JSONObject object) {
-                                    Log.e("MotionForegroundService", "Socket error: " + object.toString());
-                                }
-
-                                setIsSocketConnected(false);
-                            });
-
-                            // TODO: Only connect if client notifications are enabled
-                            mSocket.connect();
-                        } catch (URISyntaxException e) {
-                            Log.e("MotionService", "Error connecting to socket: " + e.getMessage());
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(String errorMessage) {
-                        Log.e("MotionService", "Failed to refresh token: " + errorMessage);
-                    }
-                });
-
-            }
-        } catch (IOException e) {
-            Log.e("MotionService", "IO Connection Error: " + e.getMessage());
+        // Cleanup old socket if it exists
+        if (mSocket != null) {
+            mSocket.disconnect();
+            mSocket.off();
         }
+
+        InputStream is = null;
+        try {
+            is = getAssets().open("capacitor.config.json");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        InputStreamReader reader = new InputStreamReader(is);
+        JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
+        if (config.has("server")) {
+            String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+            SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
+            String clientId = sharedPref.getString("clientId", null);
+            String refreshToken = sharedPref.getString("refreshToken", null);
+
+            HTTP.authenticate(baseUrl, refreshToken, clientId, new HTTP.RefreshTokenCallback() {
+                @Override
+                public void onSuccess(String newRefreshToken, String token) {
+                    isConnecting = false;
+
+                    // Update the refreshToken for the next attempt
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putString("refreshToken", refreshToken);
+                    boolean success = editor.commit();
+                    if (!success) {
+                        Log.e("MotionForegroundService", "Failed to save refresh token");
+                    } else {
+                        Log.d("MotionForegroundService", "Saved refresh token!");
+                    }
+
+                    Map<String, String> auth = new HashMap<>();
+                    auth.put("clientId", clientId);
+                    auth.put("token", token);
+
+                    IO.Options socketOptions = IO.Options.builder()
+                            .setAuth(auth)
+                            .setTransports(new String[]{"polling", "websocket"})
+                            .setReconnection(true) // Allow internal lib to handle signal drops
+                            .setReconnectionAttempts(5)
+                            .build();
+
+                    try {
+                        mSocket = IO.socket(baseUrl, socketOptions);
+
+                        setupSocketListeners();
+
+                        mSocket.connect();
+                    } catch (URISyntaxException e) {
+                        Log.e("MotionService", "URI Error: " + e.getMessage());
+                    }
+                }
+
+                @Override
+                public void onFailure(String errorMessage) {
+                    isConnecting = false;
+                    Log.e("MotionService", "Auth fail, retrying in 30s: " + errorMessage);
+                    // Optional: Schedule a retry using a Handler
+                }
+            });
+        }
+    }
+
+    private void setupSocketListeners() {
+        mSocket.on("notification", args -> {
+            try {
+                if (args.length > 0 && args[0] instanceof JSONObject data) {
+                    String streamUrl = data.getString("streamUrl");
+                    String cameraId = data.getString("cameraId");
+                    String title = data.getString("title");
+                    String body = data.getString("body");
+                    String icon = data.optString("icon", null);
+                    String sound = data.optString("sound", null);
+                    String channelId = data.optString("channelId", EVENT_CHANNEL_ID);
+                    String group = data.optString("group", null);
+
+                    try {
+                        showSecurityAlert(streamUrl, cameraId, title, body, icon, sound, channelId, group);
+                    } catch (IOException e) {
+                        Log.e("MotionService", "Error showing security alert: " + e.getMessage());
+                    }
+                }
+            } catch (JSONException e) {
+                Log.e("MotionService", "Error parsing socket data: " + e.getMessage());
+            }
+        });
+
+        mSocket.on(Socket.EVENT_CONNECT, args -> {
+            Log.d("MotionForegroundService", "Socket connected");
+            setIsSocketConnected(true);
+        });
+
+        mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
+            setIsSocketConnected(false);
+
+            // Check if the error is a 401/Unauthorized
+            if (args.length > 0) {
+                String errorMsg = args[0].toString();
+                Log.e("MotionService", "Connect Error: " + errorMsg);
+
+                if (errorMsg.contains("Authentication required")) {
+                    Log.d("MotionService", "Token likely expired, refreshing...");
+                    startSocket(); // Fully restart the flow with a new token
+                }
+            }
+        });
+
+        mSocket.on(Socket.EVENT_DISCONNECT, args -> {
+            setIsSocketConnected(false);
+            // "io server disconnect" means the server kicked us (often token expiration)
+            if (args.length > 0 && "io server disconnect".equals(args[0].toString())) {
+                startSocket();
+            }
+        });
     }
 
     private void showSecurityAlert(String streamUrl, String cameraId, String title, String body,

@@ -257,7 +257,7 @@ export async function notify(
               withOptional,
             })
             console.log('[Notify] Sent socket push')
-            return void 0
+            continue
           } catch (err) {
             console.error('[Notify] Socket notification emit error', err)
           }
