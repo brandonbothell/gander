@@ -91,7 +91,10 @@ public class MotionForegroundService extends Service {
                         auth.put("clientId", clientId);
                         auth.put("token", token);
 
-                        IO.Options socketOptions = IO.Options.builder().setAuth(auth).build();
+                        IO.Options socketOptions = IO.Options.builder()
+                                .setAuth(auth)
+                                .setTransports(new String[]{"polling", "websocket"})
+                                .build();
                         try {
                             mSocket = IO.socket(baseUrl, socketOptions);
                             // 3. Listen for "notification" events

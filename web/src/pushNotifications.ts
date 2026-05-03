@@ -50,14 +50,20 @@ export async function setupPushNotifications() {
       PushNotifications.addListener(
         'pushNotificationReceived',
         async (notification: PushNotificationSchema) => {
-          console.log('Push notification received:', notification)
+          console.log(
+            'Push notification received: ' +
+              JSON.stringify(notification, null, 2),
+          )
         },
       )
 
       PushNotifications.addListener(
         'pushNotificationActionPerformed',
         (action: ActionPerformed) => {
-          console.log('Push notification action recieved:', action)
+          console.log(
+            'Push notification action recieved:' +
+              JSON.stringify(action, null, 2),
+          )
           const url = action.notification.data?.streamUrl
           if (url) {
             window.location.href = url
@@ -68,7 +74,9 @@ export async function setupPushNotifications() {
       LocalNotifications.addListener(
         'localNotificationActionPerformed',
         (event) => {
-          console.log('Local notification tapped:', event)
+          console.log(
+            'Local notification tapped: ' + JSON.stringify(event, null, 2),
+          )
           const url = event.notification.extra?.streamUrl
           if (url) {
             window.location.href = url
