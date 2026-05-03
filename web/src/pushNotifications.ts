@@ -93,7 +93,7 @@ export async function setupPushNotifications() {
 
       PushNotifications.register()
 
-      const clientId = await Preferences.get({ key: 'clientId' })
+      const clientId = (await Preferences.get({ key: 'clientId' })).value
 
       return new Promise<void>((resolve, reject) => {
         let resolved = false
