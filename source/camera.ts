@@ -506,6 +506,9 @@ loadStreamsFromDb()
       const clientId = socket.handshake.auth.clientId
       if (clientId) {
         socket.join(clientId)
+        socket.on('disconnect', () => {
+          io.sockets.adapter.rooms.delete(clientId)
+        })
       }
     })
 

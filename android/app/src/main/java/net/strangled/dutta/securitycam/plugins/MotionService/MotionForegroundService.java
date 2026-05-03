@@ -187,11 +187,11 @@ public class MotionForegroundService extends Service {
             // Check if the error is a 401/Unauthorized
             if (args.length > 0) {
                 String errorMsg = args[0].toString();
-                Log.e("MotionService", "Connect Error: " + errorMsg);
+                Log.e("MotionService", "Socket connect Error: " + errorMsg);
 
                 if (errorMsg.contains("Authentication required")) {
                     Log.d("MotionService", "Token likely expired, refreshing...");
-                    startSocket(); // Fully restart the flow with a new token
+                    startSocketWithDelay(); // Fully restart the flow with a new token
                 }
             }
         });
@@ -200,7 +200,7 @@ public class MotionForegroundService extends Service {
             setIsSocketConnected(false);
             // "io server disconnect" means the server kicked us (often token expiration)
             if (args.length > 0 && "io server disconnect".equals(args[0].toString())) {
-                startSocket();
+                startSocketWithDelay();
             }
         });
     }
