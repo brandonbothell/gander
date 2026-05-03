@@ -256,10 +256,11 @@ public class MotionForegroundService extends Service {
             }
         }
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            return;
+        try {
+            NotificationManagerCompat.from(this).notify(alertId, builder.build());
+        } catch (SecurityException e) {
+            Log.e("MotionForegroundService", "Error showing security alert: " + e.getMessage());
         }
-        NotificationManagerCompat.from(this).notify(alertId, builder.build());
     }
 
     private Notification getStickyNotification() {
@@ -341,8 +342,10 @@ public class MotionForegroundService extends Service {
 
     private boolean setIsSocketConnected(boolean isSocketConnected) {
         MotionForegroundService.isSocketConnected = isSocketConnected;
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+        try {
             NotificationManagerCompat.from(this).notify(43253643, getStickyNotification());
+        } catch (SecurityException e) {
+            Log.e("MotionForegroundService", "Error showing sticky notification: " + e.getMessage());
         }
         return MotionForegroundService.isSocketConnected;
     }

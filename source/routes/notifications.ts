@@ -134,7 +134,8 @@ export default function initializeNotificationRoutes(app: express.Application) {
         !updated?.fcmToken &&
         !updated?.endpoint &&
         !updated?.p256dh &&
-        !updated?.auth // Ignore clientId since we don't send notifications without fcmToken
+        !updated?.clientId &&
+        !updated?.auth
       ) {
         await prisma.pushSubscription
           .delete({ where: { sid } })
@@ -238,7 +239,7 @@ export async function notify(
       }
     }
     // FCM or Socket Push
-    if (sub.fcmToken) {
+    if (sub.fcmToken || sub.clientId) {
       const withOptional = {
         ...(tag ? { tag } : {}),
         ...(channelId ? { channelId } : {}),
@@ -260,7 +261,7 @@ export async function notify(
         } catch (err) {
           console.error('[Notify] Socket notification emit error', err)
         }
-      } else {
+      } else if (sub.fcmToken) {
         // FCM push
         try {
           await admin.messaging().send({

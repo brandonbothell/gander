@@ -375,7 +375,6 @@ async function loadStreamsFromDb() {
             notify(dynamicStreams, streamId, {
               title: 'Stream Restart Cooldown',
               body: `Stream ${streamId} is in FFmpeg restart cooldown due to repeated failures.`,
-              tag: `server_event_${streamId}`,
               group: `stream_event_${streamId}`,
             })
           }

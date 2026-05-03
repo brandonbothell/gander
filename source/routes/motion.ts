@@ -177,7 +177,6 @@ export default function initializeMotionRoutes(
           title: 'Motion Recording Paused',
           body: `Motion recording has been paused for ${nickname}.`,
           channelId: 'motion_event_low_channel',
-          tag: `motion_pause_${streamId}`,
           group: `motion_pause_${streamId}`,
         })
       } else {
@@ -185,7 +184,6 @@ export default function initializeMotionRoutes(
           title: 'Motion Recording Resumed',
           body: `Motion recording has been resumed for ${nickname}.`,
           channelId: 'motion_event_low_channel',
-          tag: `motion_pause_${streamId}`,
           group: `motion_resume_${streamId}`,
         })
       }
@@ -347,7 +345,6 @@ export async function checkDiskSpaceAndPurge(
         title: 'Low Disk Space - Motion Saving Paused',
         body: `Host low on disk space (${Math.round(free / (1024 * 1024))}MB). Motion segments will be deleted instead of saved.`,
         channelId: 'motion_event_low_channel',
-        tag: `low_space_${streamId}`,
         group: `low_space_${streamId}`,
       })
     }
