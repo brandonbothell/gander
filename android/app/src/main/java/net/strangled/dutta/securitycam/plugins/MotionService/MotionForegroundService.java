@@ -234,7 +234,7 @@ public class MotionForegroundService extends Service {
                 .setContentText(body)
                 .setSmallIcon(getApplicationInfo().icon)
                 .setColor(Color.parseColor("#2196F3"))
-                .setGroup("detection_info")
+                .setGroup(LOW_EVENT_CHANNEL_ID)
                 .setLights(Color.parseColor("#2196F3"), 500, 500)
                 .setVibrate(new long[]{0L, 500L, 500L, 500L})
                 .addExtras(extras)
