@@ -50,12 +50,26 @@ export const motionLogPath = path.join(
   'motion',
 )
 export const authLogPath = path.join(__dirname, '..', 'logs', 'auth', 'auth')
-export const notifyLogPath = path.join(__dirname, '..', 'logs', 'auth', 'auth')
+export const notifyLogPath = path.join(
+  __dirname,
+  '..',
+  'logs',
+  'notify',
+  'notify',
+)
 
 // Ensure logs directory exists
-const logsDir = path.dirname(motionLogPath)
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true })
+const motionLogsDir = path.dirname(motionLogPath)
+if (!fs.existsSync(motionLogsDir)) {
+  fs.mkdirSync(motionLogsDir, { recursive: true })
+}
+const authLogsDir = path.dirname(motionLogPath)
+if (!fs.existsSync(authLogsDir)) {
+  fs.mkdirSync(authLogsDir, { recursive: true })
+}
+const notifyLogsDir = path.dirname(motionLogPath)
+if (!fs.existsSync(notifyLogsDir)) {
+  fs.mkdirSync(notifyLogsDir, { recursive: true })
 }
 
 // --- Configuration ---
@@ -500,6 +514,7 @@ loadStreamsFromDb()
           username: string
         }
         socket.data.username = payload.username
+        console.info(`[Socket] User '${socket.data.username}' connecting...`)
         return next()
       } catch {
         console.warn(
