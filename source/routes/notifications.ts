@@ -32,21 +32,15 @@ export default function initializeNotificationRoutes(app: express.Application) {
       const sid = getPushSubKey(req)
       const { endpoint, expirationTime, keys, fcmToken, clientId } = req.body
 
-      if (clientId) {
+      if (clientId || fcmToken) {
+        const upsert = {
+          ...(clientId ? { clientId } : {}),
+          ...(fcmToken ? { fcmToken } : {}),
+        }
         await prisma.pushSubscription.upsert({
           where: { sid },
-          update: { clientId },
-          create: { sid, clientId },
-        })
-        res.json({ success: true })
-        return
-      }
-
-      if (fcmToken) {
-        await prisma.pushSubscription.upsert({
-          where: { sid },
-          update: { fcmToken },
-          create: { sid, fcmToken },
+          update: upsert,
+          create: { sid, ...upsert },
         })
         res.json({ success: true })
         return
@@ -193,6 +187,7 @@ export async function notify(
   for (const sub of subs) {
     // Web Push
     if (sub.endpoint && sub.p256dh && sub.auth) {
+      console.info(`[Notify] [WebPush] Sending notification to '${sub.sid}'`)
       try {
         await webpush.sendNotification(
           {
@@ -216,7 +211,7 @@ export async function notify(
           }),
         )
       } catch (err) {
-        console.error('[Notify] Web Push notification error:', err)
+        console.error('[Notify] [WebPush] Notification error:', err)
         // Remove invalid web push subscription if 404
         if (
           typeof err === 'object' &&
@@ -247,21 +242,30 @@ export async function notify(
         ...(icon ? { icon } : {}),
       }
 
-      if (sub.clientId && io.sockets.adapter.rooms.has(sub.clientId)) {
-        // Socket push
-        // Emit notification data to the clientId group
-        try {
-          io.to(sub.clientId).emit('notification', {
-            streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
-            cameraId: streamId,
-            title,
-            body,
-            ...(withOptional ?? {}),
-          })
-        } catch (err) {
-          console.error('[Notify] Socket notification emit error', err)
+      console.info(
+        `[Notify] [FCM/Socket] Sending push notification to '${sub.sid}'`,
+      )
+
+      if (sub.clientId) {
+        if (io.sockets.adapter.rooms.has(sub.clientId)) {
+          // Socket push
+          // Emit notification data to the clientId group
+          try {
+            io.to(sub.clientId).emit('notification', {
+              streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
+              cameraId: streamId,
+              title,
+              body,
+              withOptional,
+            })
+            continue
+          } catch (err) {
+            console.error('[Notify] Socket notification emit error', err)
+          }
         }
-      } else if (sub.fcmToken) {
+      }
+
+      if (sub.fcmToken) {
         // FCM push
         try {
           await admin.messaging().send({

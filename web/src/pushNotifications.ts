@@ -8,6 +8,7 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import { App } from '@capacitor/app'
 import { MotionService } from './plugins/motionService'
 import { API_BASE, authFetch } from './main'
+import { Preferences } from '@capacitor/preferences'
 
 export async function subscribeToWebPush() {
   if (!navigator.serviceWorker) {
@@ -50,14 +51,20 @@ export async function setupPushNotifications() {
       PushNotifications.addListener(
         'pushNotificationReceived',
         async (notification: PushNotificationSchema) => {
-          console.log('Push notification received:', notification)
+          console.log(
+            'Push notification received: ' +
+              JSON.stringify(notification, null, 2),
+          )
         },
       )
 
       PushNotifications.addListener(
         'pushNotificationActionPerformed',
         (action: ActionPerformed) => {
-          console.log('Push notification action recieved:', action)
+          console.log(
+            'Push notification action recieved:' +
+              JSON.stringify(action, null, 2),
+          )
           const url = action.notification.data?.streamUrl
           if (url) {
             window.location.href = url
@@ -68,7 +75,9 @@ export async function setupPushNotifications() {
       LocalNotifications.addListener(
         'localNotificationActionPerformed',
         (event) => {
-          console.log('Local notification tapped:', event)
+          console.log(
+            'Local notification tapped: ' + JSON.stringify(event, null, 2),
+          )
           const url = event.notification.extra?.streamUrl
           if (url) {
             window.location.href = url
@@ -84,6 +93,8 @@ export async function setupPushNotifications() {
 
       PushNotifications.register()
 
+      const clientId = (await Preferences.get({ key: 'clientId' })).value
+
       return new Promise<void>((resolve, reject) => {
         let resolved = false
         PushNotifications.addListener('registration', async (token: Token) => {
@@ -91,7 +102,7 @@ export async function setupPushNotifications() {
             await authFetch(`${API_BASE}/api/subscribe`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fcmToken: token.value }),
+              body: JSON.stringify({ fcmToken: token.value, clientId }),
             })
             await MotionService.startService()
             resolved = true

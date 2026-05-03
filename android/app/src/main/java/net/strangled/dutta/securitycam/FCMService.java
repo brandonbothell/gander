@@ -50,8 +50,7 @@ public class FCMService extends FirebaseMessagingService {
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         if (MotionForegroundService.getIsSocketConnected()) {
-            Log.d("FCMService", "Socket is connected, ignoring notification");
-            return;
+            Log.d("FCMService", "Socket is connected, notification may be duplicated");
         }
 
         Map<String, String> data = remoteMessage.getData();
