@@ -247,7 +247,10 @@ export async function notify(
         ...(icon ? { icon } : {}),
       }
 
+      console.log('[Notify] Sending FCM/socket push')
+
       if (sub.clientId && io.sockets.adapter.rooms.has(sub.clientId)) {
+        console.log(`[Notify] Sending socket push to ${sub.sid}`)
         // Socket push
         // Emit notification data to the clientId group
         try {
@@ -256,12 +259,14 @@ export async function notify(
             cameraId: streamId,
             title,
             body,
-            ...(withOptional ?? {}),
+            withOptional,
           })
+          console.log('[Notify] Sent socket push')
         } catch (err) {
           console.error('[Notify] Socket notification emit error', err)
         }
       } else if (sub.fcmToken) {
+        console.log('[Notify] Sending FCM push')
         // FCM push
         try {
           await admin.messaging().send({
@@ -286,6 +291,7 @@ export async function notify(
             },
             token: sub.fcmToken,
           })
+          console.log('[Notify] Sent FCM push')
           /* android: {
             priority: 'high',
             notification: {
