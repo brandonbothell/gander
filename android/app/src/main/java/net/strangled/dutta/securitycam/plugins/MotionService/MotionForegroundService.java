@@ -16,7 +16,9 @@ import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
@@ -54,8 +56,6 @@ public class MotionForegroundService extends Service {
 
     private static boolean isSocketConnected = false;
 
-    private static boolean subscribed = false;
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -65,14 +65,29 @@ public class MotionForegroundService extends Service {
         startForeground(43253643, getStickyNotification());
 
         // Initialize Socket.io
-        startSocket();
+        startSocketWithDelay();
     }
 
     private boolean isConnecting = false;
+    private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
+    private boolean isRefreshingToken = false;
+
+    private void startSocketWithDelay() {
+        Log.d("MotionService", "Scheduling socket reconnection in 10 seconds...");
+
+        // Cancel any existing pending reconnections to avoid "stacking" sockets
+        reconnectHandler.removeCallbacksAndMessages(null);
+
+        reconnectHandler.postDelayed(() -> {
+            if (!isRefreshingToken) {
+                startSocket();
+            }
+        }, 10000); // 10 second delay
+    }
 
     private void startSocket() {
         // Prevent overlapping refresh attempts
-        if (isConnecting) return;
+        if (isConnecting || isRefreshingToken) return;
         isConnecting = true;
 
         // Cleanup old socket if it exists
@@ -98,16 +113,12 @@ public class MotionForegroundService extends Service {
             HTTP.authenticate(baseUrl, refreshToken, clientId, new HTTP.RefreshTokenCallback() {
                 @Override
                 public void onSuccess(String newRefreshToken, String token) {
-                    isConnecting = false;
+                    isRefreshingToken = false;
 
-                    // Update the refreshToken for the next attempt
-                    SharedPreferences.Editor editor = sharedPref.edit();
-                    editor.putString("refreshToken", refreshToken);
-                    boolean success = editor.commit();
-                    if (!success) {
-                        Log.e("MotionForegroundService", "Failed to save refresh token");
-                    } else {
-                        Log.d("MotionForegroundService", "Saved refresh token!");
+                    // Cleanup old socket instance completely
+                    if (mSocket != null) {
+                        mSocket.disconnect();
+                        mSocket.off();
                     }
 
                     Map<String, String> auth = new HashMap<>();
@@ -117,26 +128,25 @@ public class MotionForegroundService extends Service {
                     IO.Options socketOptions = IO.Options.builder()
                             .setAuth(auth)
                             .setTransports(new String[]{"polling", "websocket"})
-                            .setReconnection(true) // Allow internal lib to handle signal drops
-                            .setReconnectionAttempts(5)
+                            .setReconnection(true)
                             .build();
 
                     try {
                         mSocket = IO.socket(baseUrl, socketOptions);
-
                         setupSocketListeners();
-
                         mSocket.connect();
                     } catch (URISyntaxException e) {
                         Log.e("MotionService", "URI Error: " + e.getMessage());
                     }
+                    isConnecting = false;
                 }
 
                 @Override
                 public void onFailure(String errorMessage) {
-                    isConnecting = false;
-                    Log.e("MotionService", "Auth fail, retrying in 30s: " + errorMessage);
-                    // Optional: Schedule a retry using a Handler
+                    isRefreshingToken = false;
+                    Log.e("MotionService", "Auth failed: " + errorMessage + ". Retrying in 30s...");
+                    // If the server is down, wait longer before trying again
+                    reconnectHandler.postDelayed(() -> startSocket(), 30000);
                 }
             });
         }
