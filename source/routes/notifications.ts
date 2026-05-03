@@ -32,21 +32,15 @@ export default function initializeNotificationRoutes(app: express.Application) {
       const sid = getPushSubKey(req)
       const { endpoint, expirationTime, keys, fcmToken, clientId } = req.body
 
-      if (clientId) {
+      if (clientId || fcmToken) {
+        const upsert = {
+          ...(clientId ? { clientId } : {}),
+          ...(fcmToken ? { fcmToken } : {}),
+        }
         await prisma.pushSubscription.upsert({
           where: { sid },
-          update: { clientId },
-          create: { sid, clientId },
-        })
-        res.json({ success: true })
-        return
-      }
-
-      if (fcmToken) {
-        await prisma.pushSubscription.upsert({
-          where: { sid },
-          update: { fcmToken },
-          create: { sid, fcmToken },
+          update: upsert,
+          create: { sid, ...upsert },
         })
         res.json({ success: true })
         return
@@ -249,23 +243,32 @@ export async function notify(
 
       console.log('[Notify] Sending FCM/socket push')
 
-      if (sub.clientId && io.sockets.adapter.rooms.has(sub.clientId)) {
-        console.log(`[Notify] Sending socket push to ${sub.sid}`)
-        // Socket push
-        // Emit notification data to the clientId group
-        try {
-          io.to(sub.clientId).emit('notification', {
-            streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
-            cameraId: streamId,
-            title,
-            body,
-            withOptional,
-          })
-          console.log('[Notify] Sent socket push')
-        } catch (err) {
-          console.error('[Notify] Socket notification emit error', err)
+      if (sub.clientId) {
+        if (io.sockets.adapter.rooms.has(sub.clientId)) {
+          console.log(`[Notify] Sending socket push to ${sub.sid}`)
+          // Socket push
+          // Emit notification data to the clientId group
+          try {
+            io.to(sub.clientId).emit('notification', {
+              streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
+              cameraId: streamId,
+              title,
+              body,
+              withOptional,
+            })
+            console.log('[Notify] Sent socket push')
+            return void 0
+          } catch (err) {
+            console.error('[Notify] Socket notification emit error', err)
+          }
+        } else {
+          console.log(
+            `[Notify] Client ID ${sub.clientId} is not connected via socket`,
+          )
         }
-      } else if (sub.fcmToken) {
+      }
+
+      if (sub.fcmToken) {
         console.log(`[Notify] Sending FCM push to ${sub.sid}`)
         // FCM push
         try {

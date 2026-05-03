@@ -8,7 +8,7 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import { App } from '@capacitor/app'
 import { MotionService } from './plugins/motionService'
 import { API_BASE, authFetch } from './main'
-import { getDeviceFingerprint } from './utils/session'
+import { Preferences } from '@capacitor/preferences'
 
 export async function subscribeToWebPush() {
   if (!navigator.serviceWorker) {
@@ -93,7 +93,7 @@ export async function setupPushNotifications() {
 
       PushNotifications.register()
 
-      const clientId = (await getDeviceFingerprint()).clientId
+      const clientId = await Preferences.get({ key: 'clientId' })
 
       return new Promise<void>((resolve, reject) => {
         let resolved = false
