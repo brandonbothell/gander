@@ -266,7 +266,7 @@ export async function notify(
           console.error('[Notify] Socket notification emit error', err)
         }
       } else if (sub.fcmToken) {
-        console.log('[Notify] Sending FCM push')
+        console.log(`[Notify] Sending FCM push to ${sub.sid}`)
         // FCM push
         try {
           await admin.messaging().send({

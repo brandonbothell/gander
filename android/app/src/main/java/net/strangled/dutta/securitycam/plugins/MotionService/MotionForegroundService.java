@@ -125,32 +125,10 @@ public class MotionForegroundService extends Service {
                             mSocket.on(Socket.EVENT_CONNECT, args -> {
                                 Log.d("MotionForegroundService", "Socket connected");
                                 setIsSocketConnected(true);
-                                if (!subscribed) HTTP.subscribeToSocket(baseUrl, clientId, new HTTP.SubscribeCallback() {
-                                    @Override
-                                    public void onSuccess() {
-                                        subscribed = true;
-                                    }
-
-                                    @Override
-                                    public void onFailure(String errorMessage) {
-                                        subscribed = false;
-                                    }
-                                });
                             });
                             mSocket.on(Socket.EVENT_DISCONNECT, args -> {
                                 Log.d("MotionForegroundService", "Socket disconnected");
                                 setIsSocketConnected(false);
-                                HTTP.unsubscribeFromSocket(baseUrl, clientId, new HTTP.SubscribeCallback() {
-                                    @Override
-                                    public void onSuccess() {
-                                        subscribed = false;
-                                    }
-
-                                    @Override
-                                    public void onFailure(String errorMessage) {
-                                        subscribed = true;
-                                    }
-                                });
                             });
                             mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
                                 if (args[0] instanceof EngineIOException exception) {
@@ -160,7 +138,6 @@ public class MotionForegroundService extends Service {
                                 }
 
                                 setIsSocketConnected(false);
-                                HTTP.unsubscribeFromSocket(baseUrl, clientId, null);
                             });
 
                             // TODO: Only connect if client notifications are enabled
