@@ -187,6 +187,7 @@ export async function notify(
   for (const sub of subs) {
     // Web Push
     if (sub.endpoint && sub.p256dh && sub.auth) {
+      console.info(`[Notify] [WebPush] Sending notification to '${sub.sid}'`)
       try {
         await webpush.sendNotification(
           {
@@ -210,7 +211,7 @@ export async function notify(
           }),
         )
       } catch (err) {
-        console.error('[Notify] Web Push notification error:', err)
+        console.error('[Notify] [WebPush] Notification error:', err)
         // Remove invalid web push subscription if 404
         if (
           typeof err === 'object' &&
@@ -241,11 +242,12 @@ export async function notify(
         ...(icon ? { icon } : {}),
       }
 
-      console.log('[Notify] Sending FCM/socket push')
+      console.info(
+        `[Notify] [FCM/Socket] Sending push notification to '${sub.sid}'`,
+      )
 
       if (sub.clientId) {
         if (io.sockets.adapter.rooms.has(sub.clientId)) {
-          console.log(`[Notify] Sending socket push to ${sub.sid}`)
           // Socket push
           // Emit notification data to the clientId group
           try {
@@ -256,20 +258,14 @@ export async function notify(
               body,
               withOptional,
             })
-            console.log('[Notify] Sent socket push')
             continue
           } catch (err) {
             console.error('[Notify] Socket notification emit error', err)
           }
-        } else {
-          console.log(
-            `[Notify] Client ID ${sub.clientId} is not connected via socket`,
-          )
         }
       }
 
       if (sub.fcmToken) {
-        console.log(`[Notify] Sending FCM push to ${sub.sid}`)
         // FCM push
         try {
           await admin.messaging().send({
@@ -294,7 +290,6 @@ export async function notify(
             },
             token: sub.fcmToken,
           })
-          console.log('[Notify] Sent FCM push')
           /* android: {
             priority: 'high',
             notification: {
