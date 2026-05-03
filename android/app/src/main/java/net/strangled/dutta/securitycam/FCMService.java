@@ -1,6 +1,5 @@
 package net.strangled.dutta.securitycam;
 
-import com.getcapacitor.plugin.WebView;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -13,19 +12,15 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
-import androidx.core.graphics.drawable.IconCompat;
 
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
-import net.strangled.dutta.securitycam.API.APIService;
 import net.strangled.dutta.securitycam.API.HTTP;
 import net.strangled.dutta.securitycam.plugins.MotionService.MotionForegroundService;
 
@@ -36,13 +31,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
-import retrofit2.internal.EverythingIsNonNull;
 
 public class FCMService extends FirebaseMessagingService {
     private static final String EVENT_CHANNEL_ID = "motion_event_channel";
@@ -208,7 +196,7 @@ public class FCMService extends FirebaseMessagingService {
         // FCM registration token to your app server.
         if (refreshToken != null) {
             try {
-                sendRegistrationToServer(sharedPref, refreshToken, fcmToken);
+                sendRegistrationToServer(sharedPref, fcmToken);
             } catch (IOException e) {
                 Log.e("FCMService", "Error sending token to server", e);
             }
@@ -216,7 +204,7 @@ public class FCMService extends FirebaseMessagingService {
     }
 
     private void sendRegistrationToServer(@NonNull SharedPreferences sharedPref,
-                                          @NonNull String refreshToken, @NonNull String fcmToken) throws IOException {
+                                          @NonNull String fcmToken) throws IOException {
         InputStream is = getAssets().open("capacitor.config.json");
         InputStreamReader reader = new InputStreamReader(is);
         JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
@@ -227,11 +215,6 @@ public class FCMService extends FirebaseMessagingService {
 
             assert baseUrl != null;
             assert clientId != null;
-
-            Retrofit retrofit = new Retrofit.Builder()
-                    .baseUrl(baseUrl)
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build();
 
 //            interface DeviceInfo {
 //                userAgent: string

@@ -1,13 +1,11 @@
 package net.strangled.dutta.securitycam;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.service.notification.StatusBarNotification;
@@ -15,23 +13,12 @@ import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
-import com.google.gson.JsonObject;
 
-import net.strangled.dutta.securitycam.API.APIService;
 import net.strangled.dutta.securitycam.API.HTTP;
 
-import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-
-import okhttp3.ResponseBody;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
-import retrofit2.internal.EverythingIsNonNull;
 
 public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver {
     @Override
@@ -47,8 +34,6 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
         String baseUrl = intent.getStringExtra(ctx.getPackageName() + ".baseUrl");
         String clientId = intent.getStringExtra(ctx.getPackageName() + ".clientId");
         boolean pause = intent.getBooleanExtra(ctx.getPackageName() + ".pause", true);
-        SharedPreferences sharedPref = ctx.getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
-        String refreshToken = sharedPref.getString("refreshToken", null);
         int notificationId = intent.getIntExtra(ctx.getPackageName() + ".notificationId", 0);
 
         // 1. Edit notification action to "Unpause Detection"

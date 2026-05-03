@@ -1,16 +1,15 @@
 package net.strangled.dutta.securitycam.plugins.MotionService;
 
-import android.Manifest;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.net.Uri;
@@ -19,9 +18,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.util.Log;
 
-import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.graphics.drawable.IconCompat;
@@ -38,7 +37,6 @@ import org.json.JSONObject;
 
 import io.socket.client.IO;
 import io.socket.client.Socket;
-import io.socket.engineio.client.EngineIOException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,6 +48,12 @@ import java.util.Objects;
 
 public class MotionForegroundService extends Service {
     private Socket mSocket;
+    private PowerManager.WakeLock wakeLock;
+    private boolean isConnecting = false;
+    private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
+    private final Handler wakeLockHandler = new Handler(Looper.getMainLooper());
+    private final Handler tokenUpdateHandler = new Handler(Looper.getMainLooper());
+    private boolean isRefreshingToken = false;
     private static final String CHANNEL_ID = "motion_service_channel";
     private static final String EVENT_CHANNEL_ID = "motion_event_channel";
     private static final String LOW_EVENT_CHANNEL_ID = "motion_event_low_channel";
@@ -65,12 +69,29 @@ public class MotionForegroundService extends Service {
         startForeground(43253643, getStickyNotification());
 
         // Initialize Socket.io
+        acquireWakeLock();
         startSocketWithDelay();
+        updateTokenLoop();
     }
 
-    private boolean isConnecting = false;
-    private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
-    private boolean isRefreshingToken = false;
+    private void acquireWakeLock() {
+        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MotionForegroundService::acquireWakeLock");
+        if (wakeLock != null) {
+            wakeLock.acquire(10*60*1000L /* 10 minutes */);
+        }
+        wakeLockHandler.postDelayed(this::acquireWakeLock, 10*61*1000L /* 10 minutes 10 seconds */);
+    }
+
+    private void updateTokenLoop() {
+        tokenUpdateHandler.postDelayed(() -> {
+            SharedPreferences sharedPref = getApplicationContext()
+                    .getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
+            String refreshToken = sharedPref.getString("refreshToken", null);
+            if (refreshToken != null) HTTP.setCurrentRefreshToken(refreshToken);
+            updateTokenLoop();
+        }, 10 * 1000L /* 10 seconds */);
+    }
 
     private void startSocketWithDelay() {
         Log.d("MotionService", "Scheduling socket reconnection in 10 seconds...");
@@ -96,7 +117,7 @@ public class MotionForegroundService extends Service {
             mSocket.off();
         }
 
-        InputStream is = null;
+        InputStream is;
         try {
             is = getAssets().open("capacitor.config.json");
         } catch (IOException e) {
@@ -162,7 +183,7 @@ public class MotionForegroundService extends Service {
                     String body = data.getString("body");
                     String icon = data.optString("icon", null);
                     String sound = data.optString("sound", null);
-                    String channelId = data.optString("channelId", EVENT_CHANNEL_ID);
+                    String channelId = data.optString("channelId", LOW_EVENT_CHANNEL_ID);
                     String group = data.optString("group", null);
 
                     try {
@@ -232,9 +253,10 @@ public class MotionForegroundService extends Service {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
                 .setContentTitle(title)
                 .setContentText(body)
+                .setOnlyAlertOnce(true)
                 .setSmallIcon(getApplicationInfo().icon)
                 .setColor(Color.parseColor("#2196F3"))
-                .setGroup(LOW_EVENT_CHANNEL_ID)
+                .setChannelId(channelId)
                 .setLights(Color.parseColor("#2196F3"), 500, 500)
                 .setVibrate(new long[]{0L, 500L, 500L, 500L})
                 .addExtras(extras)
@@ -244,10 +266,10 @@ public class MotionForegroundService extends Service {
                 .setContentIntent(pendingIntent);
         if (icon != null) builder.setSmallIcon(IconCompat.createWithContentUri(Uri.parse("android.resource://" + getPackageName() + "/drawable/" + icon)));
         if (group != null) builder.setGroup(group);
-        if (sound != null) builder.setSound(Uri.parse("android.resource://" + getPackageName() + "/raw/" + sound));
+        // if (sound != null) builder.setSound(Uri.parse("android.resource://" + getPackageName() + "/raw/" + sound));
         if (title.equals("Motion Detected!")) {
             builder.setCategory(NotificationCompat.CATEGORY_ALARM);
-            builder.setGroup(EVENT_CHANNEL_ID);
+            builder.setChannelId(EVENT_CHANNEL_ID);
             // res/drawable/push_icon.png
             builder.setSmallIcon(R.drawable.push_icon);
 
@@ -325,9 +347,10 @@ public class MotionForegroundService extends Service {
             manager.createNotificationChannel(serviceChannel);
 
             // Motion notification with custom sound
-            Uri soundUri = Uri.parse("android.resource://" + ctx.getPackageName() + "/raw/motion_alert");
+            Uri soundUri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://"
+                    + ctx.getPackageName() + "/" + R.raw.motion_alert);
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build();
             NotificationChannel eventChannel = new NotificationChannel(
@@ -352,6 +375,9 @@ public class MotionForegroundService extends Service {
         if (mSocket != null) {
             mSocket.disconnect();
             mSocket.off();
+        }
+        if (wakeLock != null) {
+            wakeLock.release();
         }
     }
 

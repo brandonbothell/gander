@@ -378,4 +378,9 @@ public class HTTP {
             refreshTokenCallback.onSuccess(currentRefreshToken, currentToken);
         }
     }
+
+    public static void setCurrentRefreshToken(String refreshToken) {
+        currentRefreshToken = refreshToken;
+        lastRefreshed = (int) System.currentTimeMillis();
+    }
 }

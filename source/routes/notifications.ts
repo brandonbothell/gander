@@ -3,9 +3,9 @@ import admin from 'firebase-admin'
 import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
+import { logNotify } from '../logMotion'
 import { io, prisma, RequestWithUser } from '../camera'
 import { rateLimit } from 'express-rate-limit'
-import { logNotify } from '../logMotion'
 
 export default function initializeNotificationRoutes(app: express.Application) {
   const subscribeLimiter = rateLimit({
@@ -248,11 +248,11 @@ export async function notify(
       }
 
       if (sub.clientId) {
-        logNotify(
-          `[Notify] [Socket] Sending push notification to '${sub.sid}'`,
-          'info',
-        )
         if (io.sockets.adapter.rooms.has(sub.clientId)) {
+          logNotify(
+            `[Notify] [Socket] Sending push notification to '${sub.sid}'`,
+            'info',
+          )
           // Socket push
           // Emit notification data to the clientId group
           try {
@@ -271,6 +271,11 @@ export async function notify(
             )
           }
         }
+      } else {
+        logNotify(
+          `[Notify] [Socket] '${sub.sid}' is disconnected, sending FCM instead.`,
+          'info',
+        )
       }
 
       if (sub.fcmToken) {
