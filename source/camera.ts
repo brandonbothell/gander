@@ -42,8 +42,15 @@ export const prisma = new PrismaClient({ adapter })
 
 // Motion logging setup
 const apiStartTime = new Date().toISOString().replace(/[:.]/g, '-')
-export const motionLogPath = path.join(__dirname, '..', 'logs', 'motion')
-export const authLogPath = path.join(__dirname, '..', 'logs', 'auth')
+export const motionLogPath = path.join(
+  __dirname,
+  '..',
+  'logs',
+  'motion',
+  'motion',
+)
+export const authLogPath = path.join(__dirname, '..', 'logs', 'auth', 'auth')
+export const notifyLogPath = path.join(__dirname, '..', 'logs', 'auth', 'auth')
 
 // Ensure logs directory exists
 const logsDir = path.dirname(motionLogPath)

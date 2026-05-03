@@ -5,6 +5,7 @@ import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
 import { io, prisma, RequestWithUser } from '../camera'
 import { rateLimit } from 'express-rate-limit'
+import { logNotify } from '../logMotion'
 
 export default function initializeNotificationRoutes(app: express.Application) {
   const subscribeLimiter = rateLimit({
@@ -187,7 +188,10 @@ export async function notify(
   for (const sub of subs) {
     // Web Push
     if (sub.endpoint && sub.p256dh && sub.auth) {
-      console.info(`[Notify] [WebPush] Sending notification to '${sub.sid}'`)
+      logNotify(
+        `[Notify] [WebPush] Sending notification to '${sub.sid}'`,
+        'info',
+      )
       try {
         await webpush.sendNotification(
           {
@@ -211,7 +215,7 @@ export async function notify(
           }),
         )
       } catch (err) {
-        console.error('[Notify] [WebPush] Notification error:', err)
+        logNotify(`[Notify] [WebPush] Notification error: ${err}`, 'error')
         // Remove invalid web push subscription if 404
         if (
           typeof err === 'object' &&
@@ -226,8 +230,9 @@ export async function notify(
               data: { endpoint: null, p256dh: null, auth: null },
             })
             .catch(() =>
-              console.warn(
+              logNotify(
                 '[Notify] [WebPush] Failed to delete unused push subscription.',
+                'warn',
               ),
             )
         }
@@ -243,8 +248,9 @@ export async function notify(
       }
 
       if (sub.clientId) {
-        console.info(
+        logNotify(
           `[Notify] [Socket] Sending push notification to '${sub.sid}'`,
+          'info',
         )
         if (io.sockets.adapter.rooms.has(sub.clientId)) {
           // Socket push
@@ -259,13 +265,19 @@ export async function notify(
             })
             continue
           } catch (err) {
-            console.error('[Notify] Socket notification emit error', err)
+            logNotify(
+              `[Notify] Socket notification emit error: ${err}`,
+              'error',
+            )
           }
         }
       }
 
       if (sub.fcmToken) {
-        console.info(`[Notify] [FCM] Sending push notification to '${sub.sid}'`)
+        logNotify(
+          `[Notify] [FCM] Sending push notification to '${sub.sid}'`,
+          'info',
+        )
         // FCM push
         try {
           await admin.messaging().send({
@@ -310,9 +322,11 @@ export async function notify(
           }, */
         } catch (err) {
           if (!err || typeof err !== 'object' || !('code' in err)) {
-            throw new Error(
+            logNotify(
               '[Notify] FCM notification error: No/invalid error object provided',
+              'error',
             )
+            return
           }
 
           if (err.code === 'messaging/server-unavailable') {
@@ -323,8 +337,9 @@ export async function notify(
           } else if (
             err.code === 'messaging/registration-token-not-registered'
           ) {
-            console.warn(
+            logNotify(
               `[Notify] Invalid FCM token, removing from subscription for ${sub.sid}`,
+              'warn',
             )
             return prisma.pushSubscription
               .update({
@@ -332,13 +347,14 @@ export async function notify(
                 data: { fcmToken: null },
               })
               .catch(() =>
-                console.warn(
+                logNotify(
                   '[Notify] [FCM] Failed to remove invalid token from user.',
+                  'warn',
                 ),
               )
           }
 
-          console.error('[Notify] FCM notification error:', err)
+          logNotify(`[Notify] FCM notification error: ${err}`, 'error')
         }
       }
     }
