@@ -3,7 +3,7 @@ import admin from 'firebase-admin'
 import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
-import { prisma, RequestWithUser } from '../camera'
+import { io, prisma, RequestWithUser } from '../camera'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeNotificationRoutes(app: express.Application) {
@@ -30,7 +30,17 @@ export default function initializeNotificationRoutes(app: express.Application) {
     express.json(),
     async (req, res) => {
       const sid = getPushSubKey(req)
-      const { endpoint, expirationTime, keys, fcmToken } = req.body
+      const { endpoint, expirationTime, keys, fcmToken, clientId } = req.body
+
+      if (clientId) {
+        await prisma.pushSubscription.upsert({
+          where: { sid },
+          update: { clientId },
+          create: { sid, clientId },
+        })
+        res.json({ success: true })
+        return
+      }
 
       if (fcmToken) {
         await prisma.pushSubscription.upsert({
@@ -80,7 +90,16 @@ export default function initializeNotificationRoutes(app: express.Application) {
         return
       }
 
-      if (req.body && req.body.fcmToken) {
+      if (req.body?.clientId) {
+        await prisma.pushSubscription
+          .update({
+            where: { sid },
+            data: { clientId: null },
+          })
+          .catch(() =>
+            console.warn('[Socket] Failed to unsubscribe user from push.'),
+          )
+      } else if (req.body?.fcmToken) {
         // Unsubscribe from FCM only
         await prisma.pushSubscription
           .update({
@@ -115,7 +134,7 @@ export default function initializeNotificationRoutes(app: express.Application) {
         !updated?.fcmToken &&
         !updated?.endpoint &&
         !updated?.p256dh &&
-        !updated?.auth
+        !updated?.auth // Ignore clientId since we don't send notifications without fcmToken
       ) {
         await prisma.pushSubscription
           .delete({ where: { sid } })
@@ -162,7 +181,7 @@ export async function notify(
   const title = custom?.title ?? 'Motion Detected!'
   const body = custom?.body ?? `Motion was detected by ${nickname}.`
   const icon = custom?.icon ?? 'push_icon'
-  const sound = custom?.sound ?? 'default'
+  const sound = custom?.sound
   const channelId = custom?.channelId
   const tag = custom?.tag
   const group = custom?.group || `stream_event_${streamId}`
@@ -196,7 +215,7 @@ export async function notify(
           }),
         )
       } catch (err) {
-        console.error('Web Push notification error:', err)
+        console.error('[Notify] Web Push notification error:', err)
         // Remove invalid web push subscription if 404
         if (
           typeof err === 'object' &&
@@ -212,45 +231,61 @@ export async function notify(
             })
             .catch(() =>
               console.warn(
-                '[WebPush] Failed to delete unused push subscription.',
+                '[Notify] [WebPush] Failed to delete unused push subscription.',
               ),
             )
         }
       }
     }
-    // FCM Push
+    // FCM or Socket Push
     if (sub.fcmToken) {
-      try {
-        const withOptional = {
-          ...(tag ? { tag } : {}),
-          ...(channelId ? { channelId } : {}),
-        }
-        await admin.messaging().send({
-          android: {
-            data: {
-              title,
-              body,
-              icon,
-              color: '#2196F3',
-              sound,
-              visibility: 'public',
-              sticky: 'false',
-              localOnly: 'false',
-              defaultLightSettings: 'true',
-              eventTimestamp: new Date().getTime().toString(10),
-              vibrateTimingsMillis: '0,500,500,500',
-              ...withOptional,
+      const withOptional = {
+        ...(tag ? { tag } : {}),
+        ...(channelId ? { channelId } : {}),
+        ...(sound ? { sound } : {}),
+        ...(icon ? { icon } : {}),
+      }
 
-              streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
-              cameraId: streamId,
-              ...(group ? { group } : {}),
-              actions: title === 'Motion Detected!' ? 'true' : 'false',
-              // ...other custom data
+      if (sub.clientId && io.sockets.adapter.rooms.has(sub.clientId)) {
+        // Socket push
+        // Emit notification data to the clientId group
+        try {
+          io.to(sub.clientId).emit('notification', {
+            streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
+            cameraId: streamId,
+            title,
+            body,
+            ...(withOptional ? { withOptional } : {}),
+          })
+        } catch (err) {
+          console.error('[Notify] Socket notification emit error', err)
+        }
+      } else {
+        // FCM push
+        try {
+          await admin.messaging().send({
+            android: {
+              data: {
+                title,
+                body,
+                color: '#2196F3',
+                visibility: 'public',
+                sticky: 'false',
+                localOnly: 'false',
+                defaultLightSettings: 'true',
+                eventTimestamp: new Date().getTime().toString(10),
+                vibrateTimingsMillis: '0,500,500,500',
+                ...withOptional,
+
+                streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
+                cameraId: streamId,
+                ...(group ? { group } : {}),
+                actions: title === 'Motion Detected!' ? 'true' : 'false',
+              },
             },
-          },
-          token: sub.fcmToken,
-        })
-        /* android: {
+            token: sub.fcmToken,
+          })
+          /* android: {
             priority: 'high',
             notification: {
               title,
@@ -268,33 +303,38 @@ export async function notify(
               // clickAction: 'OPEN_STREAM',
             },
           }, */
-      } catch (err) {
-        if (!err || typeof err !== 'object' || !('code' in err)) {
-          throw new Error(
-            'FCM notification error: No/invalid error object provided',
-          )
-        }
-
-        if (err.code === 'messaging/server-unavailable') {
-          console.warn('FCM server unavailable, retrying...')
-          return setTimeout(() => {
-            notify(dynamicStreams, streamId, custom, username)
-          }, 5000) // Retry after 5 seconds
-        } else if (err.code === 'messaging/registration-token-not-registered') {
-          console.warn(
-            `Invalid FCM token, removing from subscription for ${sub.sid}`,
-          )
-          return prisma.pushSubscription
-            .update({
-              where: { sid: sub.sid },
-              data: { fcmToken: null },
-            })
-            .catch(() =>
-              console.warn('[FCM] Failed to remove invalid token from user.'),
+        } catch (err) {
+          if (!err || typeof err !== 'object' || !('code' in err)) {
+            throw new Error(
+              '[Notify] FCM notification error: No/invalid error object provided',
             )
-        }
+          }
 
-        console.error('FCM notification error:', err)
+          if (err.code === 'messaging/server-unavailable') {
+            console.warn('FCM server unavailable, retrying...')
+            return setTimeout(() => {
+              notify(dynamicStreams, streamId, custom, username)
+            }, 5000) // Retry after 5 seconds
+          } else if (
+            err.code === 'messaging/registration-token-not-registered'
+          ) {
+            console.warn(
+              `[Notify] Invalid FCM token, removing from subscription for ${sub.sid}`,
+            )
+            return prisma.pushSubscription
+              .update({
+                where: { sid: sub.sid },
+                data: { fcmToken: null },
+              })
+              .catch(() =>
+                console.warn(
+                  '[Notify] [FCM] Failed to remove invalid token from user.',
+                ),
+              )
+          }
+
+          console.error('[Notify] FCM notification error:', err)
+        }
       }
     }
   }

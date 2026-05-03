@@ -18,8 +18,8 @@ export default function initializeSignedRoutes(
 ) {
   const generateSignedLatestThumbUrlLimiter = rateLimit({
     validate: { ip: false },
-    windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 100,
+    windowMs: 5 * 1000, // 5 seconds
+    max: 5,
     standardHeaders: true,
     legacyHeaders: false,
   })

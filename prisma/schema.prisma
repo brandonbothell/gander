@@ -58,7 +58,8 @@ model PushSubscription {
   expirationTime String?
   p256dh         String?
   auth           String?
-  fcmToken       String? // <-- Add this line
+  fcmToken       String?
+  clientId       String?
 }
 
 model StreamState {

@@ -18,6 +18,7 @@ import androidx.core.app.NotificationManagerCompat;
 import com.google.gson.JsonObject;
 
 import net.strangled.dutta.securitycam.API.APIService;
+import net.strangled.dutta.securitycam.API.HTTP;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -100,79 +101,6 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
         // 2. Execute Retrofit Call
         assert baseUrl != null;
         assert clientId != null;
-        Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(baseUrl)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build();
-
-        APIService service = retrofit.create(APIService.class);
-        JsonObject motionPauseBody = new JsonObject();
-        motionPauseBody.addProperty("paused", pause);
-
-        JsonObject dummyDeviceInfoInner = new JsonObject();
-        dummyDeviceInfoInner.addProperty("clientId", clientId);
-        dummyDeviceInfoInner.addProperty("userAgent", MainActivity.userAgent);
-
-        JsonObject dummyDeviceInfo = new JsonObject();
-        dummyDeviceInfo.add("deviceInfo", dummyDeviceInfoInner);
-
-        assert refreshToken != null;
-        service.refreshToken("_rt=".concat(refreshToken), dummyDeviceInfo).enqueue(new Callback<>() {
-            @Override
-            @EverythingIsNonNull
-            public void onResponse(Call<APIService.RefreshTokenResponse> call, Response<APIService.RefreshTokenResponse> response) {
-                Log.d("NotificationActionReceiver", "Token refreshed successfully!");
-                APIService.RefreshTokenResponse body = response.body();
-
-                ResponseBody errorBody = response.errorBody();
-                if (errorBody != null) {
-                    try {
-                        Log.e("NotificationActionReceiver", "Error refreshing token: " + errorBody.string());
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                    return;
-                }
-
-                assert body != null;
-                if (body.error != null) {
-                    Log.e("NotificationActionReceiver", "Error refreshing token: " + body.error);
-                    return;
-                }
-
-                if (body.refreshToken != null) {
-                    SharedPreferences.Editor editor = sharedPref.edit();
-                    editor.putString("refreshToken", body.refreshToken);
-                    boolean success = editor.commit();
-                    if (!success) {
-                        Log.e("NotificationActionReceiver", "Failed to save refresh token");
-                    } else {
-                        Log.d("NotificationActionReceiver", "Saved refresh token!");
-                    }
-                }
-
-                if (body.token != null) {
-                    service.motionPause("Bearer ".concat(body.token), cameraId, motionPauseBody).enqueue(new Callback<>() {
-                        @Override
-                        @EverythingIsNonNull
-                        public void onResponse(Call<APIService.MotionPauseResponse> call, Response<APIService.MotionPauseResponse> response) {
-                            Log.d("NotificationActionReceiver", "Motion paused successfully");
-                        }
-
-                        @Override
-                        @EverythingIsNonNull
-                        public void onFailure(Call<APIService.MotionPauseResponse> call, Throwable t) {
-                            Log.e("NotificationActionReceiver", "Failed to pause motion", t);
-                        }
-                    });
-                }
-            }
-
-            @Override
-            @EverythingIsNonNull
-            public void onFailure(Call<APIService.RefreshTokenResponse> call, Throwable t) {
-                Log.e("FCMService", "Failed to refresh token", t);
-            }
-        });
+        HTTP.setMotionPaused(baseUrl, clientId, cameraId, pause, null);
     }
 }

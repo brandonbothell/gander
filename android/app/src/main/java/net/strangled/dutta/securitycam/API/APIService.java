@@ -18,6 +18,9 @@ public interface APIService {
     @POST("/api/subscribe")
     Call<APIResponse> fcmSubscribe(@Header("Authorization") String authorization, @Body JsonObject fcmSubscribeBody);
 
+    @POST("/api/unsubscribe")
+    Call<APIResponse> fcmUnsubscribe(@Header("Authorization") String authorization, @Body JsonObject fcmUnsubscribeBody);
+
     @POST("/api/motion-pause/{streamId}")
     Call<MotionPauseResponse> motionPause(@Header("Authorization") String authorization, @Path("streamId") String streamId, @Body JsonObject motionPauseBody);
 

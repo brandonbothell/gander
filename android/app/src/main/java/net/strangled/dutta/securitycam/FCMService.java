@@ -26,6 +26,7 @@ import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 import net.strangled.dutta.securitycam.API.APIService;
+import net.strangled.dutta.securitycam.API.HTTP;
 import net.strangled.dutta.securitycam.plugins.MotionService.MotionForegroundService;
 
 import java.io.IOException;
@@ -47,7 +48,12 @@ public class FCMService extends FirebaseMessagingService {
     private static final String EVENT_CHANNEL_ID = "motion_event_channel";
 
     @Override
-    public void onMessageReceived(RemoteMessage remoteMessage) {
+    public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
+        if (MotionForegroundService.getIsSocketConnected()) {
+            Log.d("FCMService", "Socket is connected, ignoring notification");
+            return;
+        }
+
         Map<String, String> data = remoteMessage.getData();
         StringBuilder allKeys = new StringBuilder();
         Set<String> keys = Objects.requireNonNull(remoteMessage.getData()).keySet();
@@ -65,7 +71,7 @@ public class FCMService extends FirebaseMessagingService {
                         data.get("cameraId"), data.get("group"), data.get("actions")
                 );
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                Log.e("FCMService", "Error showing notification", e);
             }
         }
     }
@@ -165,7 +171,6 @@ public class FCMService extends FirebaseMessagingService {
                         pauseIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                // We need to create pauseIntent or something
                 builder.addAction(android.R.drawable.ic_media_pause, "Pause Detection", pausePendingIntent);
             }
         }
@@ -248,54 +253,9 @@ public class FCMService extends FirebaseMessagingService {
             JsonObject fcmSubscribeBody = new JsonObject();
             fcmSubscribeBody.addProperty("fcmToken", fcmToken);
 
-            APIService service = retrofit.create(APIService.class);
-
-            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(refreshToken), dummyDeviceInfo);
-
-            refreshTokenResponse.enqueue(new Callback<>() {
-                @Override
-                @EverythingIsNonNull
-                public void onResponse(Call<APIService.RefreshTokenResponse> call, Response<APIService.RefreshTokenResponse> response) {
-                    Log.d("FCMService", "Token refreshed successfully!");
-                    APIService.RefreshTokenResponse body = response.body();
-
-                    assert body != null;
-                    if (body.refreshToken != null) {
-                        SharedPreferences.Editor editor = sharedPref.edit();
-                        editor.putString("refreshToken", body.refreshToken);
-                        editor.apply();
-                    }
-
-                    if (body.token != null) {
-                        service.fcmSubscribe("Bearer ".concat(body.token), fcmSubscribeBody).enqueue(new Callback<>() {
-                            @Override
-                            @EverythingIsNonNull
-                            public void onResponse(Call<APIService.APIResponse> call, Response<APIService.APIResponse> response) {
-                                APIService.APIResponse fcmSubscribeResponse = response.body();
-
-                                assert fcmSubscribeResponse != null;
-                                if (fcmSubscribeResponse.error != null) {
-                                    Log.e("FCMService", "Error subscribing to FCM: " + fcmSubscribeResponse.error);
-                                } else if (fcmSubscribeResponse.success != null && fcmSubscribeResponse.success) {
-                                    Log.d("FCMService", "Successfully subscribed to FCM");
-                                }
-                            }
-
-                            @Override
-                            @EverythingIsNonNull
-                            public void onFailure(Call<APIService.APIResponse> call, Throwable t) {
-                                Log.e("FCMService", "Error subscribing to FCM", t);
-                            }
-                        });
-                    }
-                }
-
-                @Override
-                @EverythingIsNonNull
-                public void onFailure(Call<APIService.RefreshTokenResponse> call, Throwable t) {
-                    Log.e("FCMService", "Failed to refresh token", t);
-                }
-            });
+            HTTP.subscribeToFCM(baseUrl, clientId, fcmToken, null);
+        } else {
+            Log.e("FCMService", "No server URL found in capacitor.config.json");
         }
     }
 }

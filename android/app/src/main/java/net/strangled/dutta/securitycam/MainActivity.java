@@ -6,6 +6,7 @@ import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
 
+import net.strangled.dutta.securitycam.API.HTTP;
 import net.strangled.dutta.securitycam.plugins.BatteryOptimization.BatteryOptimizationPlugin;
 import net.strangled.dutta.securitycam.plugins.MotionService.MotionServicePlugin;
 
@@ -15,6 +16,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        HTTP.sharedPreferences = getSharedPreferences("CapacitorStorage", MODE_PRIVATE);
         registerPlugin(BatteryOptimizationPlugin.class);
         registerPlugin(MotionServicePlugin.class);
         super.onCreate(savedInstanceState);
@@ -24,8 +26,7 @@ public class MainActivity extends BridgeActivity {
     public void load() {
         // Do stuff here to access methods on the bridge
         super.load();
-        userAgent = getBridge().getWebView().getSettings().getUserAgentString();
 
-        Log.d("MainActivity", "User agent: " + userAgent);
+        userAgent = getBridge().getWebView().getSettings().getUserAgentString();
     }
 }

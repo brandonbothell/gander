@@ -3,6 +3,7 @@ import path from 'path'
 import http from 'http'
 import fs from 'fs'
 import webpush from 'web-push'
+import { Server as SocketIOServer } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import express from 'express'
 import cors from 'cors'
@@ -470,6 +471,11 @@ async function loadStreamsFromDb() {
     })
 }
 
+const httpServer = http.createServer(app)
+export const io = new SocketIOServer(httpServer, {
+  cors: { origin: '*' },
+})
+
 loadStreamsFromDb()
   .then(cleanupExpiredTokensAndDevices)
   .then(() => setupStreamMotionMonitoring())
@@ -479,7 +485,32 @@ loadStreamsFromDb()
 
     // Use HTTP with an nginx reverse proxy in production or plain HTTP for development
     const port = process.env.PORT ?? 3000
-    http.createServer(app).listen(port, () => {
+
+    io.use((socket, next) => {
+      const { token } = socket.handshake.auth
+
+      try {
+        const payload = jwt.verify(token, JWT_SECRET) as {
+          username: string
+        }
+        socket.data.username = payload.username
+        return next()
+      } catch {
+        console.warn(
+          `[Socket] User attempted connecting with invalid token: '${token}'`,
+        )
+        return next(new Error('Invalid or expired token'))
+      }
+    })
+
+    io.on('connection', (socket) => {
+      const clientId = socket.handshake.auth.clientId
+      if (clientId) {
+        socket.join(clientId)
+      }
+    })
+
+    httpServer.listen(port, () => {
       console.debug(`HTTP server running on http://localhost:${port}`)
       if (process.env.API_ENV === 'production') return
       setTimeout(() => {

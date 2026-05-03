@@ -11,6 +11,7 @@ import { getDeviceFingerprint, getSessionId } from './utils/session'
 import { SessionMonitor } from './components/SessionMonitor'
 import { type TrustedDevice, type Session } from '../../source/types/deviceInfo'
 import { Capacitor, CapacitorCookies } from '@capacitor/core'
+import { App as CapacitorApp } from '@capacitor/app'
 import { debugLog } from './utils/debugLog'
 import type { RecordingType } from './components/Recording'
 
@@ -286,6 +287,17 @@ export default function App() {
       }
     }
   }
+
+  useEffect(() => {
+    ;(async () => {
+      if (Capacitor.getPlatform() !== 'web') {
+        CapacitorApp.addListener('appUrlOpen', (urlOpen) => {
+          console.log('App URL Open', urlOpen.url)
+          window.location.replace(urlOpen.url)
+        })
+      }
+    })()
+  }, [])
 
   // 1. FIRST: Set up BroadcastChannel listener (before any token operations)
   useEffect(() => {
