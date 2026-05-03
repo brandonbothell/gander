@@ -242,11 +242,10 @@ export async function notify(
         ...(icon ? { icon } : {}),
       }
 
-      console.info(
-        `[Notify] [FCM/Socket] Sending push notification to '${sub.sid}'`,
-      )
-
       if (sub.clientId) {
+        console.info(
+          `[Notify] [Socket] Sending push notification to '${sub.sid}'`,
+        )
         if (io.sockets.adapter.rooms.has(sub.clientId)) {
           // Socket push
           // Emit notification data to the clientId group
@@ -266,6 +265,7 @@ export async function notify(
       }
 
       if (sub.fcmToken) {
+        console.info(`[Notify] [FCM] Sending push notification to '${sub.sid}'`)
         // FCM push
         try {
           await admin.messaging().send({
