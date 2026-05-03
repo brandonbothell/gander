@@ -192,6 +192,9 @@ public class MotionForegroundService extends Service {
                 if (errorMsg.contains("Authentication required")) {
                     Log.d("MotionService", "Token likely expired, refreshing...");
                     startSocketWithDelay(); // Fully restart the flow with a new token
+                } else if (args[0] instanceof JSONObject) {
+                    Log.e("MotionService", "Socket connect Error: " + args[0]);
+                    startSocketWithDelay();
                 }
             }
         });
