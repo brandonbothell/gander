@@ -89,35 +89,38 @@ public class MotionForegroundService extends Service {
         if (intent != null) {
             if ("MUTE_NOTIFS_1H".equals(intent.getAction())) {
                 muteUntilTimestamp = System.currentTimeMillis() + 60L*60L*1000L /* 1 hour */;
-                manager.cancelAll();
-
-                NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                        .setContentTitle("Tap below to re-enable notifications.")
-                        .setSmallIcon(getApplicationInfo().icon)
-                        .setColor(Color.parseColor("#2196F3"))
-                        .setChannelId(CHANNEL_ID)
-                        .setGroup("unmute_notifs")
-                        .setVisibility(NotificationCompat.VISIBILITY_SECRET)
-                        .setPriority(NotificationCompat.PRIORITY_LOW)
-                        .setLocalOnly(true)
-                        .setOngoing(true);
-
-                Intent unmuteIntent = new Intent(this, MotionForegroundService.class)
-                        .setAction("UNMUTE_NOTIFS");
-                PendingIntent unmutePendingIntent = PendingIntent.getService(
-                        this, 5543244, unmuteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                builder.addAction(android.R.drawable.ic_lock_silent_mode, "Unmute notifications", unmutePendingIntent);
-                builder.setContentIntent(unmutePendingIntent);
-                try {
-                    manager.notify(5543245, builder.build());
-                } catch (SecurityException e) {
-                    Log.e("MotionForegroundService", "Error showing notification: " + e.getMessage());
-                }
 
                 Log.d("MotionForegroundService", "User muted alerts for 1 hour.");
             } else if ("UNMUTE_NOTIFS".equals(intent.getAction())) {
                 manager.cancel(5543245);
                 muteUntilTimestamp = 0L;
+            }
+        }
+
+        if (muteUntilTimestamp > System.currentTimeMillis()) {
+            manager.cancelAll();
+
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("Tap below to re-enable notifications.")
+                    .setSmallIcon(getApplicationInfo().icon)
+                    .setColor(Color.parseColor("#2196F3"))
+                    .setChannelId(CHANNEL_ID)
+                    .setGroup("unmute_notifs")
+                    .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setLocalOnly(true)
+                    .setOngoing(true);
+
+            Intent unmuteIntent = new Intent(this, MotionForegroundService.class)
+                    .setAction("UNMUTE_NOTIFS");
+            PendingIntent unmutePendingIntent = PendingIntent.getService(
+                    this, 5543244, unmuteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.addAction(android.R.drawable.ic_lock_silent_mode, "Unmute notifications", unmutePendingIntent);
+            builder.setContentIntent(unmutePendingIntent);
+            try {
+                manager.notify(5543245, builder.build());
+            } catch (SecurityException e) {
+                Log.e("MotionForegroundService", "Error showing notification: " + e.getMessage());
             }
         }
 
