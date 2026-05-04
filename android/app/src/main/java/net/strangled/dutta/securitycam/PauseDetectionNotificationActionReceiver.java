@@ -53,8 +53,8 @@ public class PauseDetectionNotificationActionReceiver extends BroadcastReceiver 
 
                 StatusBarNotification notification = notificationOptional.get();
                 Notification notificationObj = notification.getNotification();
-                notificationObj.actions[0].title = pause ? "Start Detection" : "Pause Detection";
-                notificationObj.actions[0].actionIntent = PendingIntent.getBroadcast(
+                notificationObj.actions[1].title = pause ? "Start Detection" : "Pause Detection";
+                notificationObj.actions[1].actionIntent = PendingIntent.getBroadcast(
                         ctx,
                         notificationId + 1, // Unique request code
                         startIntent,

@@ -1,5 +1,6 @@
 package net.strangled.dutta.securitycam.plugins.MotionService;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -80,6 +81,7 @@ public class MotionForegroundService extends Service {
         updateTokenLoop();
     }
 
+    @SuppressLint("LaunchActivityFromNotification")
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -105,6 +107,7 @@ public class MotionForegroundService extends Service {
                 PendingIntent unmutePendingIntent = PendingIntent.getService(
                         this, 5543244, unmuteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                 builder.addAction(android.R.drawable.ic_lock_silent_mode, "Unmute notifications", unmutePendingIntent);
+                builder.setContentIntent(unmutePendingIntent);
                 try {
                     manager.notify(5543245, builder.build());
                 } catch (SecurityException e) {
