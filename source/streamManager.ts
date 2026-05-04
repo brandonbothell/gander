@@ -258,11 +258,14 @@ export class StreamManager {
   // Main HLS stream - balanced for stability and performance
   async startFFmpeg() {
     // --- Cooldown and cleaning guards ---
-    if (this.ffmpegCooldownUntil && Date.now() < this.ffmpegCooldownUntil) {
+    const now = Date.now()
+
+    if (this.ffmpegCooldownUntil && now < this.ffmpegCooldownUntil) {
       logMotion(
-        `[${this.config.id}] FFmpeg restart cooldown active. Next restart allowed at ${new Date(this.ffmpegCooldownUntil).toLocaleTimeString()}`,
+        `[${this.config.id}] FFmpeg restart cooldown active. Restart will occur at ${new Date(this.ffmpegCooldownUntil).toLocaleTimeString()}`,
         'warn',
       )
+      setTimeout(() => this.startFFmpeg, this.ffmpegCooldownUntil - now)
       return
     }
     if (this.state.cleaningUp) {
@@ -282,7 +285,7 @@ export class StreamManager {
       )
       return
     }
-    const now = Date.now()
+
     this.segmentCount = 0
     this.lastSegmentTimestamp = now
     this.ffmpegRestartTimestamps = this.ffmpegRestartTimestamps.filter(
