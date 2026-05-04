@@ -2923,6 +2923,7 @@ export default function StreamPage({
             filename={recordingBeingViewed?.filename ?? ''}
             motionTimestamps={recordingBeingViewed?.motionTimestamps ?? []}
             onClose={() => setRecordingBeingViewed(null)}
+            isMobile={isMobileWidth}
             cachedRecordings={
               recordingBeingViewed
                 ? (cachedRecordings[recordingBeingViewed.streamId] ?? [])

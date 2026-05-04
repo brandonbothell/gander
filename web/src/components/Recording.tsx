@@ -25,6 +25,7 @@ interface RecordingProps {
   motionTimestamps: number[]
   onClose: () => void
   cachedRecordings: RecordingType[]
+  isMobile: boolean
   onNavigate: (filename: string, motionTimestamps: number[]) => void
   setNicknames: React.Dispatch<
     React.SetStateAction<{
@@ -44,14 +45,14 @@ export function Recording({
   cachedRecordings,
   onNavigate,
   setNicknames,
-  videoRef: externalVideoRef,
+  videoRef,
+  isMobile,
   setAutoScrollUntilRef,
 }: RecordingProps & { videoRef?: React.RefObject<HTMLVideoElement | null> }) {
   const [nickname, setNickname] = useState('')
   const [hover, setHover] = useState(false)
   const [editing, setEditing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(externalVideoRef?.current || null)
   const seekbarRef = useRef<HTMLDivElement>(null)
   // Controls fade-away logic
   const [isControlBarVisible, setIsControlBarVisible] = useState(false)
@@ -94,6 +95,7 @@ export function Recording({
     hideTimeoutRef.current = window.setTimeout(() => {
       if (isSeekingRef.current) {
         // While seeking, keep controls visible and reschedule
+        // eslint-disable-next-line react-hooks/immutability
         scheduleHide()
       } else {
         if (!isPausedRef.current) setIsControlBarVisible(false)
@@ -113,7 +115,7 @@ export function Recording({
   }
 
   const handleFullscreen = () => {
-    const video = videoRef.current
+    const video = videoRef?.current
     if (!video) return
     if (
       isIOS() &&
@@ -183,7 +185,7 @@ export function Recording({
 
   // Add fullscreenchange event listener to video
   useEffect(() => {
-    const video = videoRef.current
+    const video = videoRef?.current
     if (!video) return
 
     function onFullscreenChange() {
@@ -221,7 +223,7 @@ export function Recording({
 
   // Sync video state for controls/seek bar
   useEffect(() => {
-    const video = videoRef.current
+    const video = videoRef?.current
     if (!video) return
     const getElementHeight = () => video.getBoundingClientRect().height
     const handlePlay = () => {
@@ -264,7 +266,7 @@ export function Recording({
 
   // Control handlers
   const handlePlayPause = () => {
-    const video = videoRef.current
+    const video = videoRef?.current
     if (!video) return
     if (video.paused) {
       video.play().catch(() => {
@@ -276,17 +278,15 @@ export function Recording({
     handleShowControls()
   }
   const handleMuteToggle = () => {
-    const video = videoRef.current
-    if (!video) return
-    video.muted = !video.muted
-    setIsMuted(video.muted)
+    if (!videoRef?.current) return
+    videoRef.current.muted = !videoRef.current.muted
+    setIsMuted(videoRef.current.muted)
     handleShowControls()
   }
 
   const handleCustomSeek = (e: React.PointerEvent | React.MouseEvent) => {
-    const video = videoRef.current
     const seekbar = seekbarRef.current
-    if (!video || !seekbar) return
+    if (!videoRef?.current || !seekbar) return
 
     const rect = seekbar.getBoundingClientRect()
     const x = e.clientX - rect.left
@@ -295,19 +295,19 @@ export function Recording({
 
     if (!isSeeking) setIsSeeking(true)
     setCurrentTime(newTime)
-    video.currentTime = newTime
+    videoRef.current.currentTime = newTime
     setIsSeeking(false)
   }
 
   const handleSeekPointerDown = (e: React.PointerEvent) => {
     handleCustomSeek(e) // Seek immediately on click
     setIsSeeking(true)
-    videoRef.current?.pause()
+    videoRef?.current?.pause()
     setIsPaused(true)
   }
 
   const handleSeekPointerUp = () => {
-    const video = videoRef.current
+    const video = videoRef?.current
     if (!video) return
     setIsSeeking(false)
     video.play()
@@ -317,7 +317,7 @@ export function Recording({
   }
 
   useEffect(() => {
-    const video = videoRef.current
+    const video = videoRef?.current
     if (!video) return
 
     const handleTimeUpdate = () => {
@@ -335,7 +335,7 @@ export function Recording({
   }, [videoRef])
 
   useEffect(() => {
-    const video = videoRef.current
+    const video = videoRef?.current
     if (!video || !videoUrl) return
 
     // Restore playback position after video loads new URL
@@ -364,24 +364,24 @@ export function Recording({
       clearTimeout(hideTimeoutRef.current)
       hideTimeoutRef.current = null
     }
-    if (!open && videoRef.current) {
+    if (!open && videoRef?.current) {
       setAutoScrollUntilRef?.(Date.now() + 1000)
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 450)
       videoRef.current.pause()
       videoRef.current.src = ''
-    } else if (open && videoUrl && videoRef.current) {
+    } else if (open && videoUrl && videoRef?.current) {
       console.log(
         `Recording opened. Motion timestamps: ${JSON.stringify(motionTimestamps)}`,
       )
       videoRef.current.src = videoUrl
-      videoRef.current.load()
+      videoRef?.current.load()
 
       if (filenameRef.current !== lastFilenameRef.current) {
-        videoRef.current.play().catch(() => {
-          setTimeout(() => videoRef.current?.play(), 1000)
+        videoRef?.current.play().catch(() => {
+          setTimeout(() => videoRef?.current?.play(), 1000)
         })
       } else {
-        videoRef.current.addEventListener('loadedmetadata', handleLoaded)
+        videoRef?.current.addEventListener('loadedmetadata', handleLoaded)
       }
     }
 
@@ -390,7 +390,7 @@ export function Recording({
         clearTimeout(hideTimeoutRef.current)
         hideTimeoutRef.current = null
       }
-      if (videoRef.current) {
+      if (videoRef?.current) {
         videoRef.current.pause()
         videoRef.current.src = ''
       }
@@ -413,7 +413,7 @@ export function Recording({
     if (!isSeeking) return
 
     const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
-      if (!seekbarRef.current || !videoRef.current || duration === 0) return
+      if (!seekbarRef.current || !videoRef?.current || duration === 0) return
       const rect = seekbarRef.current.getBoundingClientRect()
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
       const x = clientX - rect.left
@@ -426,7 +426,7 @@ export function Recording({
 
     const handleGlobalUp = () => {
       setIsSeeking(false)
-      videoRef.current?.play()
+      videoRef?.current?.play()
       setIsPaused(false)
       scheduleHide()
     }
@@ -676,8 +676,8 @@ export function Recording({
               position: 'relative',
               flex: 1,
               height: 8,
-              paddingTop: 2,
-              paddingBottom: 2,
+              paddingTop: isMobile ? 4 : 2,
+              paddingBottom: isMobile ? 4 : 2,
               display: 'flex',
               alignItems: 'center',
               cursor: 'pointer',
@@ -730,7 +730,7 @@ export function Recording({
                         if (isSeeking) return
 
                         e.stopPropagation()
-                        if (videoRef.current) {
+                        if (videoRef?.current) {
                           setCurrentTime(startSec)
                           videoRef.current.currentTime = startSec
                         }
@@ -742,7 +742,7 @@ export function Recording({
                         height: 8,
                         borderRadius: 4,
                         backgroundColor: '#1cf1d1',
-                        paddingBottom: 2,
+                        paddingBottom: isMobile ? 4 : 2,
                         zIndex: 15,
                         border: '1px solid #1a1f35',
                         boxShadow: '0 0 6px rgba(28, 241, 209, 0.9)',
@@ -772,6 +772,7 @@ export function Recording({
                 height: 16,
                 backgroundColor: '#1cf1d1',
                 borderRadius: '50%',
+                padding: '3px',
                 transform: 'translate(-50%, -50%)',
                 top: '50%',
                 zIndex: 30, // Higher than the dots (25)

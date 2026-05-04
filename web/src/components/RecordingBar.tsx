@@ -8,6 +8,7 @@ interface RecordingBarProps {
   motionTimestamps: number[]
   onClose: () => void
   cachedRecordings: RecordingType[]
+  isMobile: boolean
   onNavigate: (filename: string, motionTimestamps: number[]) => void
   setAutoScrollUntilRef: (until: number) => void
   setNicknames: React.Dispatch<
