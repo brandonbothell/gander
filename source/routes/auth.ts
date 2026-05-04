@@ -250,7 +250,13 @@ export default function initializeAuthRoutes(
 
       res.json({ success: true, token, refreshToken })
     } else {
-      res.status(401).json({ success: false, message: 'Invalid credentials' })
+      setTimeout(
+        () =>
+          res
+            .status(401)
+            .json({ success: false, message: 'Invalid credentials' }),
+        1000,
+      )
     }
   })
 
