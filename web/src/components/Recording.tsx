@@ -63,6 +63,7 @@ export function Recording({
   const [duration, setDuration] = useState(0)
   const [videoHeight, setVideoHeight] = useState(0)
   const [isSeeking, setIsSeeking] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const hideTimeoutRef = useRef<number | null>(null)
   const isSeekingRef = useRef(isSeeking)
   const filenameRef = useRef(filename)
@@ -84,6 +85,7 @@ export function Recording({
   }, [isSeeking])
 
   useEffect(() => {
+    setIsLoading(true)
     lastFilenameRef.current = filenameRef.current
     filenameRef.current = filename
   }, [filename])
@@ -245,12 +247,16 @@ export function Recording({
       setDuration(video.duration || 0)
       setVideoHeight(getElementHeight())
     }
+    const handleLoad = () => {
+      setIsLoading(false)
+    }
     video.addEventListener('play', handlePlay)
     video.addEventListener('pause', handlePause)
     video.addEventListener('volumechange', handleVolumeChange)
     video.addEventListener('timeupdate', update)
     video.addEventListener('durationchange', update)
     video.addEventListener('loadedmetadata', update)
+    video.addEventListener('canplay', handleLoad)
     setIsPaused(video.paused)
     setIsMuted(video.muted)
     update()
@@ -629,21 +635,60 @@ export function Recording({
             <FiMaximize size={24} />
           </button>
         </div>
+        {/* Loading overlay */}
+        {isLoading && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: '1.1em',
+              fontWeight: 600,
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  border: '3px solid rgba(255, 255, 255, 0.3)',
+                  borderTop: '3px solid #fff',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }}
+              />
+              Loading recording...
+            </div>
+          </div>
+        )}
         {/* Seek Bar + Timestamp */}
         <div
           style={{
             width: '100%',
             maxWidth: 900,
             margin: '0 auto',
-            marginTop: isControlBarVisible ? 12 : 0,
-            marginBottom: isControlBarVisible ? 12 : 0,
+            // marginTop: isControlBarVisible ? 12 : 0,
+            marginTop: 12,
+            // marginBottom: isControlBarVisible ? 12 : 0,
+            marginBottom: 12,
             display: 'flex',
             alignItems: 'center',
             background:
               'linear-gradient(180deg, transparent 60%, #232b4a 100%)',
-            opacity: isControlBarVisible ? 1 : 0,
-            height: isControlBarVisible ? 44 : 0,
-            padding: isControlBarVisible ? '8px 18px' : '0px 18px',
+            // opacity: isControlBarVisible ? 1 : 0,
+            // height: isControlBarVisible ? 44 : 0,
+            height: 44,
+            // padding: isControlBarVisible ? '8px 18px' : '0px 18px',
+            padding: '8px 18px',
             boxSizing: 'border-box',
             borderRadius: 8,
             position: 'relative',
@@ -661,10 +706,12 @@ export function Recording({
               textAlign: 'left',
               marginRight: 12,
               transition: 'opacity 0.3s',
-              opacity: isControlBarVisible ? 1 : 0,
+              // opacity: isControlBarVisible ? 1 : 0,
             }}
           >
-            {formatTime(currentTime)} / {formatTime(duration)}
+            {isLoading
+              ? 'Loading...'
+              : `${formatTime(currentTime)} / ${formatTime(duration)}`}
           </span>
 
           {/* Custom Seek Bar Container */}
@@ -697,7 +744,7 @@ export function Recording({
             />
 
             {/* 2. Motion Dots (Middle Layer) */}
-            {isControlBarVisible &&
+            {!isLoading &&
               duration > 0 &&
               motionTimestamps
                 .reduce((acc: number[][], ms: number) => {
@@ -768,8 +815,8 @@ export function Recording({
               style={{
                 position: 'absolute',
                 left: `${(currentTime / duration) * 100}%`,
-                width: 16,
-                height: 16,
+                width: isLoading ? 0 : 16,
+                height: isLoading ? 0 : 16,
                 backgroundColor: '#1cf1d1',
                 borderRadius: '50%',
                 padding: '3px',
@@ -825,7 +872,7 @@ export function Recording({
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          marginTop: isControlBarVisible ? 0 : 8,
+          // marginTop: isControlBarVisible ? 0 : 8,
           marginBottom: 8,
           minHeight: 36,
           justifyContent: 'center',

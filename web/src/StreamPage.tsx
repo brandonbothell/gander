@@ -3013,7 +3013,7 @@ export default function StreamPage({
                 }
               />
 
-              {/* Optional: Add a loading overlay */}
+              {/* Loading overlay */}
               {isLoadingStream && (
                 <div
                   style={{
