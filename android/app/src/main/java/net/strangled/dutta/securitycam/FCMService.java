@@ -37,6 +37,12 @@ public class FCMService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
+        if (MotionForegroundService.getMuteUntilTimestamp() > System.currentTimeMillis()) {
+            Log.d("FCMService", "Notification suppressed: Mute active for another " +
+                    ((MotionForegroundService.getMuteUntilTimestamp() - System.currentTimeMillis()) / 60000L) + " minutes.");
+            return;
+        }
+
         if (MotionForegroundService.getIsSocketConnected()) {
             Log.d("FCMService", "Socket is connected, notification may be duplicated");
         }

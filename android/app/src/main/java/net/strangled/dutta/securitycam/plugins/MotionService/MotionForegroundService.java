@@ -60,6 +60,12 @@ public class MotionForegroundService extends Service {
 
     private static boolean isSocketConnected = false;
 
+    private static long muteUntilTimestamp = 0;
+
+    public static long getMuteUntilTimestamp() {
+        return muteUntilTimestamp;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -72,6 +78,38 @@ public class MotionForegroundService extends Service {
         acquireWakeLock();
         startSocketWithDelay();
         updateTokenLoop();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+        if (intent != null && "MUTE_NOTIFS_1H".equals(intent.getAction())) {
+            muteUntilTimestamp = System.currentTimeMillis() + 60L*60L*1000L /* 1 hour */;
+            manager.cancelAll();
+
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("To re-enable notifications, disable and re-enable notifications in the app.")
+                    .setSmallIcon(getApplicationInfo().icon)
+                    .setColor(Color.parseColor("#2196F3"))
+                    .setChannelId(CHANNEL_ID)
+                    .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setLocalOnly(true)
+                    .setOngoing(true);
+            try {
+                manager.notify(5543245, builder.build());
+            } catch (SecurityException e) {
+                Log.e("MotionForegroundService", "Error showing notification: " + e.getMessage());
+            }
+
+            Log.d("MotionForegroundService", "User muted alerts for 1 hour.");
+        } else {
+            manager.cancel(5543245);
+            muteUntilTimestamp = 0L;
+        }
+
+        return START_STICKY;
     }
 
     private void acquireWakeLock() {
@@ -94,7 +132,7 @@ public class MotionForegroundService extends Service {
     }
 
     private void startSocketWithDelay() {
-        Log.d("MotionService", "Scheduling socket reconnection in 10 seconds...");
+        Log.d("MotionForegroundService", "Scheduling socket reconnection in 10 seconds...");
 
         // Cancel any existing pending reconnections to avoid "stacking" sockets
         reconnectHandler.removeCallbacksAndMessages(null);
@@ -165,7 +203,7 @@ public class MotionForegroundService extends Service {
                 @Override
                 public void onFailure(String errorMessage) {
                     isRefreshingToken = false;
-                    Log.e("MotionService", "Auth failed: " + errorMessage + ". Retrying in 30s...");
+                    Log.e("MotionForegroundService", "Auth failed: " + errorMessage + ". Retrying in 30s...");
                     // If the server is down, wait longer before trying again
                     reconnectHandler.postDelayed(() -> startSocket(), 30000);
                 }
@@ -175,6 +213,16 @@ public class MotionForegroundService extends Service {
 
     private void setupSocketListeners() {
         mSocket.on("notification", args -> {
+            // Check if we are currently muted
+            if (System.currentTimeMillis() < muteUntilTimestamp) {
+                Log.d("MotionForegroundService", "Notification suppressed: Mute active for another " +
+                        ((muteUntilTimestamp - System.currentTimeMillis()) / 60000) + " minutes.");
+                return;
+            } else {
+                NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                manager.cancel(5543245);
+            }
+
             try {
                 if (args.length > 0 && args[0] instanceof JSONObject data) {
                     String streamUrl = data.getString("streamUrl");
@@ -189,11 +237,11 @@ public class MotionForegroundService extends Service {
                     try {
                         showSecurityAlert(streamUrl, cameraId, title, body, icon, sound, channelId, group);
                     } catch (IOException e) {
-                        Log.e("MotionService", "Error showing security alert: " + e.getMessage());
+                        Log.e("MotionForegroundService", "Error showing security alert: " + e.getMessage());
                     }
                 }
             } catch (JSONException e) {
-                Log.e("MotionService", "Error parsing socket data: " + e.getMessage());
+                Log.e("MotionForegroundService", "Error parsing socket data: " + e.getMessage());
             }
         });
 
@@ -208,13 +256,13 @@ public class MotionForegroundService extends Service {
             // Check if the error is a 401/Unauthorized
             if (args.length > 0) {
                 String errorMsg = args[0].toString();
-                Log.e("MotionService", "Socket connect Error: " + errorMsg);
+                Log.e("MotionForegroundService", "Socket connect Error: " + errorMsg);
 
                 if (errorMsg.contains("Authentication required")) {
-                    Log.d("MotionService", "Token likely expired, refreshing...");
+                    Log.d("MotionForegroundService", "Token likely expired, refreshing...");
                     startSocketWithDelay(); // Fully restart the flow with a new token
                 } else if (args[0] instanceof JSONObject) {
-                    Log.e("MotionService", "Socket connect Error: " + args[0]);
+                    Log.e("MotionForegroundService", "Socket connect Error: " + args[0]);
                     startSocketWithDelay();
                 }
             }
@@ -261,7 +309,7 @@ public class MotionForegroundService extends Service {
                 .setVibrate(new long[]{0L, 500L, 500L, 500L})
                 .addExtras(extras)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent);
         if (icon != null) builder.setSmallIcon(IconCompat.createWithContentUri(Uri.parse("android.resource://" + getPackageName() + "/drawable/" + icon)));
@@ -302,8 +350,14 @@ public class MotionForegroundService extends Service {
                         pauseIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                // We need to create pauseIntent or something
+                Intent muteIntent = new Intent(this, MotionForegroundService.class);
+                muteIntent.setAction("MUTE_NOTIFS_1H");
+
+                PendingIntent mutePendingIntent = PendingIntent.getService(
+                        this, alertId - 1, muteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
                 builder.addAction(android.R.drawable.ic_media_pause, "Pause Detection", pausePendingIntent);
+                builder.addAction(android.R.drawable.ic_lock_silent_mode, "Mute for 1 Hour", mutePendingIntent);
             }
         }
 
@@ -384,11 +438,6 @@ public class MotionForegroundService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        return START_STICKY;
     }
 
     public static boolean getIsSocketConnected() {
