@@ -314,6 +314,14 @@ public class MotionForegroundService extends Service {
                 .setContentIntent(pendingIntent);
         if (icon != null) builder.setSmallIcon(IconCompat.createWithContentUri(Uri.parse("android.resource://" + getPackageName() + "/drawable/" + icon)));
         if (group != null) builder.setGroup(group);
+
+        Intent muteIntent = new Intent(this, MotionForegroundService.class);
+        muteIntent.setAction("MUTE_NOTIFS_1H");
+
+        PendingIntent mutePendingIntent = PendingIntent.getService(
+                this, alertId - 1, muteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        builder.addAction(android.R.drawable.ic_lock_silent_mode, "Mute for 1 Hour", mutePendingIntent);
+
         // if (sound != null) builder.setSound(Uri.parse("android.resource://" + getPackageName() + "/raw/" + sound));
         if (title.equals("Motion Detected!")) {
             builder.setCategory(NotificationCompat.CATEGORY_ALARM);
@@ -350,14 +358,7 @@ public class MotionForegroundService extends Service {
                         pauseIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                Intent muteIntent = new Intent(this, MotionForegroundService.class);
-                muteIntent.setAction("MUTE_NOTIFS_1H");
-
-                PendingIntent mutePendingIntent = PendingIntent.getService(
-                        this, alertId - 1, muteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
                 builder.addAction(android.R.drawable.ic_media_pause, "Pause Detection", pausePendingIntent);
-                builder.addAction(android.R.drawable.ic_lock_silent_mode, "Mute for 1 Hour", mutePendingIntent);
             }
         }
 
