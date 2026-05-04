@@ -13,7 +13,7 @@ A security camera application.
 
 ## Prerequisites
 
-- Node.js v20+ (install via `nvm`, enable yarn with `corepack`). Latest tested: v25.2.1
+- Node.js v22+ (install via `nvm`, enable yarn with `corepack`). Latest tested: v25.6.1
 - ffmpeg v7+ (tested with v7.1.2)
 - A reverse proxy like nginx to handle HTTPS (see [configuration](#nginx-configuration))
 
