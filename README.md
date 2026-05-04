@@ -43,6 +43,17 @@ Run `yarn build` and then `yarn start`. Ensure ports 80 and 443 are available fo
 
 ```properties
 # Gander HTTPS server configuration
+
+ # Redirect HTTP to HTTPS
+server {
+  listen 80;
+  listen [::]:80;
+  # Change example.tld to your website's address (like example.com)
+  server_name example.tld;
+  return 301 https://$host$request_uri;
+}
+
+# HTTPS
 server {
   listen 443 ssl;
   listen [::]:443 ssl;
@@ -66,6 +77,10 @@ server {
     # alternatively use ngx_http_realip_module
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
   }
 
   error_page 500 502 503 504 /50x.html;
