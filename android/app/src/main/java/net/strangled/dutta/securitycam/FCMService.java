@@ -39,7 +39,7 @@ public class FCMService extends FirebaseMessagingService {
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         if (MotionForegroundService.getMuteUntilTimestamp() > System.currentTimeMillis()) {
             Log.d("FCMService", "Notification suppressed: Mute active for another " +
-                    ((MotionForegroundService.getMuteUntilTimestamp() - System.currentTimeMillis()) / 60000L) + " minutes.");
+                    ((MotionForegroundService.getMuteUntilTimestamp() - System.currentTimeMillis()) / 60000) + " minutes.");
             return;
         }
 
@@ -132,6 +132,13 @@ public class FCMService extends FirebaseMessagingService {
             // res/drawable/push_icon.png
             builder.setSmallIcon(R.drawable.push_icon);
         }
+
+        Intent muteIntent = new Intent(this, MotionForegroundService.class);
+        muteIntent.setAction("MUTE_NOTIFS_1H");
+
+        PendingIntent mutePendingIntent = PendingIntent.getService(
+                this, notificationId - 1, muteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        builder.addAction(android.R.drawable.ic_lock_silent_mode, "Mute for 1 Hour", mutePendingIntent);
 
         if (group != null) builder.setGroup(group);
         if (actions.equals("true")) {
