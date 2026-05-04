@@ -1,4 +1,4 @@
-# Gander
+# <img src="https://gander.brandonsbench.net/ic_launcher_round.png" width="48" alt="Gander Icon"> Gander
 
 A security camera application.
 
