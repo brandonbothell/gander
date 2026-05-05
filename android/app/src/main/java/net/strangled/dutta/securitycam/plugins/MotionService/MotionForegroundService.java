@@ -56,7 +56,6 @@ public class MotionForegroundService extends Service {
     private final Handler tokenUpdateHandler = new Handler(Looper.getMainLooper());
     private final Handler unmuteHandler = new Handler(Looper.getMainLooper());
     private final Handler socketConnectionLoopHandler = new Handler(Looper.getMainLooper());
-    private boolean isRefreshingToken = false;
     private static final String CHANNEL_ID = "motion_service_channel";
     private static final String EVENT_CHANNEL_ID = "motion_event_channel";
     private static final String LOW_EVENT_CHANNEL_ID = "motion_event_low_channel";
@@ -157,7 +156,7 @@ public class MotionForegroundService extends Service {
         reconnectHandler.removeCallbacksAndMessages(null);
 
         reconnectHandler.postDelayed(() -> {
-            if (!isRefreshingToken) {
+            if (!isConnecting) {
                 startSocket();
             }
         }, 10000); // 10 second delay
@@ -178,7 +177,7 @@ public class MotionForegroundService extends Service {
 
     private void startSocket() {
         // Prevent overlapping refresh attempts
-        if (isConnecting || isRefreshingToken) return;
+        if (isConnecting) return;
         isConnecting = true;
 
         // Cleanup old socket if it exists
@@ -204,8 +203,6 @@ public class MotionForegroundService extends Service {
             HTTP.authenticate(baseUrl, refreshToken, clientId, new HTTP.RefreshTokenCallback() {
                 @Override
                 public void onSuccess(String newRefreshToken, String token) {
-                    isRefreshingToken = false;
-
                     // Cleanup old socket instance completely
                     if (mSocket != null) {
                         mSocket.disconnect();
@@ -234,7 +231,7 @@ public class MotionForegroundService extends Service {
 
                 @Override
                 public void onFailure(String errorMessage) {
-                    isRefreshingToken = false;
+                    isConnecting = false;
                     Log.e("MotionForegroundService", "Auth failed: " + errorMessage + ". Retrying in 30s...");
                     // If the server is down, wait longer before trying again
                     reconnectHandler.postDelayed(() -> startSocket(), 30000);
