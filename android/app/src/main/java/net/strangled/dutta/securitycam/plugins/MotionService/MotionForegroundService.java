@@ -55,6 +55,7 @@ public class MotionForegroundService extends Service {
     private final Handler wakeLockHandler = new Handler(Looper.getMainLooper());
     private final Handler tokenUpdateHandler = new Handler(Looper.getMainLooper());
     private final Handler unmuteHandler = new Handler(Looper.getMainLooper());
+    private final Handler socketConnectionLoopHandler = new Handler(Looper.getMainLooper());
     private boolean isRefreshingToken = false;
     private static final String CHANNEL_ID = "motion_service_channel";
     private static final String EVENT_CHANNEL_ID = "motion_event_channel";
@@ -162,6 +163,14 @@ public class MotionForegroundService extends Service {
                 startSocket();
             }
         }, 10000); // 10 second delay
+
+        new Handler(Looper.getMainLooper()).postDelayed(this::ensureSocketConnectionLoop, 20000);
+    }
+
+    private void ensureSocketConnectionLoop() {
+        socketConnectionLoopHandler.removeCallbacksAndMessages(null);
+        if (!getIsSocketConnected()) startSocketWithDelay();
+        socketConnectionLoopHandler.postDelayed(this::ensureSocketConnectionLoop, 10000);
     }
 
     private void startSocket() {
@@ -281,7 +290,7 @@ public class MotionForegroundService extends Service {
                 if (errorMsg.contains("Authentication required")) {
                     Log.d("MotionForegroundService", "Token likely expired, refreshing...");
                     startSocketWithDelay(); // Fully restart the flow with a new token
-                } else if (args[0] instanceof JSONObject) {
+                } else {
                     Log.e("MotionForegroundService", "Socket connect Error: " + args[0]);
                     startSocketWithDelay();
                 }
@@ -289,11 +298,8 @@ public class MotionForegroundService extends Service {
         });
 
         mSocket.on(Socket.EVENT_DISCONNECT, args -> {
+            Log.d("MotionForegroundService", "Socket disconnected, will attempt to reconnect...");
             setIsSocketConnected(false);
-            // "io server disconnect" means the server kicked us (often token expiration)
-            if (args.length > 0 && "io server disconnect".equals(args[0].toString())) {
-                startSocketWithDelay();
-            }
         });
     }
 
