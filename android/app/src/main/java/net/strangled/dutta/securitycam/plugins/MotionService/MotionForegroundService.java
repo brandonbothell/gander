@@ -48,7 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public class MotionForegroundService extends Service {
-    private Socket mSocket;
+    private static Socket mSocket;
     private PowerManager.WakeLock wakeLock;
     private boolean isConnecting = false;
     private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
@@ -60,8 +60,6 @@ public class MotionForegroundService extends Service {
     private static final String CHANNEL_ID = "motion_service_channel";
     private static final String EVENT_CHANNEL_ID = "motion_event_channel";
     private static final String LOW_EVENT_CHANNEL_ID = "motion_event_low_channel";
-
-    private static boolean isSocketConnected = false;
 
     private static long muteUntilTimestamp = 0;
 
@@ -170,6 +168,11 @@ public class MotionForegroundService extends Service {
     private void ensureSocketConnectionLoop() {
         socketConnectionLoopHandler.removeCallbacksAndMessages(null);
         if (!getIsSocketConnected()) startSocketWithDelay();
+        try {
+            NotificationManagerCompat.from(this).notify(43253643, getStickyNotification());
+        } catch (SecurityException e) {
+            Log.e("MotionForegroundService", "Error showing sticky notification: " + e.getMessage());
+        }
         socketConnectionLoopHandler.postDelayed(this::ensureSocketConnectionLoop, 10000);
     }
 
@@ -276,12 +279,9 @@ public class MotionForegroundService extends Service {
 
         mSocket.on(Socket.EVENT_CONNECT, args -> {
             Log.d("MotionForegroundService", "Socket connected");
-            setIsSocketConnected(true);
         });
 
         mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
-            setIsSocketConnected(false);
-
             // Check if the error is a 401/Unauthorized
             if (args.length > 0) {
                 String errorMsg = args[0].toString();
@@ -299,7 +299,6 @@ public class MotionForegroundService extends Service {
 
         mSocket.on(Socket.EVENT_DISCONNECT, args -> {
             Log.d("MotionForegroundService", "Socket disconnected, will attempt to reconnect...");
-            setIsSocketConnected(false);
         });
     }
 
@@ -406,9 +405,10 @@ public class MotionForegroundService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentText("[" + (isSocketConnected ? "Connected" : "Disconnected") + "] Monitoring Security System")
+                .setContentText("[" + (getIsSocketConnected() ? "Connected" : "Disconnected") + "] Monitoring Security System")
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .setOngoing(true)
+                .setOnlyAlertOnce(true)
                 .setGroup("motion_service")
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -468,16 +468,6 @@ public class MotionForegroundService extends Service {
     }
 
     public static boolean getIsSocketConnected() {
-        return isSocketConnected;
-    }
-
-    private boolean setIsSocketConnected(boolean isSocketConnected) {
-        MotionForegroundService.isSocketConnected = isSocketConnected;
-        try {
-            NotificationManagerCompat.from(this).notify(43253643, getStickyNotification());
-        } catch (SecurityException e) {
-            Log.e("MotionForegroundService", "Error showing sticky notification: " + e.getMessage());
-        }
-        return MotionForegroundService.isSocketConnected;
+        return mSocket != null && mSocket.connected();
     }
 }
