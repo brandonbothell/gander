@@ -2,7 +2,7 @@ import { ChildProcess } from 'child_process'
 
 // --- Per-stream motion state ---
 export interface StreamMotionState {
-  segmentCreatedAtMap: Map<string, number>
+  segmentTimestampMap: Map<string, number>
   processingSegment: boolean
   notificationSent: boolean
   motionRecordingActive: boolean
@@ -16,7 +16,7 @@ export interface StreamMotionState {
   savingInProgress: boolean
   currentSaveProcess: ChildProcess | null
   saveRetryCount: number
-  startedRecordingAt: number
+  motionStartedAt: number
   lastSegmentProcessAt?: number
   flushTimer?: NodeJS.Timeout // Timer for flushing segments
   flushedSegments: string[] // Segments that have been flushed

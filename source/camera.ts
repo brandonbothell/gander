@@ -116,7 +116,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
     if (!streamStates[streamId]) {
       const persistedStates = await loadPersistedStreamStates()
       streamStates[streamId] = {
-        segmentCreatedAtMap: new Map(),
+        segmentTimestampMap: new Map(),
         processingSegment: false,
         notificationSent: false,
         motionRecordingActive: false,
@@ -130,7 +130,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         savingInProgress: false,
         currentSaveProcess: null,
         saveRetryCount: 0,
-        startedRecordingAt: 0,
+        motionStartedAt: 0,
         lastSegmentProcessAt: 0,
         recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
         flushRecordings: [],
@@ -153,8 +153,10 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
           const state = streamStates[streamId]
           const now = Date.now()
 
-          state.segmentCreatedAtMap.set(segmentPath, now)
-          state.processingSegment = true
+          state.segmentTimestampMap.set(
+            segmentPath,
+            state.motionStartedAt === 0 ? 0 : now - state.motionStartedAt,
+          )
 
           // --- Throttle segment processing to avoid busy loop ---
           const MIN_SEGMENT_PROCESS_INTERVAL = 300 // ms
@@ -187,11 +189,11 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
             // Ignore the one we just added
             if (state.recentSegments.length - 1 > RECENT_SEGMENT_BUFFER) {
               const expiredSegment = state.recentSegments.shift()
-              state.segmentCreatedAtMap.delete(expiredSegment!)
               if (
                 (!state.motionRecordingActive && !state.savingInProgress) ||
                 state.flushedSegments.includes(expiredSegment!)
               ) {
+                state.segmentTimestampMap.delete(expiredSegment!)
                 setTimeout(() => safeUnlinkWithRetry(expiredSegment!), 10000) // Give time for the stream to serve to clients
               }
             }
@@ -225,8 +227,8 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                   // Motion was detected and we're not currently recording/saving
                   // Start a new recording
                   state.nextFlushNumber = 1
-                  state.recordingTitle = `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`
-                  state.startedRecordingAt = now
+                  state.recordingTitle = `motion_${new Date(now).toISOString().replace(/[:.]/g, '-')}.mp4`
+                  state.motionStartedAt = now
                   state.notificationSent = false
                 }
 
@@ -248,21 +250,16 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                 }, 10000) // flush every 10 seconds
               }
 
-              const timestamp = Math.max(
-                0,
-                state.segmentCreatedAtMap.get(segmentPath)! -
-                  state.startedRecordingAt,
-              )
+              const timestamp = state.segmentTimestampMap.get(segmentPath)
 
-              // 0.5s * RECENT_SEGMENT_BUFFER is a magic number to make timestamps at the beginning of motion events work well
-              const timestampOffset = RECENT_SEGMENT_BUFFER * 500
-
-              state.currentRecordingMotionTimestamps.push(
-                timestamp + timestampOffset,
-              )
-              logMotion(
-                `Updated motion timestamps in state: ${JSON.stringify(state.currentRecordingMotionTimestamps)}`,
-              )
+              if (timestamp) {
+                state.currentRecordingMotionTimestamps.push(timestamp)
+              } else {
+                logMotion(
+                  `[Motion] Segment '${path.basename(segmentPath)}' timestamp is missing`,
+                  'warn',
+                )
+              }
 
               // --- If motion is detected, add the segment to motion segments ---
               if (!state.motionSegments.includes(segmentPath)) {
@@ -858,7 +855,7 @@ export async function createStreamManager(stream: {
   const persistedStates = await loadPersistedStreamStates()
 
   streamStates[stream.id] = {
-    segmentCreatedAtMap: new Map(),
+    segmentTimestampMap: new Map(),
     processingSegment: false,
     notificationSent: false,
     motionRecordingActive: false,
@@ -872,7 +869,7 @@ export async function createStreamManager(stream: {
     savingInProgress: false,
     currentSaveProcess: null,
     saveRetryCount: 0,
-    startedRecordingAt: 0,
+    motionStartedAt: 0,
     lastSegmentProcessAt: 0,
     recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
     flushRecordings: [],

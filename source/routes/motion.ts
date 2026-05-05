@@ -81,7 +81,7 @@ export default function initializeMotionRoutes(
         recording: state.motionRecordingActive,
         secondsLeft,
         saving: state.savingInProgress ?? false,
-        startedRecordingAt: state.startedRecordingAt,
+        startedRecordingAt: state.motionStartedAt,
         lowDiskSpace: state.lowSpaceNotified,
       }
     }
@@ -194,7 +194,7 @@ export default function initializeMotionRoutes(
   )
 }
 
-// Enhanced save function with retry logic
+// Save function with retry logic
 export async function saveMotionSegmentsWithRetry(
   streamStates: Record<string, StreamMotionState>,
   dynamicStreams: Record<string, StreamManager>,
@@ -230,12 +230,13 @@ export async function saveMotionSegmentsWithRetry(
       logMotion(
         `[${streamId}] Failed to save motion segments after ${maxRetries + 1} attempts, giving up`,
       )
-      // Reset state even on failure
+      // Reset state on failure
       state.savingInProgress = false
       state.currentSaveProcess = null
       state.saveRetryCount = 0
       state.motionSegments = []
       state.currentRecordingMotionTimestamps = []
+      state.segmentTimestampMap.clear()
     }
   }
 }
@@ -363,6 +364,7 @@ export async function checkDiskSpaceAndPurge(
       state.flushedSegments = []
       state.flushRecordings = []
       state.currentRecordingMotionTimestamps = []
+      state.segmentTimestampMap.clear()
       state.savingInProgress = false
       if (state.currentSaveProcess) {
         try {
@@ -534,6 +536,7 @@ async function saveMotionSegments(
     state.flushedSegments = []
     state.flushRecordings = []
     state.currentRecordingMotionTimestamps = []
+    state.segmentTimestampMap.clear()
     return
   }
 
@@ -566,19 +569,8 @@ async function saveMotionSegments(
   // Normalize motion timestamps at the end of motion events
   state.currentRecordingMotionTimestamps =
     state.currentRecordingMotionTimestamps.map(
-      (timestamp, index, timestamps) => {
-        if (index < 1 || timestamps.length !== 1) return timestamp // We don't want to edit the first or only timestamp
-        if (timestamp - timestamps[index - 1] > 5000) {
-          return timestamp // We don't want to edit the beginning of motion events
-        } else {
-          /* if (
-          timestamps.length === index + 1 ||
-          timestamps[index + 1] - timestamp > 5000
-        )*/
-          return timestamp + RECENT_SEGMENT_BUFFER * 2 * 500
-        } // We want to edit the end of motion events
-      },
-    )
+      (timestamp) => timestamp + RECENT_SEGMENT_BUFFER * 2 * 500,
+    ) // Push forward due to recent segment buffer (motion processing lag-behind)
 
   // Gather flushed recordings
   const flushedFiles = [...new Set(state.flushRecordings)]
@@ -631,6 +623,7 @@ async function saveMotionSegments(
     state.motionSegments = []
     state.flushedSegments = []
     state.currentRecordingMotionTimestamps = []
+    state.segmentTimestampMap.clear()
     return
   }
 
@@ -671,7 +664,8 @@ async function saveMotionSegments(
         state.currentRecordingMotionTimestamps = []
         state.nextFlushNumber = 1
         state.notificationSent = false
-        state.startedRecordingAt = 0
+        state.motionStartedAt = 0
+        state.segmentTimestampMap.clear()
         await safeUnlinkWithRetry(listFile)
         resolve()
         return
@@ -701,9 +695,10 @@ async function saveMotionSegments(
           state.flushedSegments = []
           state.nextFlushNumber = 1
           state.notificationSent = false
-          state.startedRecordingAt = 0
+          state.motionStartedAt = 0
           state.savingInProgress = false
           state.currentSaveProcess = null
+          state.segmentTimestampMap.clear()
 
           // Save to DB
           try {
@@ -766,10 +761,11 @@ async function saveMotionSegments(
         state.flushRecordings = []
         state.nextFlushNumber = 1
         state.notificationSent = false
-        state.startedRecordingAt = 0
+        state.motionStartedAt = 0
         state.savingInProgress = false
         state.currentSaveProcess = null
         state.currentRecordingMotionTimestamps = []
+        state.segmentTimestampMap.clear()
         resolve()
       }
     }, 60000)
