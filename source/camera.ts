@@ -88,7 +88,7 @@ const MOTION_RECORDING_TIMEOUT_SECONDS = {
  * should be kept in memory or storage for quick access, processing, and saving.
  * Adjust this value based on memory constraints and motion recording requirements.
  */
-const RECENT_SEGMENT_BUFFER = 6
+export const RECENT_SEGMENT_BUFFER = 6
 const STARTUP_GRACE_PERIOD = 10 // seconds
 
 const streamThumbnailPromises: Record<
@@ -116,6 +116,8 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
     if (!streamStates[streamId]) {
       const persistedStates = await loadPersistedStreamStates()
       streamStates[streamId] = {
+        segmentCreatedAtMap: new Map(),
+        processingSegment: false,
         notificationSent: false,
         motionRecordingActive: false,
         motionRecordingTimeoutAt: 0,
@@ -149,9 +151,12 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         .on('add', (segmentPath) => {
           if (!/segment_\d+\.ts$/.test(path.basename(segmentPath))) return
           const state = streamStates[streamId]
+          const now = Date.now()
+
+          state.segmentCreatedAtMap.set(segmentPath, now)
+          state.processingSegment = true
 
           // --- Throttle segment processing to avoid busy loop ---
-          const now = Date.now()
           const MIN_SEGMENT_PROCESS_INTERVAL = 300 // ms
           if (
             state.lastSegmentProcessAt &&
@@ -164,23 +169,39 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
             }
             return
           }
-          state.lastSegmentProcessAt = now
 
-          state.recentSegments.push(segmentPath)
-          if (state.recentSegments.length > RECENT_SEGMENT_BUFFER) {
-            const expiredSegment = state.recentSegments.shift()
-            if (
-              expiredSegment &&
-              ((state.motionRecordingActive && !state.savingInProgress) ||
-                state.flushedSegments.includes(expiredSegment))
-            ) {
-              safeUnlinkWithRetry(expiredSegment)
+          async function processSegment(segmentPath: string) {
+            if (state.processingSegment) {
+              logMotion(
+                'New segment observed while processing previous segment, rescheduling processing to avoid busy loop.',
+              )
+              setTimeout(() => processSegment(segmentPath), 300)
             }
-          }
-          setTimeout(async () => {
-            if (state.motionPaused) return
+
+            state.processingSegment = true
             const now = Date.now()
-            if ((now - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD) {
+
+            state.lastSegmentProcessAt = now
+            state.recentSegments.push(segmentPath)
+
+            // Ignore the one we just added
+            if (state.recentSegments.length - 1 > RECENT_SEGMENT_BUFFER) {
+              const expiredSegment = state.recentSegments.shift()
+              state.segmentCreatedAtMap.delete(expiredSegment!)
+              if (
+                (!state.motionRecordingActive && !state.savingInProgress) ||
+                state.flushedSegments.includes(expiredSegment!)
+              ) {
+                setTimeout(() => safeUnlinkWithRetry(expiredSegment!), 10000) // Give time for the stream to serve to clients
+              }
+            }
+
+            // If motion detection is paused or we just started the server up
+            if (
+              state.motionPaused ||
+              (now - state.startupTime) / 1000 < STARTUP_GRACE_PERIOD
+            ) {
+              state.processingSegment = false
               return
             }
             const motionStatus = await detectMotion(
@@ -225,16 +246,23 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                     streamId,
                   )
                 }, 10000) // flush every 10 seconds
-              } else {
-                state.currentRecordingMotionTimestamps.push(
-                  state.currentRecordingMotionTimestamps.length
-                    ? state.lastSegmentProcessAt! - state.startedRecordingAt
-                    : Math.max(0, now - state.startedRecordingAt - 1000),
-                )
-                logMotion(
-                  `Updated motion timestamps in state: ${JSON.stringify(state.currentRecordingMotionTimestamps)}`,
-                )
               }
+
+              const timestamp = Math.max(
+                0,
+                state.segmentCreatedAtMap.get(segmentPath)! -
+                  state.startedRecordingAt,
+              )
+
+              // 0.5s * RECENT_SEGMENT_BUFFER is a magic number to make timestamps at the beginning of motion events work well
+              const timestampOffset = RECENT_SEGMENT_BUFFER * 500
+
+              state.currentRecordingMotionTimestamps.push(
+                timestamp + timestampOffset,
+              )
+              logMotion(
+                `Updated motion timestamps in state: ${JSON.stringify(state.currentRecordingMotionTimestamps)}`,
+              )
 
               // --- If motion is detected, add the segment to motion segments ---
               if (!state.motionSegments.includes(segmentPath)) {
@@ -297,7 +325,12 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                 state.motionSegments.push(segmentPath)
               }
             }
-          }, 300)
+
+            state.processingSegment = false
+          }
+
+          // Process the segment after a short delay for the filesystem
+          setTimeout(() => processSegment(segmentPath), 300)
         }),
     )
 
@@ -825,6 +858,8 @@ export async function createStreamManager(stream: {
   const persistedStates = await loadPersistedStreamStates()
 
   streamStates[stream.id] = {
+    segmentCreatedAtMap: new Map(),
+    processingSegment: false,
     notificationSent: false,
     motionRecordingActive: false,
     motionRecordingTimeoutAt: 0,

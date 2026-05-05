@@ -10,6 +10,7 @@ import { logMotion } from '../logMotion'
 import {
   persistStreamState,
   prisma,
+  RECENT_SEGMENT_BUFFER,
   safeUnlinkWithRetry,
   saveMotionSegments as saveMotionSegmentsCamera,
 } from '../camera'
@@ -234,6 +235,7 @@ export async function saveMotionSegmentsWithRetry(
       state.currentSaveProcess = null
       state.saveRetryCount = 0
       state.motionSegments = []
+      state.currentRecordingMotionTimestamps = []
     }
   }
 }
@@ -560,6 +562,23 @@ async function saveMotionSegments(
   }
 
   state.savingInProgress = true
+
+  // Normalize motion timestamps at the end of motion events
+  state.currentRecordingMotionTimestamps =
+    state.currentRecordingMotionTimestamps.map(
+      (timestamp, index, timestamps) => {
+        if (index < 1 || timestamps.length !== 1) return timestamp // We don't want to edit the first or only timestamp
+        if (timestamp - timestamps[index - 1] > 5000) {
+          return timestamp // We don't want to edit the beginning of motion events
+        } else {
+          /* if (
+          timestamps.length === index + 1 ||
+          timestamps[index + 1] - timestamp > 5000
+        )*/
+          return timestamp + RECENT_SEGMENT_BUFFER * 2 * 500
+        } // We want to edit the end of motion events
+      },
+    )
 
   // Gather flushed recordings
   const flushedFiles = [...new Set(state.flushRecordings)]

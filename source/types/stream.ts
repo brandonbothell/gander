@@ -2,6 +2,8 @@ import { ChildProcess } from 'child_process'
 
 // --- Per-stream motion state ---
 export interface StreamMotionState {
+  segmentCreatedAtMap: Map<string, number>
+  processingSegment: boolean
   notificationSent: boolean
   motionRecordingActive: boolean
   motionTimeout?: NodeJS.Timeout
