@@ -1,6 +1,8 @@
 package net.strangled.dutta.securitycam.API;
 
 import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -20,7 +22,7 @@ import retrofit2.converter.gson.GsonConverterFactory;
 import retrofit2.internal.EverythingIsNonNull;
 
 public class HTTP {
-    private static int lastRefreshed = 0;
+    private static float lastRefreshed = 0F;
     private static String currentRefreshToken = null;
     private static String currentToken = null;
     public static SharedPreferences sharedPreferences = null;
@@ -36,6 +38,10 @@ public class HTTP {
     }
 
     public static void authenticate(String baseUrl, String refreshToken, String clientId, RefreshTokenCallback callback) {
+        authenticate(baseUrl, refreshToken, clientId, callback, 1);
+    }
+
+    public static void authenticate(String baseUrl, String refreshToken, String clientId, RefreshTokenCallback callback, int attempt) {
             // One minute minimum rest between refreshes
             if (System.currentTimeMillis() - lastRefreshed < 60 * 1000) {
                 Log.d("Refresh Token", "Token is still valid, skipping refresh");
@@ -74,7 +80,7 @@ public class HTTP {
 
             Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(refreshToken), dummyDeviceInfo);
 
-            refreshTokenResponse.enqueue(new Callback<>() {
+        refreshTokenResponse.enqueue(new Callback<>() {
                 @Override
                 @EverythingIsNonNull
                 public void onResponse(Call<APIService.RefreshTokenResponse> call, Response<APIService.RefreshTokenResponse> response) {
@@ -87,13 +93,26 @@ public class HTTP {
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
+
+                        if (response.code() == 401 && attempt <= 3) {
+                            Log.d("HTTP", "401 detected. Retrying in 5 seconds...");
+
+                            // Wait 5 seconds before the next attempt
+                            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                // Retry the original request after refresh token has likely been updated from MotionForegroundService
+                                HTTP.authenticate(baseUrl, HTTP.currentRefreshToken, clientId, callback, attempt + 1);
+                            }, 5000);
+                        } else {
+                            Log.e("Refresh Token", "Token refresh failed!");
+                            callback.onFailure("Authentication failed due to expired token");
+                        }
                         return;
                     }
 
                     assert body != null;
                     if (body.refreshToken != null && body.token != null) {
                         Log.d("Refresh Token", "Token refreshed successfully!");
-                        HTTP.lastRefreshed = (int) System.currentTimeMillis();
+                        HTTP.lastRefreshed = System.currentTimeMillis();
                         HTTP.currentRefreshToken = body.refreshToken;
                         HTTP.currentToken = body.token;
                         if (sharedPreferences != null) {
@@ -379,8 +398,8 @@ public class HTTP {
         }
     }
 
+
     public static void setCurrentRefreshToken(String refreshToken) {
         currentRefreshToken = refreshToken;
-        lastRefreshed = (int) System.currentTimeMillis();
     }
 }

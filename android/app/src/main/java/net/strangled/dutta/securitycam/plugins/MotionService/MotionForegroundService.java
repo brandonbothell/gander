@@ -54,6 +54,7 @@ public class MotionForegroundService extends Service {
     private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
     private final Handler wakeLockHandler = new Handler(Looper.getMainLooper());
     private final Handler tokenUpdateHandler = new Handler(Looper.getMainLooper());
+    private final Handler unmuteHandler = new Handler(Looper.getMainLooper());
     private boolean isRefreshingToken = false;
     private static final String CHANNEL_ID = "motion_service_channel";
     private static final String EVENT_CHANNEL_ID = "motion_event_channel";
@@ -89,9 +90,13 @@ public class MotionForegroundService extends Service {
         if (intent != null) {
             if ("MUTE_NOTIFS_1H".equals(intent.getAction())) {
                 muteUntilTimestamp = System.currentTimeMillis() + 60L*60L*1000L /* 1 hour */;
+                unmuteHandler.postDelayed(() -> {
+                    manager.cancel(5543245);
+                }, 60L*60L*1000L);
 
                 Log.d("MotionForegroundService", "User muted alerts for 1 hour.");
             } else if ("UNMUTE_NOTIFS".equals(intent.getAction())) {
+                unmuteHandler.removeCallbacksAndMessages(null);
                 manager.cancel(5543245);
                 muteUntilTimestamp = 0L;
             }
