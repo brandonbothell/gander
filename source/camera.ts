@@ -86,9 +86,9 @@ const MOTION_RECORDING_TIMEOUT_SECONDS = {
  *
  * This constant determines how many of the most recent video segments
  * should be kept in memory or storage for quick access or processing.
- * Adjust this value based on memory constraints and application requirements.
+ * Adjust this value based on memory constraints and application ments.
  */
-const RECENT_SEGMENT_BUFFER = 9
+const RECENT_SEGMENT_BUFFER = 6
 const STARTUP_GRACE_PERIOD = 10 // seconds
 
 const streamThumbnailPromises: Record<
