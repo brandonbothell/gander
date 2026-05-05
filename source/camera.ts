@@ -85,8 +85,8 @@ const MOTION_RECORDING_TIMEOUT_SECONDS = {
  * Number of recent video segments to buffer.
  *
  * This constant determines how many of the most recent video segments
- * should be kept in memory or storage for quick access or processing.
- * Adjust this value based on memory constraints and application ments.
+ * should be kept in memory or storage for quick access, processing, and saving.
+ * Adjust this value based on memory constraints and motion recording requirements.
  */
 const RECENT_SEGMENT_BUFFER = 6
 const STARTUP_GRACE_PERIOD = 10 // seconds
