@@ -2,6 +2,7 @@ package net.strangled.dutta.securitycam.plugins.MotionService;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -457,6 +458,26 @@ public class MotionForegroundService extends Service {
         if (wakeLock != null) {
             wakeLock.release();
         }
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // This is called when the user swipes the app away from 'Recents'
+        Intent restartServiceIntent = new Intent(getApplicationContext(), this.getClass());
+        restartServiceIntent.setPackage(getPackageName());
+
+        PendingIntent restartServicePendingIntent = PendingIntent.getService(
+                getApplicationContext(), 1, restartServiceIntent,
+                PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+
+        AlarmManager alarmService = (AlarmManager) getApplicationContext().getSystemService(Context.ALARM_SERVICE);
+        // Schedule a restart in 5 seconds
+        alarmService.set(
+                AlarmManager.RTC,
+                System.currentTimeMillis() + 5000,
+                restartServicePendingIntent);
+
+        super.onTaskRemoved(rootIntent);
     }
 
     @Override
