@@ -4,6 +4,8 @@ import android.content.Intent;
 import android.content.Context;
 import android.os.Build;
 
+import androidx.core.content.ContextCompat;
+
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -14,23 +16,17 @@ public class MotionServicePlugin extends Plugin {
 
     @PluginMethod
     public void startService(PluginCall call) {
-        Context context = getContext();
-        Intent serviceIntent = new Intent(context, MotionForegroundService.class);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent);
-        } else {
-            context.startService(serviceIntent);
-        }
-
+        Context ctx = getContext();
+        Intent serviceIntent = new Intent(ctx, MotionForegroundService.class);
+        ContextCompat.startForegroundService(ctx, serviceIntent);
         call.resolve();
     }
 
     @PluginMethod
     public void stopService(PluginCall call) {
-        Context context = getContext();
-        Intent serviceIntent = new Intent(context, MotionForegroundService.class);
-        context.stopService(serviceIntent);
+        Context ctx = getContext();
+        Intent serviceIntent = new Intent(ctx, MotionForegroundService.class);
+        ctx.stopService(serviceIntent);
         call.resolve();
     }
 }

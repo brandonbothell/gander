@@ -54,10 +54,21 @@
 
         <receiver android:name=".PauseDetectionNotificationActionReceiver" android:exported="false" />
 
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" /> <!-- For some HTC/other devices -->
+            </intent-filter>
+        </receiver>
+
     </application>
 
     <!-- Permissions -->
 
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.INTERNET"
         tools:ignore="ManifestOrder" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

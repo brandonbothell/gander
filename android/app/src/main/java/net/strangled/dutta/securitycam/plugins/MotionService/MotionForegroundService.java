@@ -51,7 +51,6 @@ import java.util.Objects;
 public class MotionForegroundService extends Service {
     private static Socket mSocket;
     private PowerManager.WakeLock wakeLock;
-    private boolean isConnecting = false;
     private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
     private final Handler wakeLockHandler = new Handler(Looper.getMainLooper());
     private final Handler tokenUpdateHandler = new Handler(Looper.getMainLooper());
@@ -157,7 +156,7 @@ public class MotionForegroundService extends Service {
         reconnectHandler.removeCallbacksAndMessages(null);
 
         reconnectHandler.postDelayed(() -> {
-            if (!isConnecting) {
+            if (mSocket == null || !mSocket.connected()) {
                 startSocket();
             }
         }, 10000); // 10 second delay
@@ -177,9 +176,7 @@ public class MotionForegroundService extends Service {
     }
 
     private void startSocket() {
-        // Prevent overlapping refresh attempts
-        if (isConnecting) return;
-        isConnecting = true;
+        if (mSocket != null && mSocket.connected()) return;
 
         // Cleanup old socket if it exists
         if (mSocket != null) {
@@ -227,12 +224,10 @@ public class MotionForegroundService extends Service {
                     } catch (URISyntaxException e) {
                         Log.e("MotionService", "URI Error: " + e.getMessage());
                     }
-                    isConnecting = false;
                 }
 
                 @Override
                 public void onFailure(String errorMessage) {
-                    isConnecting = false;
                     Log.e("MotionForegroundService", "Auth failed: " + errorMessage + ". Retrying in 30s...");
                     // If the server is down, wait longer before trying again
                     reconnectHandler.postDelayed(() -> startSocket(), 30000);
