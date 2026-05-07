@@ -8,9 +8,11 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.media.AudioAttributes;
@@ -21,6 +23,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.UserManager;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
@@ -70,14 +73,34 @@ public class MotionForegroundService extends Service {
     public void onCreate() {
         super.onCreate();
 
-        // Start Foreground service
+        // 1. Start Foreground service
         MotionForegroundService.createNotificationChannels(getApplicationContext());
         startForeground(43253643, getStickyNotification());
-
-        // Initialize Socket.io
         acquireWakeLock();
-        startSocketWithDelay();
-        updateTokenLoop();
+
+        // 2. Check if storage is accessible (unlocked)
+        UserManager userManager = (UserManager) getSystemService(Context.USER_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !userManager.isUserUnlocked()) {
+            // Device is locked; wait for the unlock signal
+            MotionForegroundService service = this;
+            registerReceiver(new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (Intent.ACTION_USER_UNLOCKED.equals(intent.getAction())) {
+                        // 3. Initialize Socket.io
+                        startSocketWithDelay();
+                        socketConnectionLoopHandler.postDelayed(service::ensureSocketConnectionLoop, 20000);
+                        updateTokenLoop();
+                        unregisterReceiver(this);
+                    }
+                }
+            }, new IntentFilter(Intent.ACTION_USER_UNLOCKED));
+        } else {
+            // 3. Initialize Socket.io
+            startSocketWithDelay();
+            socketConnectionLoopHandler.postDelayed(this::ensureSocketConnectionLoop, 20000);
+            updateTokenLoop();
+        }
     }
 
     @SuppressLint("LaunchActivityFromNotification")
@@ -156,12 +179,10 @@ public class MotionForegroundService extends Service {
         reconnectHandler.removeCallbacksAndMessages(null);
 
         reconnectHandler.postDelayed(() -> {
-            if (mSocket == null || !mSocket.connected()) {
+            if (!getIsSocketConnected()) {
                 startSocket();
             }
         }, 10000); // 10 second delay
-
-        new Handler(Looper.getMainLooper()).postDelayed(this::ensureSocketConnectionLoop, 20000);
     }
 
     private void ensureSocketConnectionLoop() {
@@ -278,14 +299,11 @@ public class MotionForegroundService extends Service {
             // Check if the error is a 401/Unauthorized
             if (args.length > 0) {
                 String errorMsg = args[0].toString();
-                Log.e("MotionForegroundService", "Socket connect Error: " + errorMsg);
 
-                if (errorMsg.contains("Authentication required")) {
+                if (errorMsg.contains("Invalid or expired token")) {
                     Log.d("MotionForegroundService", "Token likely expired, refreshing...");
-                    startSocketWithDelay(); // Fully restart the flow with a new token
                 } else {
                     Log.e("MotionForegroundService", "Socket connect Error: " + args[0]);
-                    startSocketWithDelay();
                 }
             }
         });

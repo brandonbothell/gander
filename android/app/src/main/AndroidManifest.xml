@@ -50,16 +50,23 @@
         <service
             android:name=".plugins.MotionService.MotionForegroundService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:directBootAware="true"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Monitoring self-hosted security camera socket for real-time motion alerts." />
+        </service>
 
         <receiver android:name=".PauseDetectionNotificationActionReceiver" android:exported="false" />
 
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
+            android:directBootAware="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" /> <!-- For some HTC/other devices -->
             </intent-filter>
         </receiver>
@@ -73,7 +80,7 @@
         tools:ignore="ManifestOrder" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Required to keep the app running in the background without any resource limitations -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Required to request the manage overlay permission -->
