@@ -258,12 +258,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/local-notifications@npm:8.0.2":
-  version: 8.0.2
-  resolution: "@capacitor/local-notifications@npm:8.0.2"
+"@capacitor/local-notifications@npm:8.1.0":
+  version: 8.1.0
+  resolution: "@capacitor/local-notifications@npm:8.1.0"
   peerDependencies:
     "@capacitor/core": ">=8.0.0"
-  checksum: 10c0/e53b3770c00fee0c632098085e5148ce76f78337a74009b91902dbb031ae39196962332460c0738b038c54d4d948603216e0a4c985af759b0f9594af13105e89
+  checksum: 10c0/68da77856fa9236776cacac5e605f9e9a01977a2adb32c0359a783bbf089f91f17fac24402187a48b8a2158026861a4480e2df4f2214f290aa8f911838e02f68
   languageName: node
   linkType: hard
 
@@ -5635,7 +5635,7 @@ __metadata:
     "@capacitor/app": "npm:8.1.0"
     "@capacitor/cli": "npm:8.3.1"
     "@capacitor/core": "npm:8.3.1"
-    "@capacitor/local-notifications": "npm:8.0.2"
+    "@capacitor/local-notifications": "npm:8.1.0"
     "@capacitor/preferences": "npm:8.0.1"
     "@capacitor/push-notifications": "npm:8.0.3"
     "@capacitor/screen-orientation": "npm:8.0.1"
@@ -10893,7 +10893,7 @@ __metadata:
   dependencies:
     "@capacitor/app": "npm:8.1.0"
     "@capacitor/core": "npm:8.3.1"
-    "@capacitor/local-notifications": "npm:8.0.2"
+    "@capacitor/local-notifications": "npm:8.1.0"
     "@capacitor/preferences": "npm:8.0.1"
     "@capacitor/push-notifications": "npm:8.0.3"
     "@capacitor/screen-orientation": "npm:8.0.1"
