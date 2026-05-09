@@ -4,7 +4,7 @@ import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
 import { logNotify } from '../logMotion'
-import { io, prisma, RequestWithUser } from '../camera'
+import { io, prisma, RequestWithUser, socketDisconnectMap } from '../camera'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeNotificationRoutes(app: express.Application) {
@@ -147,6 +147,15 @@ export default function initializeNotificationRoutes(app: express.Application) {
 }
 
 /**
+ * Map of `clientId` to an array of pending `notify` calls to send when the client reconnects.
+ */
+
+export const socketReconnectQueue = new Map<
+  string,
+  Array<() => Promise<void>>
+>()
+
+/**
  * Send a notification for a specific stream.
  * @param streamId The ID of the stream to notify about.
  * @param custom Optional custom notification data.
@@ -238,6 +247,7 @@ export async function notify(
         }
       }
     }
+
     // FCM or Socket Push
     if (sub.fcmToken || sub.clientId) {
       const withOptional = {
@@ -270,12 +280,31 @@ export async function notify(
               'error',
             )
           }
+        } else if (
+          socketDisconnectMap.has(sub.clientId) &&
+          Date.now() - 5 * 60 * 1000 < socketDisconnectMap.get(sub.clientId)!
+        ) {
+          logNotify(
+            `[Notify] [Socket] Client '${sub.sid}' recently disconnected, adding notification to queue for reconnect.`,
+            'info',
+          )
+          // If the client recently disconnected (within the last 5 minutes), add to queue for sending on reconnect
+          const pending = socketReconnectQueue.get(sub.clientId) || []
+          pending.push(() => notify(dynamicStreams, streamId, custom, username))
+          socketReconnectQueue.set(sub.clientId, pending)
+        } else {
+          logNotify(
+            `[Notify] [Socket] '${sub.sid}' is disconnected, sending FCM instead.`,
+            'info',
+          )
+          if (socketReconnectQueue.has(sub.clientId)) {
+            const notifyFns = socketReconnectQueue.get(sub.clientId)!
+            socketReconnectQueue.delete(sub.clientId)
+            for (const notifyFn of notifyFns) {
+              await notifyFn()
+            }
+          }
         }
-      } else {
-        logNotify(
-          `[Notify] [Socket] '${sub.sid}' is disconnected, sending FCM instead.`,
-          'info',
-        )
       }
 
       if (sub.fcmToken) {
@@ -336,9 +365,10 @@ export async function notify(
 
           if (err.code === 'messaging/server-unavailable') {
             console.warn('FCM server unavailable, retrying...')
-            return setTimeout(() => {
+            setTimeout(() => {
               notify(dynamicStreams, streamId, custom, username)
             }, 5000) // Retry after 5 seconds
+            return
           } else if (
             err.code === 'messaging/registration-token-not-registered'
           ) {
@@ -346,7 +376,7 @@ export async function notify(
               `[Notify] Invalid FCM token, removing from subscription for ${sub.sid}`,
               'warn',
             )
-            return prisma.pushSubscription
+            prisma.pushSubscription
               .update({
                 where: { sid: sub.sid },
                 data: { fcmToken: null },
@@ -357,6 +387,7 @@ export async function notify(
                   'warn',
                 ),
               )
+            return
           }
 
           logNotify(`[Notify] FCM notification error: ${err}`, 'error')
