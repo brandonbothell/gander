@@ -282,7 +282,7 @@ export async function notify(
           }
         } else if (
           socketDisconnectMap.has(sub.clientId) &&
-          Date.now() - 5 * 60 * 1000 < socketDisconnectMap.get(sub.clientId)!
+          Date.now() - 10 * 60 * 1000 < socketDisconnectMap.get(sub.clientId)!
         ) {
           logNotify(
             `[Notify] [Socket] Client '${sub.sid}' recently disconnected, adding notification to queue for reconnect.`,
