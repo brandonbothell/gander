@@ -288,7 +288,7 @@ export async function notify(
             `[Notify] [Socket] Client '${sub.sid}' recently disconnected, adding notification to queue for reconnect.`,
             'info',
           )
-          // If the client recently disconnected (within the last 5 minutes), add to queue for sending on reconnect
+          // If the client recently disconnected (within the last 10 minutes), add to queue for sending on reconnect
           const pending = socketReconnectQueue.get(sub.clientId) || []
           pending.push(() => notify(dynamicStreams, streamId, custom, username))
           socketReconnectQueue.set(sub.clientId, pending)
