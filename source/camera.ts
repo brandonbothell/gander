@@ -17,7 +17,10 @@ import { StreamManager } from './streamManager'
 import initializeStreamRoutes from './routes/streams'
 import initializeSignedRoutes from './routes/signed'
 import initializeRecordingRoutes from './routes/recordings'
-import initializeNotificationRoutes, { notify } from './routes/notifications'
+import initializeNotificationRoutes, {
+  notify,
+  socketReconnectQueue,
+} from './routes/notifications'
 import initializeMotionRoutes, {
   checkDiskSpaceAndPurge,
   flushMotionSegmentsWithRetry,
@@ -57,6 +60,7 @@ export const notifyLogPath = path.join(
   'notify',
   'notify',
 )
+export const socketDisconnectMap = new Map<string, number>()
 
 // Ensure logs directory exists
 const motionLogsDir = path.dirname(motionLogPath)
@@ -554,13 +558,24 @@ loadStreamsFromDb()
       }
     })
 
-    io.on('connection', (socket) => {
+    io.on('connection', async (socket) => {
       const clientId = socket.handshake.auth.clientId
       if (clientId) {
+        socketDisconnectMap.delete(clientId)
         socket.join(clientId)
         socket.on('disconnect', () => {
           io.sockets.adapter.rooms.delete(clientId)
+          console.info(`[Socket] Client '${socket.data.username}' disconnected`)
+          socketDisconnectMap.set(clientId, Date.now())
         })
+
+        if (socketReconnectQueue.has(clientId)) {
+          const notifyFns = socketReconnectQueue.get(clientId)!
+          socketReconnectQueue.delete(clientId)
+          for (const notifyFn of notifyFns) {
+            await notifyFn()
+          }
+        }
       }
     })
 
