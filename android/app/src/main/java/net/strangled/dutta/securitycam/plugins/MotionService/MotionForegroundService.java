@@ -249,9 +249,7 @@ public class MotionForegroundService extends Service {
 
                 @Override
                 public void onFailure(String errorMessage) {
-                    Log.e("MotionForegroundService", "Auth failed: " + errorMessage + ". Retrying in 30s...");
-                    // If the server is down, wait longer before trying again
-                    reconnectHandler.postDelayed(() -> startSocket(), 30000);
+                    Log.e("MotionForegroundService", "Auth failed: " + errorMessage + ". Socket reconnection will be rescheduled.");
                 }
             });
         }
