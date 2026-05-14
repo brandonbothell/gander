@@ -37,7 +37,7 @@ export default function initializeAuthRoutes(
   const refreshTokenLimiter = rateLimit({
     validate: { ip: false },
     windowMs: 30 * 60 * 1000, // 30 minutes
-    max: 200,
+    max: 500,
     standardHeaders: true,
     legacyHeaders: false,
   })
