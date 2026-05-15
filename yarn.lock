@@ -303,9 +303,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@dotenvx/dotenvx@npm:1.64.0":
-  version: 1.64.0
-  resolution: "@dotenvx/dotenvx@npm:1.64.0"
+"@dotenvx/dotenvx@npm:1.66.0":
+  version: 1.66.0
+  resolution: "@dotenvx/dotenvx@npm:1.66.0"
   dependencies:
     commander: "npm:^11.1.0"
     dotenv: "npm:^17.2.1"
@@ -319,7 +319,7 @@ __metadata:
     yocto-spinner: "npm:^1.1.0"
   bin:
     dotenvx: src/cli/dotenvx.js
-  checksum: 10c0/592f1d51d6688fad53684a37e9762d34e74068ad46ab2223453b86de157071590ac1d39cef4a2d83251ec84d9383aaa556b022fb54774a59742c457d2f9875b1
+  checksum: 10c0/1e525ffe2ba2313542052976b33cb4e834579017b17ccce7f65c7379b5793a0f5dc93b929115f35a3b2f8fe6010cea325f7b88535cda186c8e2659ab59f72996
   languageName: node
   linkType: hard
 
@@ -5651,7 +5651,7 @@ __metadata:
     "@capacitor/preferences": "npm:8.0.1"
     "@capacitor/push-notifications": "npm:8.0.3"
     "@capacitor/screen-orientation": "npm:8.0.1"
-    "@dotenvx/dotenvx": "npm:1.64.0"
+    "@dotenvx/dotenvx": "npm:1.66.0"
     "@eslint/compat": "npm:2.0.5"
     "@eslint/eslintrc": "npm:3.3.5"
     "@eslint/js": "npm:10.0.1"

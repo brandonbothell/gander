@@ -82,7 +82,7 @@
     "@capacitor/preferences": "8.0.1",
     "@capacitor/push-notifications": "8.0.3",
     "@capacitor/screen-orientation": "8.0.1",
-    "@dotenvx/dotenvx": "1.64.0",
+    "@dotenvx/dotenvx": "1.66.0",
     "@prisma/adapter-better-sqlite3": "7.8.0",
     "@prisma/client": "7.8.0",
     "@prisma/client-runtime-utils": "7.8.0",
