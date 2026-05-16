@@ -39,7 +39,7 @@
     "env:decrypt": "yarn dotenvx decrypt"
   },
   "devDependencies": {
-    "@eslint/compat": "2.0.5",
+    "@eslint/compat": "2.1.0",
     "@eslint/eslintrc": "3.3.5",
     "@eslint/js": "10.0.1",
     "@stylistic/eslint-plugin": "5.10.0",
@@ -54,7 +54,7 @@
     "@types/session-file-store": "1.2.6",
     "@types/web-push": "3.6.4",
     "@typescript-eslint/eslint-plugin": "8.59.1",
-    "@typescript-eslint/parser": "8.59.1",
+    "@typescript-eslint/parser": "8.59.3",
     "concurrently": "9.2.1",
     "eslint": "10.3.0",
     "eslint-config-prettier": "10.1.8",
@@ -71,7 +71,7 @@
     "ts-node": "10.9.2",
     "ts-node-dev": "2.0.0",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.59.1"
+    "typescript-eslint": "8.59.3"
   },
   "dependencies": {
     "@capacitor/android": "8.3.1",
