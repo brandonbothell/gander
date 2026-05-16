@@ -39,7 +39,7 @@
     "env:decrypt": "yarn dotenvx decrypt"
   },
   "devDependencies": {
-    "@eslint/compat": "2.0.5",
+    "@eslint/compat": "2.1.0",
     "@eslint/eslintrc": "3.3.5",
     "@eslint/js": "10.0.1",
     "@stylistic/eslint-plugin": "5.10.0",
