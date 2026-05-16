@@ -5808,7 +5808,7 @@ __metadata:
     "@types/session-file-store": "npm:1.2.6"
     "@types/web-push": "npm:3.6.4"
     "@typescript-eslint/eslint-plugin": "npm:8.59.1"
-    "@typescript-eslint/parser": "npm:8.59.1"
+    "@typescript-eslint/parser": "npm:8.59.3"
     "@yarnpkg/pnpify": "npm:4.1.6"
     chalk: "npm:5.6.2"
     chokidar: "npm:5.0.0"
