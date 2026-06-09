@@ -2348,10 +2348,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/google.maps@npm:3.64.1":
-  version: 3.64.1
-  resolution: "@types/google.maps@npm:3.64.1"
-  checksum: 10c0/4ade621941045c7e1b1ead30e0b4025b7fccf2b4cfb7c9b5f48c31cceb964c74d17c28b6105be15b99df85c23e19b25415e9fd7bdd7b1d40b7000d22dbbb4e7e
+"@types/google.maps@npm:3.65.0":
+  version: 3.65.0
+  resolution: "@types/google.maps@npm:3.65.0"
+  checksum: 10c0/d41bc1ed2c63f297a8956b097953515e87aa21d25ef918102067efa97113ea558bb42be521337af93698b36d4c6283439b3e087b4b57c7033f59128cdc7159cb
   languageName: node
   linkType: hard
 
@@ -11135,7 +11135,7 @@ __metadata:
     "@eslint/eslintrc": "npm:3.3.5"
     "@eslint/js": "npm:10.0.1"
     "@stylistic/eslint-plugin": "npm:5.10.0"
-    "@types/google.maps": "npm:3.64.1"
+    "@types/google.maps": "npm:3.65.0"
     "@types/react": "npm:19.2.14"
     "@types/react-dom": "npm:19.2.3"
     "@types/react-window": "npm:1.8.8"
