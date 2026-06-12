@@ -14,7 +14,7 @@
     "@capacitor/core": "8.3.1",
     "@capacitor/local-notifications": "8.1.0",
     "@capacitor/preferences": "8.0.1",
-    "@capacitor/push-notifications": "8.0.3",
+    "@capacitor/push-notifications": "8.1.1",
     "@capacitor/screen-orientation": "8.0.1",
     "@eslint/eslintrc": "3.3.5",
     "@stylistic/eslint-plugin": "5.10.0",
