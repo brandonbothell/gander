@@ -80,7 +80,7 @@
     "@capacitor/core": "8.3.1",
     "@capacitor/local-notifications": "8.1.0",
     "@capacitor/preferences": "8.0.1",
-    "@capacitor/push-notifications": "8.0.3",
+    "@capacitor/push-notifications": "8.1.1",
     "@capacitor/screen-orientation": "8.0.1",
     "@dotenvx/dotenvx": "1.66.0",
     "@prisma/adapter-better-sqlite3": "7.8.0",
