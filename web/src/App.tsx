@@ -613,7 +613,7 @@ export default function App() {
 
   useEffect(() => {
     if (!authenticated) {
-      setAuthenticated(localStorage.getItem('ak') !== null)
+      setAuthenticated(localStorage.getItem('ak') !== null ? true : null)
     }
   }, [authenticated])
 
