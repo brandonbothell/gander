@@ -107,12 +107,17 @@ export default function initializeAuthRoutes(
 
     const refreshTokenExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
 
-    if (
-      config.users.some(
-        (user) => user.username === username && user.password === password,
+    const configUserIndex = config.users.findIndex(
+      (user) => user.username === username && user.password === password,
+    )
+
+    if (configUserIndex >= 0) {
+      const configUser = config.users[configUserIndex]
+      const token = jwt.sign(
+        { username, isAdmin: configUser.isAdmin },
+        JWT_SECRET,
+        { expiresIn: '5m' },
       )
-    ) {
-      const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '5m' })
       const refreshToken = jwt.sign(
         {
           username,
@@ -129,6 +134,7 @@ export default function initializeAuthRoutes(
           username: true,
           jwts: true,
           refreshTokens: true,
+          isAdmin: false,
         },
       })
 
@@ -148,6 +154,7 @@ export default function initializeAuthRoutes(
             jwts: JSON.stringify([token]),
             refreshTokens: JSON.stringify([refreshToken]),
             trustedIps: JSON.stringify([newDevice]),
+            isAdmin: configUser.isAdmin ?? false,
           },
         })
       } else {
@@ -465,9 +472,13 @@ export default function initializeAuthRoutes(
       expires: new Date(refreshTokenExp * 1000),
     })
 
-    const token = jwt.sign({ username: user.username }, JWT_SECRET, {
-      expiresIn: '5m',
-    })
+    const token = jwt.sign(
+      { username: user.username, isAdmin: user.isAdmin },
+      JWT_SECRET,
+      {
+        expiresIn: '5m',
+      },
+    )
     res.json({ success: true, token, refreshToken: newRefreshToken })
   })
 

@@ -104,7 +104,7 @@ const streamThumbnailPromises: Record<
 const dynamicStreams: Record<string, StreamManager> = {}
 
 export interface RequestWithUser extends express.Request {
-  user?: { username: string }
+  user?: { username: string; isAdmin: boolean }
 }
 
 const streamStates: Record<string, StreamMotionState> = {}

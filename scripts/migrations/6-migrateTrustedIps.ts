@@ -1,7 +1,9 @@
-// Create scripts/migrateTrustedIps.ts
-import { PrismaClient } from '../../source/generated/prisma'
+import '@dotenvx/dotenvx/config'
+import { PrismaClient } from '../../source/generated/prisma/client'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
-const prisma = new PrismaClient()
+const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL })
+const prisma = new PrismaClient({ adapter })
 
 async function migrateTrustedIps() {
   console.log('Starting migration of trustedIps to device objects...')
@@ -14,7 +16,11 @@ async function migrateTrustedIps() {
       const trustedIps = JSON.parse(user.trustedIps || '[]')
 
       // Check if already migrated (first item is an object with ip property)
-      if (trustedIps.length > 0 && typeof trustedIps[0] === 'object' && trustedIps[0].ip) {
+      if (
+        trustedIps.length > 0 &&
+        typeof trustedIps[0] === 'object' &&
+        trustedIps[0].ip
+      ) {
         console.log(`User ${user.username} already migrated, skipping...`)
         continue
       }
@@ -28,16 +34,16 @@ async function migrateTrustedIps() {
           vendor: 'Unknown',
           language: 'Unknown',
           timezone: 'Unknown',
-          screen: 'Unknown'
+          screen: 'Unknown',
         },
         firstSeen: new Date().toISOString(),
         lastSeen: new Date().toISOString(),
-        loginCount: 1
+        loginCount: 1,
       }))
 
       await prisma.user.update({
         where: { username: user.username },
-        data: { trustedIps: JSON.stringify(migratedIps) }
+        data: { trustedIps: JSON.stringify(migratedIps) },
       })
 
       migratedCount++

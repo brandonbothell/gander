@@ -1,7 +1,7 @@
 import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
-import { createStreamManager, prisma } from '../camera'
+import { createStreamManager, prisma, RequestWithUser } from '../camera'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeStreamRoutes(
@@ -121,7 +121,12 @@ export default function initializeStreamRoutes(
     updateStreamLimiter,
     jwtAuth,
     express.json(),
-    async (req, res) => {
+    async (req: RequestWithUser, res) => {
+      if (!req.user?.isAdmin) {
+        res.status(403).json({ error: 'Access denied.' })
+        return
+      }
+
       const { id } = req.params
       const { nickname, ffmpegInput, rtspUser, rtspPass } = req.body
       const stream = await prisma.stream.findUnique({ where: { id } })
@@ -215,13 +220,20 @@ export default function initializeStreamRoutes(
     '/api/streams/:id',
     deleteStreamLimiter,
     jwtAuth,
-    async (req, res) => {
+    async (req: RequestWithUser, res) => {
+      if (!req.user?.isAdmin) {
+        res.status(403).json({ error: 'Access denied.' })
+        return
+      }
+
       const { id } = req.params
       const stream = await prisma.stream.findUnique({ where: { id } })
+
       if (!stream) {
         res.status(404).json({ error: 'Stream not found.' })
         return
       }
+
       try {
         await prisma.stream.delete({ where: { id } })
         if (dynamicStreams[id]) {

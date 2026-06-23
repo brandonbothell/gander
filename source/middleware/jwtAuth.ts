@@ -17,6 +17,7 @@ export async function jwtAuth(
   try {
     const payload = jwt.verify(auth.slice(7), JWT_SECRET) as {
       username: string
+      isAdmin: boolean
     }
     req.user = payload
 

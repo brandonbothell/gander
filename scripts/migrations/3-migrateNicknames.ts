@@ -1,14 +1,16 @@
-// scripts/migrateNicknames.ts
+import '@dotenvx/dotenvx/config'
 import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
-import { PrismaClient } from '../../source/generated/prisma'
+import { PrismaClient } from '../../source/generated/prisma/client'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
-const prisma = new PrismaClient()
+const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL })
+const prisma = new PrismaClient({ adapter })
 
 const streams = [
   { id: 'cam1', recordDir: 'D:/Recordings/SecurityCam' },
-  { id: 'cam2', recordDir: 'D:/Recordings/SecurityCam/cam2' }
+  { id: 'cam2', recordDir: 'D:/Recordings/SecurityCam/cam2' },
 ]
 
 // Helper to get duration in seconds using ffprobe
@@ -25,8 +27,9 @@ function getVideoDuration(filePath: string): number {
 
 async function main() {
   for (const stream of streams) {
-    const files = fs.readdirSync(stream.recordDir)
-      .filter(f => f.endsWith('.mp4'))
+    const files = fs
+      .readdirSync(stream.recordDir)
+      .filter((f) => f.endsWith('.mp4'))
       .sort((a, b) => a.localeCompare(b)) // Sort by filename
     for (const filename of files) {
       const filePath = path.join(stream.recordDir, filename)
@@ -34,7 +37,7 @@ async function main() {
 
       // Try to get nickname from old table
       const old = await prisma.nickname.findUnique({
-        where: { streamId_filename: { streamId: stream.id, filename } }
+        where: { streamId_filename: { streamId: stream.id, filename } },
       })
       await prisma.motionRecording.upsert({
         where: { streamId_filename: { streamId: stream.id, filename } },
@@ -44,7 +47,7 @@ async function main() {
           filename,
           duration,
           nickname: old?.nickname ?? null,
-        }
+        },
       })
     }
   }

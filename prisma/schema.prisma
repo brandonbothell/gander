@@ -18,6 +18,7 @@ model User {
   refreshTokens String   @default("[]")
   trustedIps    String   @default("[]")
   createdAt     DateTime @default(now())
+  isAdmin       Boolean  @default(false)
 }
 
 model UserLastSeenRecording {

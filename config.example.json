@@ -15,11 +15,13 @@
   "users": [
     {
       "username":         "User1",
-      "password":         "ExamplePassword1"
+      "password":         "ExamplePassword1",
+      "isAdmin":          true
     },
     {
       "username":         "User2",
-      "password":         "ExamplePassword2"
+      "password":         "ExamplePassword2",
+      "isAdmin":          false
     }
   ],
   "greenlockConfigDir":   "C:\\Example\\Path\\greenlock.d",

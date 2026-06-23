@@ -1,6 +1,9 @@
-import { PrismaClient } from '../../source/generated/prisma'
+import '@dotenvx/dotenvx/config'
+import { PrismaClient } from '../../source/generated/prisma/client'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
-const prisma = new PrismaClient()
+const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL })
+const prisma = new PrismaClient({ adapter })
 
 const mapping: Record<string, string> = {
   cam1: 'cmc53bic00000p03cfhifr28z',
@@ -62,7 +65,7 @@ async function migrate() {
   await prisma.$disconnect()
 }
 
-migrate().catch(e => {
+migrate().catch((e) => {
   console.error(e)
   prisma.$disconnect()
   process.exit(1)
