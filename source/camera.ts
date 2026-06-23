@@ -146,6 +146,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         lowSpaceNotified: false,
         lastNotifiedRestartCooldownAt: 0,
         currentRecordingMotionTimestamps: [],
+        lastPlaylistUpdatedAt: 0,
       }
     }
 
@@ -343,10 +344,18 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
 
     // --- Stream Connection Watcher ---
 
-    const setMotionWatcherTimeout = () => {
+    const setMotionWatcherTimeout = (streamId: string) => {
+      clearTimeout(motionWatcherTimeouts.get(streamId))
       motionWatcherTimeouts.set(
         streamId,
         setTimeout(() => {
+          if (
+            streamStates[streamId].lastPlaylistUpdatedAt === 0 ||
+            Date.now() - streamStates[streamId].lastPlaylistUpdatedAt < 15000
+          ) {
+            // If the playlist was updated within the last 15 seconds, do not reconnect
+            return
+          }
           // If no segments are detected within 15 seconds, reconnect the stream via stream manager
           try {
             dynamicStreams[streamId].reconnect()
@@ -360,14 +369,15 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
     watchers.set(
       `${streamId}-m3u8-update-watcher`,
       chokidar
-        .watch(`${dynamicStreams[streamId].config.hlsDir}/stream.m3u8`)
+        .watch(dynamicStreams[streamId].getPlaylistPath())
         .on('change', () => {
+          streamStates[streamId].lastPlaylistUpdatedAt = Date.now()
           clearTimeout(motionWatcherTimeouts.get(streamId))
-          setMotionWatcherTimeout()
+          setMotionWatcherTimeout(streamId)
         }),
     )
 
-    setTimeout(setMotionWatcherTimeout, 10000) // 10-second delay to avoid immediate trigger on startup
+    setTimeout(() => setMotionWatcherTimeout(streamId), 10000) // 10-second delay to avoid immediate trigger on startup
   }
 
   if (streamId) {
@@ -924,6 +934,7 @@ export async function createStreamManager(stream: {
     lowSpaceNotified: false,
     lastNotifiedRestartCooldownAt: 0,
     currentRecordingMotionTimestamps: [],
+    lastPlaylistUpdatedAt: 0,
   }
 
   return new StreamManager(

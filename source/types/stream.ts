@@ -31,6 +31,7 @@ export interface StreamMotionState {
    * Array of times in milliseconds since start the of a recording that motion was detected, excluding the first.
    */
   currentRecordingMotionTimestamps: number[]
+  lastPlaylistUpdatedAt: number // Timestamp of the last stream.m3u8 file update, used to detect if the stream is still active
 }
 
 export type SignedUrl = {
