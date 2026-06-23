@@ -613,9 +613,11 @@ export default function App() {
 
   useEffect(() => {
     if (!authenticated) {
-      setAuthenticated(localStorage.getItem('ak') !== null ? true : null)
+      setAuthenticated(
+        localStorage.getItem('ak') !== null ? true : authenticated,
+      )
     }
-  }, [authenticated])
+  }, [])
 
   // In App.tsx, add this function to handle session monitor closing
   const handleSessionMonitorClose = () => {
