@@ -56,6 +56,20 @@ export default function App() {
     debugLog('=== STARTING TOKEN REFRESH ===')
 
     try {
+      debugLog('Checking for API key in localStorage')
+      if (localStorage.getItem('ak')) {
+        debugLog('API key found in localStorage, skipping token refresh')
+        setAuthenticated(true)
+        return true
+      }
+    } catch {
+      debugLog(
+        'Error occurred while checking for API key in localStorage',
+        'error',
+      )
+    }
+
+    try {
       debugLog('Attempting to get refresh token from storage')
 
       const rtExists = Capacitor.isNativePlatform()
