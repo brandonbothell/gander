@@ -338,6 +338,35 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
     console.log(
       `[${streamId}] Watcher set up for ${dynamicStreams[streamId].config.hlsDir}`,
     )
+
+    // --- Motion Detection Watcher ---
+
+    let motionWatcherTimeout: NodeJS.Timeout
+
+    const setMotionWatcherTimeout = () => {
+      motionWatcherTimeout = setTimeout(() => {
+        // If no segments are detected within 15 seconds, reconnect the stream via stream manager
+        try {
+          dynamicStreams[streamId].reconnect()
+        } catch (err) {
+          console.error(`[${streamId}] Error reconnecting stream:`, err)
+        }
+      }, 15000) // 15 seconds
+    }
+
+    setTimeout(
+      () =>
+        watchers.set(
+          `${streamId}-m3u8-update-watcher`,
+          chokidar
+            .watch(`${dynamicStreams[streamId].config.hlsDir}/stream.m3u8`)
+            .on('change', () => {
+              clearTimeout(motionWatcherTimeout)
+              setMotionWatcherTimeout()
+            }),
+        ),
+      10000,
+    ) // 10-second delay to avoid immediate trigger on startup
   }
 
   if (streamId) {
