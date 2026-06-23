@@ -8,5 +8,6 @@ export default defineConfig({
     minify: false,
     sourcemap: false,
     cssMinify: false,
+    target: 'chrome84',
   },
 })
