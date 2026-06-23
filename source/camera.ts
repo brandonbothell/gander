@@ -109,6 +109,8 @@ export interface RequestWithUser extends express.Request {
 
 const streamStates: Record<string, StreamMotionState> = {}
 
+const motionWatcherTimeouts = new Map<string, NodeJS.Timeout>()
+
 const watchers = new Map<string, chokidar.FSWatcher>()
 
 export async function setupStreamMotionMonitoring(streamId?: string) {
@@ -341,17 +343,18 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
 
     // --- Stream Connection Watcher ---
 
-    let motionWatcherTimeout: NodeJS.Timeout
-
     const setMotionWatcherTimeout = () => {
-      motionWatcherTimeout = setTimeout(() => {
-        // If no segments are detected within 15 seconds, reconnect the stream via stream manager
-        try {
-          dynamicStreams[streamId].reconnect()
-        } catch (err) {
-          console.error(`[${streamId}] Error reconnecting stream:`, err)
-        }
-      }, 15000) // 15 seconds
+      motionWatcherTimeouts.set(
+        streamId,
+        setTimeout(() => {
+          // If no segments are detected within 15 seconds, reconnect the stream via stream manager
+          try {
+            dynamicStreams[streamId].reconnect()
+          } catch (err) {
+            console.error(`[${streamId}] Error reconnecting stream:`, err)
+          }
+        }, 15000),
+      ) // 15 seconds
     }
 
     watchers.set(
@@ -359,7 +362,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       chokidar
         .watch(`${dynamicStreams[streamId].config.hlsDir}/stream.m3u8`)
         .on('change', () => {
-          clearTimeout(motionWatcherTimeout)
+          clearTimeout(motionWatcherTimeouts.get(streamId))
           setMotionWatcherTimeout()
         }),
     )
