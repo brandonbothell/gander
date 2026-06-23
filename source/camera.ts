@@ -339,7 +339,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       `[${streamId}] Watcher set up for ${dynamicStreams[streamId].config.hlsDir}`,
     )
 
-    // --- Motion Detection Watcher ---
+    // --- Stream Connection Watcher ---
 
     let motionWatcherTimeout: NodeJS.Timeout
 
@@ -354,19 +354,17 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       }, 15000) // 15 seconds
     }
 
-    setTimeout(
-      () =>
-        watchers.set(
-          `${streamId}-m3u8-update-watcher`,
-          chokidar
-            .watch(`${dynamicStreams[streamId].config.hlsDir}/stream.m3u8`)
-            .on('change', () => {
-              clearTimeout(motionWatcherTimeout)
-              setMotionWatcherTimeout()
-            }),
-        ),
-      10000,
-    ) // 10-second delay to avoid immediate trigger on startup
+    watchers.set(
+      `${streamId}-m3u8-update-watcher`,
+      chokidar
+        .watch(`${dynamicStreams[streamId].config.hlsDir}/stream.m3u8`)
+        .on('change', () => {
+          clearTimeout(motionWatcherTimeout)
+          setMotionWatcherTimeout()
+        }),
+    )
+
+    setTimeout(setMotionWatcherTimeout, 10000) // 10-second delay to avoid immediate trigger on startup
   }
 
   if (streamId) {
