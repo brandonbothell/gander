@@ -39,9 +39,16 @@ if ('serviceWorker' in navigator) {
   })
 }
 
-function getToken() {
+function getTokenOrApiKey():
+  | { token: string; type: 'jwt' | 'api' }
+  | undefined {
   const jwt = localStorage.getItem('jwt')
-  return jwt ?? undefined
+  const apiKey = jwt ? null : atob(localStorage.getItem('ak') || '')
+  return jwt
+    ? { token: jwt, type: 'jwt' }
+    : apiKey
+      ? { token: apiKey, type: 'api' }
+      : undefined
 }
 
 // Global logout function - will be set by App component
@@ -61,10 +68,9 @@ let tokenRefreshPromise: Promise<boolean> | null = null
 let isRefreshInProgress = false
 
 export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
-  const token = getToken()
-  const jwt = localStorage.getItem('jwt')
+  const token = getTokenOrApiKey()
 
-  if (!jwt && globalTryRefreshToken && globalLogout && !isRefreshInProgress) {
+  if (!token && globalTryRefreshToken && globalLogout && !isRefreshInProgress) {
     isRefreshInProgress = true
     try {
       const refreshed = await globalTryRefreshToken()
@@ -78,17 +84,17 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   }
 
   // Use the latest JWT
-  const finalJwt = localStorage.getItem('jwt') ?? undefined
+  const finalToken = getTokenOrApiKey()
 
-  const makeRequest = (authToken?: string) => {
+  const makeRequest = (authToken?: { token: string; type: 'jwt' | 'api' }) => {
     return fetch(input, {
       ...init,
       headers: {
         ...(init.headers ?? {}),
         Authorization: authToken
-          ? `Bearer ${authToken}`
-          : token
-            ? `Bearer ${finalJwt}`
+          ? `${authToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${authToken.token}`
+          : finalToken
+            ? `${finalToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${finalToken.token}`
             : '',
       },
     })
@@ -115,7 +121,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
       const refreshSuccess = await tokenRefreshPromise
       if (refreshSuccess) {
         // Retry the original request with the new token
-        const newToken = getToken()
+        const newToken = getTokenOrApiKey()
         return makeRequest(newToken)
       } else {
         // Refresh failed, logout
@@ -134,7 +140,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
       if (tokenRefreshSuccess) {
         console.log('Token refresh successful, retrying request...')
         // Retry the original request with the new token
-        const newToken = getToken()
+        const newToken = getTokenOrApiKey()
         const retryResponse = await makeRequest(newToken)
 
         // If the retry also fails with 401, logout

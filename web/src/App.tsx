@@ -238,6 +238,11 @@ export default function App() {
   // Enhanced logout function - PREVENT INFINITE LOOP
   const logout = async (skipBroadcast = false): Promise<void> => {
     try {
+      localStorage.removeItem('ak')
+    } catch {
+      /* ignore */
+    }
+    try {
       const rtExists = Capacitor.isNativePlatform()
         ? (await CapacitorCookies.getCookies())['_rtexists']
         : (await cookieStore.get('_rtexists'))?.value
@@ -606,6 +611,12 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [])
 
+  useEffect(() => {
+    if (!authenticated) {
+      setAuthenticated(localStorage.getItem('ak') !== null)
+    }
+  }, [authenticated])
+
   // In App.tsx, add this function to handle session monitor closing
   const handleSessionMonitorClose = () => {
     setShowSessionMonitor(false)
@@ -661,7 +672,9 @@ export default function App() {
   }
 
   if (authenticated === false) {
-    return <LoginPage onLogin={handleLogin} />
+    return (
+      <LoginPage onLogin={handleLogin} setAuthenticated={setAuthenticated} />
+    )
   }
   if (authenticated === null) {
     return (

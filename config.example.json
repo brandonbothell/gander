@@ -12,11 +12,15 @@
     "publicKey":          "BEXAMPLEPUBLICKEY1234567890",
     "privateKey":         "EXAMPLEPRIVATEKEY0987654321"
   },
+  "restrictApiKeysToLocalNetwork": true,
   "users": [
     {
       "username":         "User1",
       "password":         "ExamplePassword1",
-      "isAdmin":          true
+      "isAdmin":          true,
+      "apiKeys": [
+        "EXAMPLE_API_KEY_1"
+      ]
     },
     {
       "username":         "User2",
