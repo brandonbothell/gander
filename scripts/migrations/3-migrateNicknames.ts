@@ -2,8 +2,8 @@ import '@dotenvx/dotenvx/config'
 import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
-import { PrismaClient } from '../../source/generated/prisma/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
+import { PrismaClient } from '../../source/generated/prisma/client'
 
 const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL })
 const prisma = new PrismaClient({ adapter })

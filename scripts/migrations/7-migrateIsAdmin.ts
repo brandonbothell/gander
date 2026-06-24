@@ -1,7 +1,7 @@
 import '@dotenvx/dotenvx/config'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaClient } from '../../source/generated/prisma/client'
 import config from '../../config.json'
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
 const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL })
 const prisma = new PrismaClient({ adapter })
