@@ -350,6 +350,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
         streamId,
         setTimeout(() => {
           if (
+            !streamStates[streamId] ||
             streamStates[streamId].lastPlaylistUpdatedAt === 0 ||
             Date.now() - streamStates[streamId].lastPlaylistUpdatedAt < 15000
           ) {
@@ -371,7 +372,9 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       chokidar
         .watch(dynamicStreams[streamId].getPlaylistPath())
         .on('change', () => {
-          streamStates[streamId].lastPlaylistUpdatedAt = Date.now()
+          if (streamStates[streamId]) {
+            streamStates[streamId].lastPlaylistUpdatedAt = Date.now()
+          }
           clearTimeout(motionWatcherTimeouts.get(streamId))
           setMotionWatcherTimeout(streamId)
         }),
