@@ -424,6 +424,12 @@ video:hover {
   z-index: 5;
 }
 
+@media (max-width: 600px) {
+  .recording-duration-badge {
+    left: 20px;
+  }
+}
+
 @media (max-width: 563px) {
   .recording-duration-badge {
     left: 40px;
