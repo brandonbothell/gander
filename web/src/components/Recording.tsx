@@ -15,18 +15,17 @@ import { formatTimestamp } from '../utils/format'
 export type RecordingType = {
   streamId: string
   filename: string
+  duration: number
   motionTimestamps: number[]
 }
 
 interface RecordingProps {
   open: boolean
-  streamId: string
-  filename: string
-  motionTimestamps: number[]
+  recording: RecordingType
   onClose: () => void
   cachedRecordings: RecordingType[]
   isMobile: boolean
-  onNavigate: (filename: string, motionTimestamps: number[]) => void
+  onNavigate: (recording: RecordingType) => void
   setNicknames: React.Dispatch<
     React.SetStateAction<{
       [filename: string]: string
@@ -38,9 +37,7 @@ interface RecordingProps {
 
 export function Recording({
   open,
-  streamId,
-  filename,
-  motionTimestamps,
+  recording: { streamId, filename, motionTimestamps },
   onClose,
   cachedRecordings,
   onNavigate,
@@ -1013,7 +1010,7 @@ export function Recording({
       >
         {prev && (
           <button
-            onClick={() => onNavigate(prev.filename, prev.motionTimestamps)}
+            onClick={() => onNavigate(prev)}
             style={{
               background: 'transparent',
               color: '#fff',
@@ -1067,7 +1064,7 @@ export function Recording({
         </button>
         {next && (
           <button
-            onClick={() => onNavigate(next.filename, next.motionTimestamps)}
+            onClick={() => onNavigate(next)}
             style={{
               background: 'transparent',
               marginBottom: window.innerWidth <= 600 ? 12 : 0,

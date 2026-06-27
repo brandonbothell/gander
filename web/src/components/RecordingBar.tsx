@@ -3,13 +3,11 @@ import { Recording, type RecordingType } from './Recording'
 
 interface RecordingBarProps {
   open: boolean
-  streamId: string
-  filename: string
-  motionTimestamps: number[]
+  recording: RecordingType
   onClose: () => void
   cachedRecordings: RecordingType[]
   isMobile: boolean
-  onNavigate: (filename: string, motionTimestamps: number[]) => void
+  onNavigate: (recording: RecordingType) => void
   setAutoScrollUntilRef: (until: number) => void
   setNicknames: React.Dispatch<
     React.SetStateAction<{
@@ -38,7 +36,7 @@ export function RecordingBar(props: RecordingBarProps) {
       video.removeEventListener('play', handlePlay)
       video.removeEventListener('pause', handlePause)
     }
-  }, [videoRef, props.filename])
+  }, [videoRef, props.recording.filename])
 
   useEffect(() => {
     if (props.open) {

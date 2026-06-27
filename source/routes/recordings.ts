@@ -166,7 +166,12 @@ export default function initializeRecordingRoutes(
       const recordings = await prisma.motionRecording.findMany({
         where: { streamId },
         orderBy: { filename: 'desc' },
-        select: { streamId: true, filename: true, motionTimestamps: true },
+        select: {
+          streamId: true,
+          filename: true,
+          motionTimestamps: true,
+          duration: true,
+        },
         skip: (pageNum - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
       })
@@ -253,12 +258,18 @@ export default function initializeRecordingRoutes(
           ...(lastSeen && { filename: { gt: lastSeen } }),
         },
         orderBy: { filename: 'desc' },
-        select: { streamId: true, filename: true, motionTimestamps: true },
+        select: {
+          streamId: true,
+          filename: true,
+          motionTimestamps: true,
+          duration: true,
+        },
       })
 
       const newRecordings = recordings.map((r) => ({
         filename: r.filename,
         motionTimestamps: r.motionTimestamps,
+        duration: r.duration,
       }))
 
       // Get deleted recordings since lastSeen

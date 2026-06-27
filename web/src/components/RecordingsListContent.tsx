@@ -49,7 +49,7 @@ interface RecordingsListContentProps {
   handleTouchStart: (filename: string, checked: boolean) => void
   handleTouchMove: (e: React.TouchEvent) => void
   handleTouchEnd: () => void
-  handleView: (filename: string, motionTimestamps: number[]) => void
+  handleView: (recording: RecordingType) => void
   handleCheckboxChange: (filename: string, checked: boolean) => void
   nicknames: Record<string, string>
   viewed: Array<{ filename: string; streamId: string }>
@@ -93,7 +93,7 @@ const Cell = ({
     handleTouchStart: (filename: string, checked: boolean) => void
     handleTouchMove: (e: React.TouchEvent) => void
     handleTouchEnd: () => void
-    handleView: (filename: string, motionTimestamps: number[]) => void
+    handleView: (recording: RecordingType) => void
     handleCheckboxChange: (filename: string, checked: boolean) => void
     nicknames: Record<string, string>
     viewed: Array<{ filename: string; streamId: string }>
@@ -145,8 +145,7 @@ const Cell = ({
       >
         <RecordingThumbItem
           recordingsListRef={recordingsListRef}
-          streamId={recordingsStream!.id}
-          filename={rec.filename}
+          recording={rec}
           checked={checked}
           hovered={hovered === rec.filename}
           anySelected={selected.length > 0}
@@ -156,7 +155,7 @@ const Cell = ({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
-          onClick={() => handleView(rec.filename, rec.motionTimestamps)}
+          onClick={() => handleView(rec)}
           onCheckboxChange={(checked) =>
             handleCheckboxChange(rec.filename, checked)
           }

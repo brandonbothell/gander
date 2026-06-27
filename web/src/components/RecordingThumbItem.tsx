@@ -1,10 +1,17 @@
 import type { RefObject } from 'react'
 import { useSignedUrl } from '../hooks/useSignedUrl'
 import { formatTimestamp } from '../utils/format'
+import type { RecordingType } from './Recording'
+
+function formatDuration(seconds: number) {
+  const rounded = Math.max(0, Math.round(seconds))
+  const mins = Math.floor(rounded / 60)
+  const secs = rounded % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
 
 export interface RecordingThumbItemProps {
-  streamId: string
-  filename: string
+  recording: RecordingType
   checked: boolean
   hovered: boolean
   anySelected: boolean
@@ -22,8 +29,7 @@ export interface RecordingThumbItemProps {
 }
 
 export function RecordingThumbItem({
-  streamId,
-  filename,
+  recording,
   checked,
   hovered,
   anySelected,
@@ -40,9 +46,9 @@ export function RecordingThumbItem({
   recordingsListRef,
 }: RecordingThumbItemProps) {
   const thumbUrl = useSignedUrl(
-    filename.replace(/\.mp4$/, '.jpg'),
+    recording.filename.replace(/\.mp4$/, '.jpg'),
     'thumbnail',
-    streamId,
+    recording.streamId,
   )
 
   return (
@@ -100,9 +106,16 @@ export function RecordingThumbItem({
             }}
           />
         )}
-        <img src={thumbUrl} alt={filename} className="recording-thumb" />
+        <img
+          src={thumbUrl}
+          alt={recording.filename}
+          className="recording-thumb"
+        />
+        <span className="recording-duration-badge">
+          {formatDuration(recording.duration)}
+        </span>
         {nickname && <span className="recording-nickname">{nickname}</span>}
-        <span className="timestamp">{formatTimestamp(filename)}</span>
+        <span className="timestamp">{formatTimestamp(recording.filename)}</span>
         {!viewed && <span className="new-badge">New</span>}
       </button>
     </div>
