@@ -436,6 +436,24 @@ video:hover {
   }
 }
 
+@media (max-width: 463px) {
+  .recording-duration-badge {
+    left: 30px;
+  }
+}
+
+@media (max-width: 420px) {
+  .recording-duration-badge {
+    left: 20px;
+  }
+}
+
+/* @media (max-width: 371px) {
+  .recording-duration-badge {
+    left: 40px;
+  }
+} */
+
 .recording-actions {
   display: flex;
   flex-direction: row;
