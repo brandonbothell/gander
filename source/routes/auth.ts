@@ -451,7 +451,6 @@ export default function initializeAuthRoutes(
       )
       logAuth(
         `[Refresh Token] Unauthorized Refresh Request Headers for ${user.username}: ${JSON.stringify(req.headers, null, 2)}`,
-        'warn',
       )
       return
     }

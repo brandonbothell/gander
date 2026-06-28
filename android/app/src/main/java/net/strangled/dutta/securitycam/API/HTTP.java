@@ -23,6 +23,9 @@ import retrofit2.internal.EverythingIsNonNull;
 
 public class HTTP {
     private static float lastRefreshed = 0F;
+    private static int refreshFailuresInARow = 0;
+
+    private static String dontTryThisTokenAgain = null;
     private static String currentRefreshToken = null;
     private static String currentToken = null;
     public static SharedPreferences sharedPreferences = null;
@@ -42,43 +45,51 @@ public class HTTP {
     }
 
     public static void authenticate(String baseUrl, String refreshToken, String clientId, RefreshTokenCallback callback, int attempt) {
-            // One minute minimum rest between refreshes
-            if (System.currentTimeMillis() - lastRefreshed < 60 * 1000) {
-                Log.d("Refresh Token", "Token is still valid, skipping refresh");
-                callback.onSuccess(refreshToken, HTTP.currentToken);
-                return;
-            }
+        // One minute minimum rest between refreshes
+        if (System.currentTimeMillis() - lastRefreshed < 60 * 1000) {
+            Log.d("Refresh Token", "Token is still valid, skipping refresh");
+            callback.onSuccess(refreshToken, HTTP.currentToken);
+            return;
+        }
 
-            if (refreshToken == null) refreshToken = currentRefreshToken;
+        if (refreshToken == null) refreshToken = currentRefreshToken;
 
-            assert baseUrl != null;
-            assert clientId != null;
-            assert refreshToken != null;
+        assert baseUrl != null;
+        assert clientId != null;
+        assert refreshToken != null;
+        String finalRefreshToken = refreshToken;
 
-            Retrofit retrofit = new Retrofit.Builder()
-                    .baseUrl(baseUrl)
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build();
+        if (refreshToken.equals(dontTryThisTokenAgain)) {
+            Log.w("Refresh Token", "Failed to refresh token too many times in a row, skipping");
+            callback.onFailure("Failed to refresh token too many times in a row");
+            return;
+        }
 
-//            interface DeviceInfo {
-//                userAgent: string
-//                platform: string
-//                vendor: string
-//                language: string
-//                timezone: string
-//                screen: string
-//                clientId: string
-//            }
-            JsonObject dummyDeviceInfoInner = new JsonObject();
-            dummyDeviceInfoInner.addProperty("clientId", clientId);
-            dummyDeviceInfoInner.addProperty("userAgent", MainActivity.userAgent);
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
 
-            JsonObject dummyDeviceInfo = new JsonObject();
-            dummyDeviceInfo.add("deviceInfo", dummyDeviceInfoInner);
+//        interface DeviceInfo {
+//            userAgent: string
+//            platform: string
+//            vendor: string
+//            language: string
+//            timezone: string
+//            screen: string
+//            clientId: string
+//        }
+        JsonObject dummyDeviceInfoInner = new JsonObject();
+        dummyDeviceInfoInner.addProperty("clientId", clientId);
+        dummyDeviceInfoInner.addProperty("userAgent", MainActivity.userAgent);
 
-            APIService service = retrofit.create(APIService.class);
+        JsonObject dummyDeviceInfo = new JsonObject();
+        dummyDeviceInfo.add("deviceInfo", dummyDeviceInfoInner);
+        Log.d("Refresh Token", "Attempting to refresh token, client ID: " + dummyDeviceInfo.get("deviceInfo").getAsJsonObject().get("clientId").getAsString());
 
-            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(refreshToken), dummyDeviceInfo);
+        APIService service = retrofit.create(APIService.class);
+
+        Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(refreshToken), dummyDeviceInfo);
 
         refreshTokenResponse.enqueue(new Callback<>() {
                 @Override
@@ -88,8 +99,13 @@ public class HTTP {
 
                     ResponseBody errorBody = response.errorBody();
                     if (errorBody != null) {
+
+                        if (++refreshFailuresInARow >= 10) {
+                            dontTryThisTokenAgain = finalRefreshToken;
+                        }
+
                         try {
-                            Log.e("Refresh Token", "Error refreshing token: " + errorBody.string());
+                            Log.e("Refresh Token", "Error refreshing token (attempt " + refreshFailuresInARow + "): " + errorBody.string());
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
@@ -103,14 +119,15 @@ public class HTTP {
                                 HTTP.authenticate(baseUrl, HTTP.currentRefreshToken, clientId, callback, attempt + 1);
                             }, 5000);
                         } else {
-                            Log.e("Refresh Token", "Token refresh failed!");
                             callback.onFailure("Authentication failed due to expired token");
                         }
+
                         return;
                     }
 
                     assert body != null;
                     if (body.refreshToken != null && body.token != null) {
+                        refreshFailuresInARow = 0;
                         Log.d("Refresh Token", "Token refreshed successfully!");
                         HTTP.lastRefreshed = System.currentTimeMillis();
                         HTTP.currentRefreshToken = body.refreshToken;
@@ -121,13 +138,17 @@ public class HTTP {
                             boolean success = editor.commit();
                             if (!success) {
                                 Log.e("Refresh Token", "Failed to save refresh token");
+                                dontTryThisTokenAgain = finalRefreshToken;
                                 callback.onFailure("Failed to save refresh token to shared preferences");
                                 return;
                             }
                         }
                         callback.onSuccess(body.refreshToken, body.token);
                     } else {
-                        Log.e("Refresh Token", "Token refresh failed!");
+                        if (++refreshFailuresInARow >= 10) {
+                            dontTryThisTokenAgain = finalRefreshToken;
+                        }
+                        Log.e("Refresh Token", "Failed to refresh token (attempt " + refreshFailuresInARow + ")");
                         callback.onFailure("Refresh token or token is missing from the server response");
                     }
                 }
@@ -135,7 +156,10 @@ public class HTTP {
                 @Override
                 @EverythingIsNonNull
                 public void onFailure(Call<APIService.RefreshTokenResponse> call, Throwable t) {
-                    Log.e("Refresh Token", "Failed to refresh token", t);
+                    if (++refreshFailuresInARow >= 10) {
+                        dontTryThisTokenAgain = finalRefreshToken;
+                    }
+                    Log.e("Refresh Token", "Failed to refresh token (attempt " + refreshFailuresInARow + ")", t);
                     callback.onFailure("Failed to refresh token");
                 }
             });

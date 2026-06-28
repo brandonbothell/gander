@@ -2,7 +2,7 @@ import '@dotenvx/dotenvx/config'
 import type { CapacitorConfig } from '@capacitor/cli'
 import localConfig from './config.json'
 
-const config: CapacitorConfig & { clientId: string } = {
+const config: CapacitorConfig = {
   appId: localConfig.appId,
   appName: localConfig.appName,
   webDir: './web/dist',

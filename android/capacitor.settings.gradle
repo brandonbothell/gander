@@ -12,7 +12,7 @@ include ':capacitor-preferences'
 project(':capacitor-preferences').projectDir = new File('../.yarn/unplugged/@capacitor-preferences-virtual-145482f746/node_modules/@capacitor/preferences/android')
 
 include ':capacitor-push-notifications'
-project(':capacitor-push-notifications').projectDir = new File('../.yarn/unplugged/@capacitor-push-notifications-virtual-bddc5ecd66/node_modules/@capacitor/push-notifications/android')
+project(':capacitor-push-notifications').projectDir = new File('../.yarn/unplugged/@capacitor-push-notifications-virtual-84841742d3/node_modules/@capacitor/push-notifications/android')
 
 include ':capacitor-screen-orientation'
 project(':capacitor-screen-orientation').projectDir = new File('../.yarn/unplugged/@capacitor-screen-orientation-virtual-9ebc92bedf/node_modules/@capacitor/screen-orientation/android')
