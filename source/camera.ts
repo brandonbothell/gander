@@ -348,20 +348,49 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       clearTimeout(motionWatcherTimeouts.get(streamId))
       motionWatcherTimeouts.set(
         streamId,
-        setTimeout(() => {
+        setTimeout(async () => {
           if (
-            !streamStates[streamId] ||
-            streamStates[streamId].lastPlaylistUpdatedAt === 0 ||
-            Date.now() - streamStates[streamId].lastPlaylistUpdatedAt < 15000
+            !streamStates[streamId] &&
+            !dynamicStreams[streamId].restartInProgress
+          ) {
+            try {
+              await dynamicStreams[streamId].startFFmpeg().catch((err) => {
+                console.warn(
+                  `[${streamId}] FFmpeg failed to restart:`,
+                  err?.message || err,
+                )
+              })
+            } catch (err) {
+              logMotion(
+                `[${streamId}] Error restarting FFmpeg: ${JSON.stringify(err, null, 2)}`,
+                'error',
+              )
+            }
+
+            setupStreamMotionMonitoring(streamId)
+            return
+          }
+
+          if (
+            Date.now() - streamStates[streamId].lastPlaylistUpdatedAt <
+            15000
           ) {
             // If the playlist was updated within the last 15 seconds, do not reconnect
             return
           }
+
           // If no segments are detected within 15 seconds, reconnect the stream via stream manager
+          logMotion(
+            `[${streamId}] Reconnecting due to stream playlist stagnation`,
+            'warn',
+          )
           try {
             dynamicStreams[streamId].reconnect()
           } catch (err) {
-            console.error(`[${streamId}] Error reconnecting stream:`, err)
+            logMotion(
+              `[${streamId}] Error reconnecting stream: ${JSON.stringify(err, null, 2)}`,
+              'error',
+            )
           }
         }, 15000),
       ) // 15 seconds

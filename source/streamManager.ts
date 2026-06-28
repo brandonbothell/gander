@@ -29,7 +29,10 @@ export class StreamManager {
   private lastSegmentTimestamp: number = Date.now()
   private segmentCount: number = 0
   private recentSegmentGaps: number[] = []
-  private restartInProgress = false
+  private _restartInProgress = false
+  public get restartInProgress() {
+    return this._restartInProgress
+  }
   private state: StreamMotionState
   private lastRestartTimestamp = 0
   private ffmpegCooldownUntil: number = 0
@@ -674,7 +677,7 @@ export class StreamManager {
       )
       return
     }
-    this.restartInProgress = true
+    this._restartInProgress = true
     if (this.segmentMonitorTimer) {
       clearInterval(this.segmentMonitorTimer)
       this.segmentMonitorTimer = null
@@ -716,7 +719,7 @@ export class StreamManager {
     } catch (e) {
       logMotion(
         `[${streamId}] Error stopping stream motion monitoring: ${e}`,
-        'warn',
+        'error',
       )
     }
     // Kill managed ffmpeg process
@@ -822,7 +825,7 @@ export class StreamManager {
         'error',
       )
     }
-    this.restartInProgress = false
+    this._restartInProgress = false
     logMotion(`[${streamId}] Reconnect completed`)
   }
 
