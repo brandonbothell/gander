@@ -107,7 +107,7 @@ export interface RequestWithUser extends express.Request {
   user?: { username: string; isAdmin: boolean }
 }
 
-const streamStates: Record<string, StreamMotionState> = {}
+const streamStates: Record<string, StreamMotionState | undefined> = {}
 
 const motionWatcherTimeouts = new Map<string, NodeJS.Timeout>()
 
@@ -155,9 +155,10 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       streamId,
       chokidar
         .watch(dynamicStreams[streamId].config.hlsDir, { ignoreInitial: true })
-        .on('add', (segmentPath) => {
+        .on('add', async (segmentPath) => {
           if (!/segment_\d+\.ts$/.test(path.basename(segmentPath))) return
-          const state = streamStates[streamId]
+          const state =
+            streamStates[streamId] ?? (await initializeStreamState(streamId))
           const now = Date.now()
 
           state.segmentTimestampMap.set(
@@ -317,7 +318,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                 state.motionRecordingActive = false
                 state.motionRecordingTimeoutAt = 0
                 if (state.flushTimer) {
-                  clearInterval(state.flushTimer)
+                  clearInterval(state!.flushTimer)
                   state.flushTimer = undefined
                 }
                 state.motionTimeout = undefined
@@ -371,10 +372,10 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
             return
           }
 
-          if (
-            Date.now() - streamStates[streamId].lastPlaylistUpdatedAt <
-            15000
-          ) {
+          const state =
+            streamStates[streamId] ?? (await initializeStreamState(streamId))
+
+          if (Date.now() - state.lastPlaylistUpdatedAt < 15000) {
             // If the playlist was updated within the last 15 seconds, do not reconnect
             return
           }
@@ -392,8 +393,8 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
               'error',
             )
           }
-        }, 15000),
-      ) // 15 seconds
+        }, 15000), // 15 seconds
+      )
     }
 
     watchers.set(
@@ -483,10 +484,11 @@ async function loadStreamsFromDb() {
       }
 
       // --- Monitor for FFmpeg cooldowns and alert ---
-      setInterval(() => {
+      setInterval(async () => {
         for (const streamId in dynamicStreams) {
           const stream = dynamicStreams[streamId]
-          const state = streamStates[streamId]
+          const state =
+            streamStates[streamId] ?? (await initializeStreamState(streamId))
           const now = Date.now()
           if (
             stream &&
@@ -939,9 +941,26 @@ export async function createStreamManager(stream: {
   const recordDir = path.join(config.recordingsDirectory, stream.id)
   const flushDir = path.join(recordDir, 'flush')
   const thumbDir = path.join(recordDir, 'thumbnails')
-  const persistedStates = await loadPersistedStreamStates()
 
-  streamStates[stream.id] = {
+  await initializeStreamState(stream.id)
+
+  return new StreamManager(
+    {
+      id: stream.id,
+      hlsDir,
+      recordDir,
+      thumbDir,
+      flushDir,
+      ffmpegInput: stream.ffmpegInput,
+      rtspUser: stream.rtspUser ?? undefined,
+      rtspPass: stream.rtspPass ?? undefined,
+    },
+    streamStates[stream.id]!,
+  )
+}
+
+export async function initializeStreamState(streamId: string) {
+  streamStates[streamId] = {
     segmentTimestampMap: new Map(),
     processingSegment: false,
     notificationSent: false,
@@ -951,7 +970,8 @@ export async function createStreamManager(stream: {
     flushingSegments: [],
     recentSegments: [],
     flushedSegments: [],
-    motionPaused: persistedStates[stream.id]?.motionPaused ?? false,
+    motionPaused:
+      (await loadPersistedStreamState(streamId))?.motionPaused ?? false,
     startupTime: Date.now(),
     savingInProgress: false,
     currentSaveProcess: null,
@@ -969,19 +989,20 @@ export async function createStreamManager(stream: {
     lastPlaylistUpdatedAt: 0,
   }
 
-  return new StreamManager(
-    {
-      id: stream.id,
-      hlsDir,
-      recordDir,
-      thumbDir,
-      flushDir,
-      ffmpegInput: stream.ffmpegInput,
-      rtspUser: stream.rtspUser ?? undefined,
-      rtspPass: stream.rtspPass ?? undefined,
-    },
-    streamStates[stream.id],
-  )
+  return streamStates[streamId]
+}
+
+async function loadPersistedStreamState(
+  streamId: string,
+): Promise<StreamMotionState | undefined> {
+  const state = await prisma.streamState.findUnique({ where: { streamId } })
+  try {
+    return state ? JSON.parse(state.state) : undefined
+  } catch {
+    console.error(
+      `[loadPersistedStreamState] Failed to parse persisted state for stream ${streamId}`,
+    )
+  }
 }
 
 async function loadPersistedStreamStates() {
@@ -1108,7 +1129,10 @@ async function cleanExit() {
     }
 
     // Save any pending segments BEFORE stopping FFmpeg and cleaning directories
-    if (state?.motionSegments.length > 0 || state.flushRecordings.length > 0) {
+    if (
+      state &&
+      (state.motionSegments.length > 0 || state.flushRecordings.length > 0)
+    ) {
       logMotion(
         `[${streamId}] [cleanExit] Saving ${state.motionSegments.length || state.flushRecordings.length} pending segments`,
       )

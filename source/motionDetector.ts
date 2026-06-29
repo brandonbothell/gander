@@ -10,7 +10,7 @@ import { Jimp, diff as getDiff } from 'jimp'
 import { StreamMotionState } from './types/stream'
 import { StreamManager } from './streamManager'
 import { logMotion } from './logMotion'
-import { prisma } from './camera'
+import { initializeStreamState, prisma } from './camera'
 
 const STANDARD_WIDTH = 160 // Much smaller for performance
 const STANDARD_HEIGHT = 90
@@ -297,7 +297,7 @@ function extractFrame(segmentPath: string, outputPath: string): Promise<void> {
 }
 
 export async function detectMotion(
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
   streamId: string,
   segmentPath: string,
   diffThreshold = streamMotionThresholds.min ?? 0.002,
@@ -305,9 +305,10 @@ export async function detectMotion(
 ): Promise<{ motion: boolean; aboveCameraMovementThreshold: boolean }> {
   debugLog(`[${streamId}] [Motion] Starting detection for ${segmentPath}`)
 
-  const state = streamStates[streamId]
+  const state =
+    streamStates[streamId] ?? (await initializeStreamState(streamId))
 
-  if (!state || state.cleaningUp) {
+  if (state.cleaningUp) {
     logMotion(
       `[${streamId}] Skipping flush/frame extraction during cleanup`,
       'warn',
@@ -499,7 +500,7 @@ export async function detectMotion(
 let cleanFrameCacheRunning = false
 export function cleanFrameCache(
   dynamicStreams: Record<string, StreamManager>,
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
 ) {
   if (cleanFrameCacheRunning) {
     // Prevent overlapping runs

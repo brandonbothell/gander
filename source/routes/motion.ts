@@ -8,6 +8,7 @@ import { clearMotionHistory } from '../motionDetector'
 import { jwtAuth } from '../middleware/jwtAuth'
 import { logMotion } from '../logMotion'
 import {
+  initializeStreamState,
   persistStreamState,
   prisma,
   RECENT_SEGMENT_BUFFER,
@@ -20,7 +21,7 @@ import { rateLimit } from 'express-rate-limit'
 
 export default function initializeMotionRoutes(
   app: Express,
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
   dynamicStreams: Record<string, StreamManager>,
 ) {
   const setMotionPauseLimiter = rateLimit({
@@ -94,7 +95,7 @@ export default function initializeMotionRoutes(
       Object.fromEntries(
         Object.entries(streamStates).map(([streamId, state]) => [
           streamId,
-          state.motionPaused,
+          state ? state.motionPaused : true,
         ]),
       ),
     )
@@ -196,12 +197,21 @@ export default function initializeMotionRoutes(
 
 // Save function with retry logic
 export async function saveMotionSegmentsWithRetry(
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
   retryAttempt: number = 0,
 ): Promise<void> {
-  const state = streamStates[streamId]
+  let state = streamStates[streamId]
+  if (!state) {
+    await initializeStreamState(streamId)
+    logMotion(
+      `[${streamId}] Motion save failed due to missing stream state`,
+      'error',
+    )
+    return
+  }
+
   const maxRetries = 2
 
   try {
@@ -243,12 +253,13 @@ export async function saveMotionSegmentsWithRetry(
 
 // --- Flush motion segments periodically ---
 export async function flushMotionSegmentsWithRetry(
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
   retryAttempt: number = 0,
 ): Promise<void> {
-  const state = streamStates[streamId]
+  const state =
+    streamStates[streamId] ?? (await initializeStreamState(streamId))
   const maxRetries = 2
 
   try {
@@ -325,13 +336,15 @@ function thresholdBytes(): number {
 // Exported helper to be called periodically or before saves.
 // Returns true when low space was detected (and segments were purged).
 export async function checkDiskSpaceAndPurge(
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
 ): Promise<boolean> {
-  const state = streamStates[streamId]
+  const state =
+    streamStates[streamId] ?? (await initializeStreamState(streamId))
   const stream = dynamicStreams[streamId]
-  if (!state || !stream) return false
+
+  if (!stream) return false
 
   const free = await getFreeBytesForPath(stream.config.recordDir)
   if (free <= 0) return false // couldn't determine; don't act
@@ -390,11 +403,12 @@ export async function checkDiskSpaceAndPurge(
 
 // Insert check before flushMotionSegments starts (early return on low space)
 async function flushMotionSegments(
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
 ): Promise<void> {
-  const state = streamStates[streamId]
+  const state =
+    streamStates[streamId] ?? (await initializeStreamState(streamId))
   const stream = dynamicStreams[streamId]
 
   // Check disk space and purge if low - do not attempt to flush when low
@@ -514,11 +528,19 @@ async function flushMotionSegments(
 
 // --- Modified saveMotionSegments ---
 async function saveMotionSegments(
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
 ): Promise<void> {
   const state = streamStates[streamId]
+  if (!state) {
+    await initializeStreamState(streamId)
+    logMotion(
+      `[${streamId}] Motion save failed due to missing stream state`,
+      'error',
+    )
+    return
+  }
   const stream = dynamicStreams[streamId]
 
   // If low disk space, purge and skip save

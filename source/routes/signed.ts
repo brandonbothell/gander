@@ -13,7 +13,7 @@ import { rateLimit } from 'express-rate-limit'
 export default function initializeSignedRoutes(
   app: express.Express,
   dynamicStreams: Record<string, StreamManager>,
-  streamStates: Record<string, StreamMotionState>,
+  streamStates: Record<string, StreamMotionState | undefined>,
   streamThumbnailPromises: Record<string, Promise<{ success: boolean }> | null>,
 ) {
   const generateSignedLatestThumbUrlLimiter = rateLimit({
