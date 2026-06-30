@@ -28,6 +28,5 @@
       "isAdmin":          false
     }
   ],
-  "greenlockConfigDir":   "C:\\Example\\Path\\greenlock.d",
-  "jwtSecret":            "EXAMPLE_SECRET_KEY_1234567890"
+  "greenlockConfigDir":   "C:\\Example\\Path\\greenlock.d"
 }
