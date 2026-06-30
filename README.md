@@ -5,7 +5,7 @@ A security camera application.
 ## Quick Start
 
 1. Configure files: Copy `config.example.json`, `web/config.example.json`, `greenlock.d/config.example.json`, and `.env.example` to their respective `.json` and `.env` files, replacing placeholders.
-2. Run `yarn db:generate` to set up the database.
+2. Run `yarn db:generate` and `yarn db:migrate:deploy` to set up the database.
 3. Generate SSL certificates: `yarn generate:ssl`.
 4. Build and start: `yarn build && yarn start`.
 5. Access via your reverse-proxy (see [nginx config](#nginx-configuration))
@@ -25,7 +25,7 @@ A security camera application.
    - `web/config.json`
    - `greenlock.d/config.json` (if you don't have SSL certificates already)
 
-2. **Database**: Run `yarn db:generate` to initialize the database manager.
+2. **Database**: Run `yarn db:generate` to initialize the database manager and `yarn db:migrate:deploy` to set up the database tables.
 
 3. **SSL Certificates**: Use `yarn generate:ssl` to generate SSL (HTTPS) certificates **after** editing `greenlock.d/config.json` with greenlock-express.
     - This starts an ACME authentication server on ports 80/443 and terminates automatically after certificate renewal or a 40-second timeout.
