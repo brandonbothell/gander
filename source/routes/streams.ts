@@ -3,9 +3,11 @@ import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
 import {
   createStreamManager,
+  motionWatcherTimeouts,
   prisma,
   RequestWithUser,
   setupStreamMotionMonitoring,
+  stopStreamMotionMonitoring,
 } from '../camera'
 import { rateLimit } from 'express-rate-limit'
 
@@ -249,6 +251,10 @@ export default function initializeStreamRoutes(
         return
       }
 
+      prisma.streamState.delete({ where: { streamId: id } }).catch(() => {
+        /* ignore */
+      })
+
       try {
         await prisma.stream.delete({ where: { id } })
         if (dynamicStreams[id]) {
@@ -262,7 +268,10 @@ export default function initializeStreamRoutes(
             res.status(500).json({ error: 'Failed to destroy stream.' })
             return
           }
+          stopStreamMotionMonitoring(id)
           delete dynamicStreams[id]
+          clearTimeout(motionWatcherTimeouts.get(id))
+          motionWatcherTimeouts.delete(id)
         }
         res.json({ success: true })
       } catch (e) {

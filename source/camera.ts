@@ -109,7 +109,7 @@ export interface RequestWithUser extends express.Request {
 
 const streamStates: Record<string, StreamMotionState | undefined> = {}
 
-const motionWatcherTimeouts = new Map<string, NodeJS.Timeout>()
+export const motionWatcherTimeouts = new Map<string, NodeJS.Timeout>()
 
 const watchers = new Map<string, chokidar.FSWatcher>()
 
