@@ -1,7 +1,12 @@
 import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
-import { createStreamManager, prisma, RequestWithUser } from '../camera'
+import {
+  createStreamManager,
+  prisma,
+  RequestWithUser,
+  setupStreamMotionMonitoring,
+} from '../camera'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeStreamRoutes(
@@ -91,12 +96,22 @@ export default function initializeStreamRoutes(
         })
         try {
           dynamicStreams[stream.id] = await createStreamManager(stream)
-          await dynamicStreams[stream.id].startFFmpeg().catch((err) => {
-            console.warn(
-              `[${stream.id}] FFmpeg failed to start:`,
-              err?.message || err,
+          await dynamicStreams[stream.id]
+            .startFFmpeg()
+            .catch((err) => {
+              console.warn(
+                `[${stream.id}] FFmpeg failed to start:`,
+                err?.message || err,
+              )
+            })
+            .then(() =>
+              setupStreamMotionMonitoring(stream.id).catch((err) =>
+                console.warn(
+                  `[${stream.id}] Failed to setup motion monitoring:`,
+                  err?.message || err,
+                ),
+              ),
             )
-          })
         } catch (err) {
           console.error(
             `[StreamManager] Failed to start FFmpeg for stream ${stream.id}:`,
