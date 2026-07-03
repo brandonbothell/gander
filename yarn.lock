@@ -238,12 +238,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/android@npm:8.3.1":
-  version: 8.3.1
-  resolution: "@capacitor/android@npm:8.3.1"
+"@capacitor/android@npm:8.4.1":
+  version: 8.4.1
+  resolution: "@capacitor/android@npm:8.4.1"
   peerDependencies:
-    "@capacitor/core": ^8.3.0
-  checksum: 10c0/c7b59e0561c1ceade4da5d096af3f30750d4c6082b2a5debe16c1d7dd46fb5821c43e81e2af4eb098b31a35a9e846a7e57e9aa8181067e82e1ec25d1a23bf539
+    "@capacitor/core": ^8.4.0
+  checksum: 10c0/84df2b3e50e6735ad8a1f8899593df7e420d3e7894c02fd57416dba8da928d67fcee650ae365275548e261ff125e89418153d7baa0a73981116227420aa26444
   languageName: node
   linkType: hard
 
@@ -6037,7 +6037,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "gander@workspace:."
   dependencies:
-    "@capacitor/android": "npm:8.3.1"
+    "@capacitor/android": "npm:8.4.1"
     "@capacitor/app": "npm:8.1.0"
     "@capacitor/cli": "npm:8.3.1"
     "@capacitor/core": "npm:8.3.1"
