@@ -311,12 +311,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/push-notifications@npm:8.1.1":
-  version: 8.1.1
-  resolution: "@capacitor/push-notifications@npm:8.1.1"
+"@capacitor/push-notifications@npm:8.1.2":
+  version: 8.1.2
+  resolution: "@capacitor/push-notifications@npm:8.1.2"
   peerDependencies:
     "@capacitor/core": ">=8.0.0"
-  checksum: 10c0/4641fd997e03385676c12848c9ba3bb36a180450926614efb1769d8e6579c60641365e1018f8d846979c5c411f9152b50be4bac7c2e4d06dbf7c1954c07e181c
+  checksum: 10c0/064e9c5780e266d715c88c96c3489c0e0dcf40e58155826d6a5beb448a1796d7561f4df0d61a11cf8440e54206fc17a84239eb40556d21e57c67be247db9adb1
   languageName: node
   linkType: hard
 
@@ -5856,7 +5856,7 @@ __metadata:
     "@capacitor/core": "npm:8.3.1"
     "@capacitor/local-notifications": "npm:8.1.0"
     "@capacitor/preferences": "npm:8.0.1"
-    "@capacitor/push-notifications": "npm:8.1.1"
+    "@capacitor/push-notifications": "npm:8.1.2"
     "@capacitor/screen-orientation": "npm:8.0.1"
     "@dotenvx/dotenvx": "npm:1.66.0"
     "@eslint/compat": "npm:2.1.0"
@@ -11056,7 +11056,7 @@ __metadata:
     "@capacitor/core": "npm:8.3.1"
     "@capacitor/local-notifications": "npm:8.1.0"
     "@capacitor/preferences": "npm:8.0.1"
-    "@capacitor/push-notifications": "npm:8.1.1"
+    "@capacitor/push-notifications": "npm:8.1.2"
     "@capacitor/screen-orientation": "npm:8.0.1"
     "@eslint/eslintrc": "npm:3.3.5"
     "@eslint/js": "npm:10.0.1"
