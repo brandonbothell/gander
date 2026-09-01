@@ -1,8 +1,11 @@
+import '@dotenvx/dotenvx/config'
 import path from 'path'
 import fs from 'fs'
-import { PrismaClient } from '../source/generated/prisma'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
+import { PrismaClient } from '../source/generated/prisma/client'
 
-const prisma = new PrismaClient()
+const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL })
+const prisma = new PrismaClient({ adapter })
 
 // List your streams and their recording directories here
 const streams = [
