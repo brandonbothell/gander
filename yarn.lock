@@ -256,9 +256,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/cli@npm:8.3.1":
-  version: 8.3.1
-  resolution: "@capacitor/cli@npm:8.3.1"
+"@capacitor/cli@npm:8.4.2":
+  version: 8.4.2
+  resolution: "@capacitor/cli@npm:8.4.2"
   dependencies:
     "@ionic/cli-framework-output": "npm:^2.2.8"
     "@ionic/utils-subprocess": "npm:^3.0.1"
@@ -280,7 +280,7 @@ __metadata:
   bin:
     cap: bin/capacitor
     capacitor: bin/capacitor
-  checksum: 10c0/7e23fd4f1ea78ce23634ef7ca34fab6f937c1cf5410190520e8996256bfbfd690b94df60ea9058c425c9e2ac4d28de975f1bdc5df5cda9582b6a8ee27ac6a8e3
+  checksum: 10c0/2351137b8e0c4ae4a826bb47784571704626114b260e3ef88e8ec68dfce9e116f8d75878b80a89c6323f77dce281778083979162e55f8adcb833a990c3aa0667
   languageName: node
   linkType: hard
 
@@ -5852,7 +5852,7 @@ __metadata:
   dependencies:
     "@capacitor/android": "npm:8.4.1"
     "@capacitor/app": "npm:8.1.0"
-    "@capacitor/cli": "npm:8.3.1"
+    "@capacitor/cli": "npm:8.4.2"
     "@capacitor/core": "npm:8.3.1"
     "@capacitor/local-notifications": "npm:8.1.0"
     "@capacitor/preferences": "npm:8.0.1"
