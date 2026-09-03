@@ -6,19 +6,21 @@
   "packageManager": "yarn@4.17.0",
   "workspaces": [
     ".",
-    "web"
+    "web",
+    "web2"
   ],
   "scripts": {
     "start": "node ./compiled/camera.js",
     "build": "yarn build:server & yarn build:client",
     "android:sync": "yarn cap sync android",
     "android:open": "yarn cap open android",
-    "dev": "concurrently --kill-others-on-fail --raw \"yarn dev:client\" \"yarn dev:server -- --host 0.0.0.0\"",
+    "dev": "concurrently --kill-others-on-fail --raw \"yarn dev:client2\" \"yarn dev:server -- --host 0.0.0.0\"",
     "build:server": "yarn build:server:safe",
     "build:server:safe": "copyfiles -u 1 \"source/generated/**/*\" \"compiled-temp\" && tsc --project tsconfig.build.json --outDir compiled-temp && tsx --tsconfig tsconfig.build.json scripts/safeReplace.ts",
     "build:server:force": "copyfiles -u 1 \"source/generated/**/*\" \"compiled\" && tsc --project tsconfig.build.json",
     "build:client": "dotenvx run -- yarn workspace web build",
     "dev:client": "dotenvx run -- yarn workspace web vite build --watch",
+    "dev:client2": "dotenvx run -- yarn workspace web2 vite build --watch",
     "dev:server": "nodemon --watch source --ext ts --exec \"tsx --tsconfig tsconfig.build.json ./source/camera.ts\"",
     "db:generate": "yarn prisma generate",
     "db:push": "yarn prisma db push",

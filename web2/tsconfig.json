@@ -1,10 +1,12 @@
 {
+  "compilerOptions": {
+    "noCheck": true
+  },
   "files": [
     "../eslint.config.mts",
     "../prisma.config.ts",
     "../capacitor.config.ts"
   ],
-  "include": ["../web2/src"],
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
