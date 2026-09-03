@@ -52,7 +52,7 @@ export default function FullLayout(props: {
       }}
       padding="md"
     >
-      <AppShell.Header>
+      <AppShell.Header zIndex={1001}>
         <Group h="100%" w="100%" px="md">
           <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
           Gander
@@ -65,7 +65,9 @@ export default function FullLayout(props: {
         </Group>
         <Group h="100%" w="50%" px="md"></Group>
       </AppShell.Header>
-      <AppShell.Navbar p="md">Navbar</AppShell.Navbar>
+      <AppShell.Navbar zIndex={1001} p="md">
+        Navbar
+      </AppShell.Navbar>
       <AppShell.Main style={{ display: 'grid', justifyContent: 'center' }}>
         <StreamsDisplay streams={streams} />
         {/* <StreamVideoLayout /> */}
