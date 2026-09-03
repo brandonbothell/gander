@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import {
   type SplitterPaneSize,
   useLocalStorage,
-  useResizeObserver,
   type UseSplitterReturnValue,
   useViewportSize,
 } from '@mantine/hooks'
@@ -31,7 +30,6 @@ export default function StreamsDisplay(props: { streams: Stream[] }) {
   })
 
   const { width } = useViewportSize()
-  const [resizeRef] = useResizeObserver<HTMLDivElement>()
   const [splitterStyles, setSplitterStyles] = useLocalStorage<CSSProperties>({
     key: 'splitterStyles',
     defaultValue: {
@@ -132,8 +130,7 @@ export default function StreamsDisplay(props: { streams: Stream[] }) {
         <Splitter
           style={splitterStyles}
           w={width < 768 ? '95vw' : undefined}
-          h={width < 768 ? undefined : '60vh'}
-          ref={resizeRef}
+          h={width < 768 ? undefined : '70vh'}
           splitterRef={splitterRef}
           className={classes.demo}
         >

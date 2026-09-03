@@ -15,9 +15,6 @@ export default function FullLayout(props: {
     key: 'jwt',
   })
   const [streams, setStreams] = useState<Stream[]>([])
-  const activeStream = useLocalStorage({
-    key: 'stream',
-  })
 
   useEffect(() => {
     let cancelled = false
