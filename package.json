@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "start": "node ./compiled/camera.js",
-    "build": "yarn build:server & yarn build:client",
+    "build": "yarn build:server & yarn build:client2",
     "android:sync": "yarn cap sync android",
     "android:open": "yarn cap open android",
     "dev": "concurrently --kill-others-on-fail --raw \"yarn dev:client2\" \"yarn dev:server -- --host 0.0.0.0\"",
@@ -19,6 +19,7 @@
     "build:server:safe": "copyfiles -u 1 \"source/generated/**/*\" \"compiled-temp\" && tsc --project tsconfig.build.json --outDir compiled-temp && tsx --tsconfig tsconfig.build.json scripts/safeReplace.ts",
     "build:server:force": "copyfiles -u 1 \"source/generated/**/*\" \"compiled\" && tsc --project tsconfig.build.json",
     "build:client": "dotenvx run -- yarn workspace web build",
+    "build:client2": "dotenvx run -- yarn workspace web2 build",
     "dev:client": "dotenvx run -- yarn workspace web vite build --watch",
     "dev:client2": "dotenvx run -- yarn workspace web2 vite build --watch",
     "dev:server": "nodemon --watch source --ext ts --exec \"tsx --tsconfig tsconfig.build.json ./source/camera.ts\"",
