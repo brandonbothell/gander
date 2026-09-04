@@ -75,8 +75,8 @@ export default function FullLayout(props: {
       </AppShell.Navbar>
       <AppShell.Main style={{ display: 'grid', justifyContent: 'center' }}>
         <StreamsGrid streams={streams} />
-        <RecordingsPages />
-        <Text>
+        <RecordingsPages streams={streams} />
+        <Text mt="sm">
           AppShell example with all elements: Navbar, Header, Aside, Footer.
         </Text>
         <Text>All elements except AppShell.Main have fixed position.</Text>
