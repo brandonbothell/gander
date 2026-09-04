@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useDisclosure, useLocalStorage } from '@mantine/hooks'
-import { AppShell, Burger, Text, Group } from '@mantine/core'
+import { AppShell, Burger, Group, Text } from '@mantine/core'
 import { authFetch } from '../main'
-import StreamsDisplay from '../Component/StreamsDisplay'
+import StreamsGrid from '../Component/StreamsGrid'
 import { SessionsLogoutButton } from '../Component/SessionsLogoutButton'
+import RecordingsPages from '../Component/RecordingsPages'
 import { type Stream } from '../../../source/types/shared'
 // import StreamVideoLayout from './StreamVideoLayout'
 
@@ -73,8 +74,8 @@ export default function FullLayout(props: {
         Navbar
       </AppShell.Navbar>
       <AppShell.Main style={{ display: 'grid', justifyContent: 'center' }}>
-        <StreamsDisplay streams={streams} />
-        {/* <StreamVideoLayout /> */}
+        <StreamsGrid streams={streams} />
+        <RecordingsPages />
         <Text>
           AppShell example with all elements: Navbar, Header, Aside, Footer.
         </Text>

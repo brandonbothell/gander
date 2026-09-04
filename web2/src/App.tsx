@@ -533,6 +533,7 @@ export default function App() {
   }
 
   // If authenticated is null, we'll show a loading overlay further down
+  // If it's false, show a sign-in
   if (authenticated === false) {
     return (
       <MantineProvider theme={theme} defaultColorScheme="dark">

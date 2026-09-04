@@ -6,11 +6,10 @@ import {
   useViewportSize,
 } from '@mantine/hooks'
 import { type CSSProperties, Group, Splitter } from '@mantine/core'
-import { type Stream } from '../../../source/types/shared'
+import { type Stream } from 'c:/Users/shado/Documents/_GitRepositories/gander/source/types/shared'
 import StreamVideo from './StreamVideo'
-import classes from './SessionsLogoutButton.module.css'
 
-export default function StreamsDisplay(props: { streams: Stream[] }) {
+export default function StreamsGrid(props: { streams: Stream[] }) {
   if (!props.streams || props.streams.length === 0) {
     return <div>No streams available</div>
   }
@@ -127,61 +126,50 @@ export default function StreamsDisplay(props: { streams: Stream[] }) {
   }, [])
 
   return (
-    <div className={classes.root}>
-      <Group justify="center">
-        <Splitter
-          style={splitterStyles}
-          w={width < 768 ? '95vw' : undefined}
-          h={width < 768 ? undefined : '70vh'}
-          splitterRef={splitterRef}
-          className={classes.demo}
+    <Group justify="center">
+      <Splitter
+        style={splitterStyles}
+        w={width < 768 ? '95vw' : undefined}
+        h={width < 768 ? undefined : '70vh'}
+        splitterRef={splitterRef}
+      >
+        <Splitter.Pane
+          defaultSize={50}
+          min={10}
+          display={'initial'}
+          collapsible
         >
-          <Splitter.Pane
-            defaultSize={50}
-            min={10}
-            display={'initial'}
-            collapsible
-          >
-            <Splitter
-              splitterRef={splitter2Ref}
-              orientation="vertical"
-              h="100%"
-            >
-              <Splitter.Pane defaultSize={50} min={10} bg="blue" collapsible>
-                <StreamVideo
-                  stream={props.streams[0]}
-                  getAspectRatio={getAspectRatio}
-                />
-              </Splitter.Pane>
-              <Splitter.Pane defaultSize={50} min={10} bg="violet" collapsible>
-                <StreamVideo
-                  stream={props.streams[1]}
-                  getAspectRatio={getAspectRatio}
-                />
-              </Splitter.Pane>
-            </Splitter>
-          </Splitter.Pane>
-          <Splitter.Pane
-            defaultSize={50}
-            min={10}
-            display={'initial'}
-            collapsible
-          >
-            <Splitter
-              splitterRef={splitter3Ref}
-              orientation="vertical"
-              h="100%"
-            >
-              <Splitter.Pane defaultSize={50} min={10} bg="teal" collapsible>
-                Editor
-              </Splitter.Pane>
-              <Splitter.Pane defaultSize={50} min={10} bg="grape" collapsible>
-                Terminal
-              </Splitter.Pane>
-            </Splitter>
-          </Splitter.Pane>
-        </Splitter>
-      </Group>
-    </div>
+          <Splitter splitterRef={splitter2Ref} orientation="vertical" h="100%">
+            <Splitter.Pane defaultSize={50} min={10} bg="blue" collapsible>
+              <StreamVideo
+                stream={props.streams[0]}
+                getAspectRatio={getAspectRatio}
+              />
+            </Splitter.Pane>
+            <Splitter.Pane defaultSize={50} min={10} bg="violet" collapsible>
+              <StreamVideo
+                stream={props.streams[1]}
+                getAspectRatio={getAspectRatio}
+              />
+            </Splitter.Pane>
+          </Splitter>
+        </Splitter.Pane>
+        <Splitter.Pane
+          defaultSize={50}
+          min={10}
+          display={'initial'}
+          collapsible
+        >
+          <Splitter splitterRef={splitter3Ref} orientation="vertical" h="100%">
+            <Splitter.Pane defaultSize={50} min={10} bg="teal" collapsible>
+              Editor
+            </Splitter.Pane>
+            <Splitter.Pane defaultSize={50} min={10} bg="grape" collapsible>
+              Terminal
+            </Splitter.Pane>
+          </Splitter>
+        </Splitter.Pane>
+      </Splitter>
+    </Group>
   )
 }
