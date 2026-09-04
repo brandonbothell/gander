@@ -49,14 +49,21 @@ export default function FullLayout(props: {
       }}
       padding="md"
     >
-      <AppShell.Header zIndex={1001}>
+      <AppShell.Header zIndex={1001} style={{ pointerEvents: 'none' }}>
         <Group h="100%" w="100%" px="md">
-          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+          <Burger
+            opened={opened}
+            onClick={toggle}
+            hiddenFrom="sm"
+            size="sm"
+            style={{ pointerEvents: 'auto' }}
+          />
           Gander
           <SessionsLogoutButton
             logout={props.logout}
             style={{
               marginLeft: 'auto',
+              pointerEvents: 'auto',
             }}
           />
         </Group>

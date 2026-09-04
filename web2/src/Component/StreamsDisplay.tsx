@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import {
   type SplitterPaneSize,
   useLocalStorage,
@@ -29,20 +29,24 @@ export default function StreamsDisplay(props: { streams: Stream[] }) {
     key: 'splitterState',
   })
 
+  const getAspectRatio = useCallback(() => {
+    if (splitterRef.current?.collapsed.includes(true)) {
+      const uncollapsedIndex = splitterRef.current.collapsed.findIndex(
+        (c) => c === false,
+      )
+      if (splitters[uncollapsedIndex + 1].current?.collapsed.includes(true)) {
+        return '16 / 9'
+      } else return '16 / 18'
+    }
+    return '16 / 9'
+  }, [splitterRef, splitter2Ref, splitter3Ref])
+
   const { width } = useViewportSize()
   const [splitterStyles, setSplitterStyles] = useLocalStorage<CSSProperties>({
     key: 'splitterStyles',
     defaultValue: {
       zIndex: 1000,
-      aspectRatio: splitterRef.current
-        ? splitterRef.current.collapsed.includes(true)
-          ? '16 / 18'
-          : '16 / 9'
-        : storedSplitterState?.length
-          ? storedSplitterState[0].collapsed.includes(true)
-            ? '16 / 18'
-            : '16 / 9'
-          : '16 / 18',
+      aspectRatio: getAspectRatio(),
     },
   })
 
@@ -110,9 +114,7 @@ export default function StreamsDisplay(props: { streams: Stream[] }) {
 
       setSplitterStyles((prev) => ({
         ...prev,
-        aspectRatio: splitterRef.current?.collapsed.includes(true)
-          ? '16 / 18'
-          : '16 / 9',
+        aspectRatio: getAspectRatio(),
       }))
     }
 
@@ -146,10 +148,16 @@ export default function StreamsDisplay(props: { streams: Stream[] }) {
               h="100%"
             >
               <Splitter.Pane defaultSize={50} min={10} bg="blue" collapsible>
-                <StreamVideo streamId={props.streams[0].id} />
+                <StreamVideo
+                  stream={props.streams[0]}
+                  getAspectRatio={getAspectRatio}
+                />
               </Splitter.Pane>
               <Splitter.Pane defaultSize={50} min={10} bg="violet" collapsible>
-                <StreamVideo streamId={props.streams[1].id} />
+                <StreamVideo
+                  stream={props.streams[1]}
+                  getAspectRatio={getAspectRatio}
+                />
               </Splitter.Pane>
             </Splitter>
           </Splitter.Pane>
