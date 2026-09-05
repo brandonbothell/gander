@@ -686,7 +686,7 @@ function verifySignedUrl(
 }
 
 // --- Helper to create a signed stream playlist URL for a specific stream ---
-function createSignedStreamUrl(streamId: string, expiresInSeconds = 300) {
+function createSignedStreamUrl(streamId: string, expiresInSeconds = 60) {
   const expires = Math.floor(Date.now() / 1000) + expiresInSeconds
   const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
   const data = `stream:${streamId}:${expires}`

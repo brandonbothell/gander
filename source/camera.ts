@@ -658,7 +658,7 @@ loadStreamsFromDb()
       if (process.env.API_ENV === 'production') return
       setTimeout(() => {
         open(`http://localhost:${port}`)
-      }, 1500)
+      }, 3000)
     })
   })
 
@@ -856,7 +856,7 @@ const thumbnailLimiter = rateLimit({
 })
 
 // --- Static & API Routes ---
-app.use(express.static(path.join(__dirname, '..', 'web', 'dist')))
+app.use(express.static(path.join(__dirname, '..', 'web2', 'dist')))
 app.use(
   '/recordings/thumbnails',
   thumbnailLimiter,
@@ -864,11 +864,11 @@ app.use(
   express.static(path.join(config.recordingsDirectory, 'thumbnails')),
 )
 app.get(/^\/(?!hls|api|recordings|signed|sounds).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'))
+  res.sendFile(path.join(__dirname, '..', 'web2', 'dist', 'index.html'))
 })
 
 app.get(/^\/recordings(\/[^/]+)(\/[^/]+)?$/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'))
+  res.sendFile(path.join(__dirname, '..', 'web2', 'dist', 'index.html'))
 })
 
 app.get('/api/vapid-public-key', (req, res) => {
