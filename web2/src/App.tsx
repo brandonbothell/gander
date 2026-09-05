@@ -420,13 +420,8 @@ export default function App() {
       const currentVersion = import.meta.env.VITE_REACT_APP_VERSION ?? '1.0.0'
       let lastUpdate = localStorage.getItem('lastUsedAppVersion')
 
-      if (!lastUpdate) {
-        localStorage.setItem('lastUsedAppVersion', '1.0.0')
-        lastUpdate = '1.0.0'
-      }
-
       // If new version, reset cached data
-      if (lastUpdate !== currentVersion) {
+      if (lastUpdate && lastUpdate !== currentVersion) {
         // Reset all cached states if the website was updated
         setCachedRecordings({})
         setCachedRecordingRanges({})
