@@ -658,7 +658,7 @@ loadStreamsFromDb()
       if (process.env.API_ENV === 'production') return
       setTimeout(() => {
         open(`http://localhost:${port}`)
-      }, 1500)
+      }, 3000)
     })
   })
 
