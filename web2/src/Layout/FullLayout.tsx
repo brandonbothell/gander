@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useDisclosure, useLocalStorage } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage, useViewportSize } from '@mantine/hooks'
 import { AppShell, Burger, Group, Text } from '@mantine/core'
 import { authFetch } from '../main'
 import StreamsGrid from '../Component/StreamsGrid'
@@ -16,6 +16,7 @@ export default function FullLayout(props: {
     key: 'jwt',
   })
   const [streams, setStreams] = useState<Stream[]>([])
+  const { width } = useViewportSize()
 
   useEffect(() => {
     let cancelled = false
@@ -42,10 +43,10 @@ export default function FullLayout(props: {
     <AppShell
       header={{ height: 60 }}
       footer={{ height: 60 }}
-      navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      navbar={{ width: 300, breakpoint: 1200, collapsed: { mobile: !opened } }}
       aside={{
         width: 300,
-        breakpoint: 'md',
+        breakpoint: 1500,
         collapsed: { desktop: false, mobile: true },
       }}
       padding="md"
@@ -55,9 +56,11 @@ export default function FullLayout(props: {
           <Burger
             opened={opened}
             onClick={toggle}
-            hiddenFrom="sm"
             size="sm"
-            style={{ pointerEvents: 'auto' }}
+            style={{
+              pointerEvents: 'auto',
+              display: width < 1200 ? 'initial' : 'none',
+            }}
           />
           Gander
           <SessionsLogoutButton
@@ -73,7 +76,7 @@ export default function FullLayout(props: {
       <AppShell.Navbar zIndex={1001} p="md">
         Navbar
       </AppShell.Navbar>
-      <AppShell.Main style={{ display: 'grid', justifyContent: 'center' }}>
+      <AppShell.Main style={{ display: 'grid' }}>
         <StreamsGrid streams={streams} />
         <RecordingsPages streams={streams} />
         <Text mt="sm">

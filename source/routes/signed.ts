@@ -373,7 +373,7 @@ export default function initializeSignedRoutes(
 
   const videoAndThumbnailSignedUrlLimiter = rateLimit({
     validate: { ip: false },
-    windowMs: 2 * 1000, // 2 seconds
+    windowMs: 500, // Half second
     max: 50,
     standardHeaders: true,
     legacyHeaders: false,

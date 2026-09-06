@@ -160,7 +160,7 @@ export default function initializeRecordingRoutes(
       const { streamId, page } = req.params
       const username = req.user!.username
       const pageNum = Math.max(1, parseInt(page, 10) ?? 1)
-      const PAGE_SIZE = 50
+      const PAGE_SIZE = 20
 
       const total = await prisma.motionRecording.count({ where: { streamId } })
       const recordings = await prisma.motionRecording.findMany({

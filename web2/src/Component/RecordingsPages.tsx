@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { randomId, useMap } from '@mantine/hooks'
+import { useMap } from '@mantine/hooks'
 import {
   Box,
   Code,
   Combobox,
   Input,
   InputBase,
-  LoadingOverlay,
   Pagination,
   Title,
   useCombobox,
@@ -14,22 +13,7 @@ import {
 import { Recording } from '../types'
 import { API_BASE, authFetch } from '../main'
 import { type Stream } from '../../../source/types/shared'
-
-function chunk<T>(array: T[], size: number): T[][] {
-  if (!array.length) {
-    return []
-  }
-  const head = array.slice(0, size)
-  const tail = array.slice(size)
-  return [head, ...chunk(tail, size)]
-}
-
-const data = chunk(
-  Array(30)
-    .fill(0)
-    .map((_, index) => ({ id: index, name: randomId() })),
-  5,
-)
+import RecordingsGrid from './RecordingsGrid'
 
 export default function RecordingsPages(props: { streams: Stream[] }) {
   const [loading, setLoading] = useState(false)
@@ -67,12 +51,10 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
       return <>Failed to load page.</>
     }
 
-    return recordingsToRender.map((recording) => (
-      <Code key={recording.filename} mt="sm">
-        filename: {recording.filename}, duration: {recording.duration}s
-      </Code>
-    ))
-  }, [activePage, activeStream, recordings])
+    return (
+      <RecordingsGrid recordings={recordingsToRender} pageLoading={loading} />
+    )
+  }, [activePage, activeStream, recordings, loading])
 
   useEffect(() => {
     if (lastFailedPage !== 0 && activePage === lastFailedPage) return
@@ -135,8 +117,8 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
             ...(() => {
               const blankPages: [][] = []
 
-              // 50 items per page
-              for (let i = 0; i < Math.ceil(page.total / 50); i++) {
+              // 20 items per page
+              for (let i = 0; i < Math.ceil(page.total / 20); i++) {
                 blankPages.push([])
               }
 
@@ -151,8 +133,8 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
               ...(() => {
                 const blankPages: [][] = []
 
-                // 50 items per page
-                for (let i = 0; i < Math.ceil(page.total / 50); i++) {
+                // 20 items per page
+                for (let i = 0; i < Math.ceil(page.total / 20); i++) {
                   blankPages.push([])
                 }
 
@@ -217,17 +199,12 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
           <Pagination
             total={
               totalRecordings.has(activeStream.id)
-                ? Math.ceil(totalRecordings.get(activeStream.id)! / 50)
+                ? Math.ceil(totalRecordings.get(activeStream.id)! / 20)
                 : 0
             }
             value={activePage}
             onChange={setPage}
             mt="sm"
-          />
-          <LoadingOverlay
-            visible={loading}
-            zIndex={1000}
-            overlayProps={{ radius: 'sm', blur: 2 }}
           />
         </Box>
       )}
