@@ -267,6 +267,7 @@ export default function RecordingsGrid(props: {
     let onVideoLoad: (() => void) | undefined
 
     const loadRecording = async () => {
+      if (!videoElement) return
       setLoading(true)
       const src = await fetchRecordingUrl(videoElement.src || undefined)
       if (cancelled || !src) {
@@ -296,11 +297,13 @@ export default function RecordingsGrid(props: {
     return () => {
       cancelled = true
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
-      if (onVideoLoad) {
-        videoElement.removeEventListener('loadeddata', onVideoLoad)
+      if (videoElement) {
+        if (onVideoLoad) {
+          videoElement.removeEventListener('loadeddata', onVideoLoad)
+        }
+        videoElement.removeAttribute('src')
+        videoElement.load()
       }
-      videoElement.removeAttribute('src')
-      videoElement.load()
       setLoading(false)
     }
   }, [activeRecording, fetchRecordingUrl, lightboxOpen, videoElement])
@@ -325,6 +328,7 @@ export default function RecordingsGrid(props: {
         onIndexChange={(index) => setRecording(props.recordings[index])}
         withThumbnails
         withDownload
+        currentSrc={videoElement?.src || ''}
         closeOnSwipeDown={!(inlineFullscreen && width < 500)}
         withFullscreen={canFullscreen}
         closeOnClickOutside={false}

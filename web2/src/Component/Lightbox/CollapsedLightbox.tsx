@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   createCloseToolbarItem,
+  createDownloadToolbarItem,
   createFullscreenToolbarItem,
   createThumbnailsToolbarItem,
   Lightbox,
@@ -9,7 +10,9 @@ import {
   type ToolbarItemsPayload,
 } from '@mantine/lightbox'
 
-type CollapsedLightboxProps = LightboxProps
+type CollapsedLightboxProps = LightboxProps & {
+  currentSrc: string
+}
 
 export default function CollapsedLightbox({
   children,
@@ -51,6 +54,7 @@ export default function CollapsedLightbox({
         thumbnailsVisible,
         payload.labels,
       ),
+      createDownloadToolbarItem(props.currentSrc, payload.labels),
       createFullscreenToolbarItem(
         payload.toggleFullscreen,
         payload.isFullscreen,
