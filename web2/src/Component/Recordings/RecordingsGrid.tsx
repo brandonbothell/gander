@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-react'
 import { Lightbox, type LightboxSlideData } from '@mantine/lightbox'
-import { useDisclosure, useMap } from '@mantine/hooks'
+import { useDisclosure, useMap, useViewportSize } from '@mantine/hooks'
 import {
   Paper,
   SimpleGrid,
@@ -8,8 +9,9 @@ import {
   Image,
   LoadingOverlay,
   Center,
+  ActionIcon,
 } from '@mantine/core'
-import { Video } from '@gfazioli/mantine-video'
+import { useVideo, Video } from '@gfazioli/mantine-video'
 import { Recording } from '../../types'
 import { API_BASE, authFetch, fetchWithRetry } from '../../main'
 import classes from './RecordingsGrid.module.css'
@@ -21,12 +23,15 @@ export default function RecordingsGrid(props: {
   const signedUrlsMap = useMap<string, { url: string; expiresAt: number }>()
   const loadedThumbnailMap = useMap<string, boolean>()
 
+  const { width } = useViewportSize()
+  const { canFullscreen } = useVideo()
   const [loading, setLoading] = useState(false)
   const [activeRecording, setRecording] = useState<Recording | null>(null)
   const videoRef = useRef<HTMLDivElement>(null)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
     null,
   )
+  const [inlineFullscreen, setInlineFullscreen] = useState(false)
   const recordingRequestId = useRef(0)
 
   const setVideoContainer = useCallback((element: HTMLDivElement | null) => {
@@ -48,11 +53,11 @@ export default function RecordingsGrid(props: {
       if (!force && isFresh) return currentUrl
 
       const requestId = ++recordingRequestId.current
-      const url = `${API_BASE}/api/signed-urls/${activeRecording.streamId}?type=video&filenames=${activeRecording.filename}`
+      const url = `${API_BASE}/api/signed-url/${activeRecording.streamId}?type=video&filename=${activeRecording.filename}`
 
       try {
         const response = await fetchWithRetry(() => authFetch(url))
-        const signedUrl = `${API_BASE}${(await response.json())[0].url}`
+        const signedUrl = `${API_BASE}${(await response.json()).url}`
 
         if (requestId !== recordingRequestId.current) return
         return signedUrl
@@ -82,33 +87,119 @@ export default function RecordingsGrid(props: {
       props.recordings.map((recording) => ({
         type: 'custom',
         autoPlay: true,
-        render: ({ active }) =>
-          active && (
-            <Center h="100%">
-              <LoadingOverlay
-                visible={loading}
-                zIndex={2000}
-                overlayProps={{ radius: 'sm', blur: 2 }}
-              />
-              <Video autoPlay muted shortcuts ref={setVideoContainer} h="80%">
-                <Video.Controls />
-              </Video>
-            </Center>
-          ),
+        render: ({ active }) => (
+          <Center h="100%" w="100%" display={'grid'} pos="relative">
+            {active && (
+              <>
+                <LoadingOverlay
+                  visible={loading}
+                  zIndex={2000}
+                  overlayProps={{ radius: 'sm', blur: 2 }}
+                />
+                <div
+                  className={
+                    inlineFullscreen
+                      ? classes.inlineFullscreenFrame
+                      : classes.videoFrame
+                  }
+                >
+                  <Video
+                    autoPlay
+                    muted
+                    shortcuts
+                    controls={false}
+                    ref={setVideoContainer}
+                    h={'100%'}
+                    style={{ display: loading ? 'none' : 'block' }}
+                    className={
+                      inlineFullscreen
+                        ? classes.inlineFullscreenVideo
+                        : undefined
+                    }
+                    classNames={{ controls: classes.inlineFullscreenControls }}
+                  >
+                    <Video.Controls>
+                      <Video.PlayButton />
+                      {width >= 500 ||
+                        (inlineFullscreen && (
+                          <>
+                            <Video.SkipButton seconds={-10} />
+                            <Video.SkipButton seconds={10} />
+                          </>
+                        ))}
+                      <Video.Timeline />
+                      {width >= 500 && (
+                        <Video.TimeDisplay format="current/-remaining" />
+                      )}
+                      <Video.MuteButton />
+                      <Video.PiPButton />
+                      {canFullscreen ? (
+                        <Video.FullscreenButton />
+                      ) : (
+                        <ActionIcon
+                          variant="subtle"
+                          color="white"
+                          aria-label={
+                            inlineFullscreen
+                              ? 'Exit fullscreen'
+                              : 'Enter fullscreen'
+                          }
+                          onClick={() => setInlineFullscreen((value) => !value)}
+                        >
+                          {inlineFullscreen ? (
+                            <IconArrowsMinimize size={20} />
+                          ) : (
+                            <IconArrowsMaximize size={20} />
+                          )}
+                        </ActionIcon>
+                      )}
+                    </Video.Controls>
+                  </Video>
+                  <Text
+                    pos="absolute"
+                    bottom={-50}
+                    style={{ display: loading ? 'none' : 'block' }}
+                  >
+                    {`${recording.nickname ? `${recording.nickname} (` : ''}${formatTime(recording.duration)}${recording.nickname ? ')' : ''}`}
+                  </Text>
+                </div>
+              </>
+            )}
+          </Center>
+        ),
         renderThumb: () => (
-          <Center h="100%" bg="blue.6" style={{ borderRadius: 4 }}>
+          <Center
+            pos="relative"
+            h="100%"
+            bg="blue.6"
+            style={{ borderRadius: 4 }}
+          >
             {signedUrlsMap.has(
               `${recording.streamId}-${recording.filename}`,
             ) ? (
-              <Image
-                radius="md"
-                h="100%"
-                src={
-                  signedUrlsMap.get(
-                    `${recording.streamId}-${recording.filename}`,
-                  )!.url
-                }
-              />
+              <>
+                <span
+                  className={classes.recordingDurationBadge}
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    background: 'none',
+                    boxShadow: 'none',
+                    textShadow: '0 2px 8px rgba(0, 0, 0, 0.35)',
+                  }}
+                >
+                  {formatTime(recording.duration)}
+                </span>
+                <Image
+                  radius="md"
+                  h="100%"
+                  src={
+                    signedUrlsMap.get(
+                      `${recording.streamId}-${recording.filename}`,
+                    )!.url
+                  }
+                />
+              </>
             ) : (
               <Text c="white" size="xs">
                 {recording.filename}
@@ -117,8 +208,12 @@ export default function RecordingsGrid(props: {
           </Center>
         ),
       })),
-    [props.recordings, loading],
+    [canFullscreen, inlineFullscreen, props.recordings, loading, width],
   )
+
+  useEffect(() => {
+    if (!lightboxOpen) setInlineFullscreen(false)
+  }, [activeRecording, lightboxOpen])
 
   useEffect(() => {
     props.recordings.forEach(async function getSignedUrl(recording) {
@@ -225,7 +320,10 @@ export default function RecordingsGrid(props: {
         onIndexChange={(index) => setRecording(props.recordings[index])}
         withThumbnails
         withDownload
-        withFullscreen
+        closeOnSwipeDown={!inlineFullscreen}
+        withFullscreen={canFullscreen}
+        closeOnClickOutside
+        emblaOptions={{ watchDrag: false }}
       />
       {props.recordings?.map((recording, index) => (
         <Paper

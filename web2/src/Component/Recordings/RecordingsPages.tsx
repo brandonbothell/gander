@@ -165,6 +165,14 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
               rightSectionPointerEvents="none"
               onClick={() => streamCombobox.toggleDropdown()}
               size="md"
+              styles={{
+                input: {
+                  height: 'auto',
+                  minHeight: 'var(--input-height-md)',
+                  whiteSpace: 'normal',
+                  textAlign: 'left',
+                },
+              }}
             >
               <Title order={2}>
                 {activeStream ? (
