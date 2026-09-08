@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-react'
-import { Lightbox, type LightboxSlideData } from '@mantine/lightbox'
+import { type LightboxSlideData } from '@mantine/lightbox'
 import { useDisclosure, useMap, useViewportSize } from '@mantine/hooks'
 import {
   Paper,
@@ -12,6 +12,7 @@ import {
   ActionIcon,
 } from '@mantine/core'
 import { useVideo, Video } from '@gfazioli/mantine-video'
+import CollapsedLightbox from '../Lightbox/CollapsedLightbox'
 import { Recording } from '../../types'
 import { API_BASE, authFetch, fetchWithRetry } from '../../main'
 import classes from './RecordingsGrid.module.css'
@@ -316,7 +317,7 @@ export default function RecordingsGrid(props: {
         zIndex={1000}
         overlayProps={{ radius: 'sm', blur: 2 }}
       />
-      <Lightbox
+      <CollapsedLightbox
         opened={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
         slides={lightboxSlides}
@@ -326,7 +327,7 @@ export default function RecordingsGrid(props: {
         withDownload
         closeOnSwipeDown={!(inlineFullscreen && width < 500)}
         withFullscreen={canFullscreen}
-        closeOnClickOutside
+        closeOnClickOutside={false}
         emblaOptions={{ watchDrag: false }}
       />
       {props.recordings?.map((recording, index) => (
