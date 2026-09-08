@@ -119,7 +119,8 @@ export default function FullLayout(props: {
               <FiChevronRight
                 size={16}
                 style={{
-                  transform: openedLayouts ? 'rotate(-90deg)' : 'none',
+                  transform: openedLayouts ? 'rotate(90deg)' : 'none',
+                  transition: 'transform 200ms ease',
                 }}
               />
             }
