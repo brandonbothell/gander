@@ -134,7 +134,7 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
                 const blankPages: [][] = []
 
                 // 20 items per page
-                for (let i = 0; i < Math.ceil(page.total / 20); i++) {
+                for (let i = currentRecordings.length; i < activePage; i++) {
                   blankPages.push([])
                 }
 
