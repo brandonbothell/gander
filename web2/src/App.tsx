@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
 import theme from './theme'
+import SecureStorage from './secure-storage'
 import { API_BASE, setAuthHandlers, authFetch } from './main'
 import {
   getDeviceFingerprint,
@@ -27,11 +28,9 @@ export function debugLog(
   message: string,
   level: 'log' | 'warn' | 'error' = 'log',
 ) {
-  if (import.meta.env.DEV) {
-    if (level === 'log') console.log(message)
-    else if (level === 'warn') console.warn(message)
-    else if (level === 'error') console.error(message)
-  }
+  if (level === 'log') console.log(message)
+  else if (level === 'warn') console.warn(message)
+  else if (level === 'error') console.error(message)
 }
 
 export default function App() {
@@ -87,10 +86,15 @@ export default function App() {
       )
     }
 
+    const refreshToken = await SecureStorage.getRefreshToken().catch(
+      console.error,
+    )
+
     try {
       debugLog('Attempting to get refresh token from storage')
 
-      const rtExists = (await cookieStore.get('_rtexists'))?.value
+      const rtExists =
+        !!refreshToken || !!(await cookieStore?.get('_rtexists'))?.value
       if (!rtExists) {
         debugLog(
           `No refresh token available for refresh attempt, _rtexists: '${rtExists}'`,
@@ -176,7 +180,10 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ deviceInfo }),
+        body: JSON.stringify({
+          deviceInfo,
+          ...(refreshToken ? { 'refresh-token': refreshToken } : {}),
+        }),
       }
 
       const refreshStartTime = Date.now()
@@ -204,6 +211,7 @@ export default function App() {
           localStorage.setItem('jwt', data.token)
 
           localStorage.removeItem('tokenRefreshInProgress')
+          await SecureStorage.setRefreshToken(data.refreshToken)
 
           // Broadcast to all tabs
           const tokenChannel = new BroadcastChannel('tokenUpdates')
@@ -235,6 +243,7 @@ export default function App() {
 
     // Cleanup on failure
     debugLog('Token refresh failed, cleaning up', 'error')
+    await SecureStorage.removeRefreshToken()
     localStorage.removeItem('jwt')
     localStorage.removeItem('tokenRefreshInProgress')
 
@@ -251,7 +260,11 @@ export default function App() {
       /* ignore */
     }
     try {
-      const rtExists = (await cookieStore.get('_rtexists'))?.value
+      const refreshToken = await SecureStorage.getRefreshToken().catch(
+        console.error,
+      )
+      const rtExists =
+        !!refreshToken || !!(await cookieStore?.get('_rtexists'))?.value
       if (!rtExists) {
         debugLog(
           `No refresh token available for logout attempt, _rtexists: '${rtExists}'`,
@@ -269,12 +282,16 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ clientId: fingerprint.clientId }),
+        body: JSON.stringify({
+          clientId: fingerprint.clientId,
+          ...(refreshToken ? { Cookie: `_rt=${refreshToken}` } : {}),
+        }),
       }).catch(console.error)
     } catch (error) {
       console.error('Error during logout:', error)
     } finally {
       // Clear all tokens and authentication state
+      await SecureStorage.clearAll()
       localStorage.removeItem('jwt')
       setAuthenticated(false)
 
@@ -516,6 +533,9 @@ export default function App() {
     }
 
     try {
+      if (!window.isSecureContext) {
+        await SecureStorage.setRefreshToken(refreshToken)
+      }
       localStorage.setItem('jwt', token)
       setAuthenticated(true)
     } catch (error) {

@@ -119,9 +119,10 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
     tokenRefreshPromise = globalTryRefreshToken()
 
     try {
-      const tokenRefreshSuccess = await tokenRefreshPromise.catch(
-        () => (tokenRefreshPromise = null),
-      )
+      const tokenRefreshSuccess = await tokenRefreshPromise.catch((error) => {
+        console.error('Token refresh error: ' + error)
+        return false
+      })
       if (tokenRefreshSuccess) {
         console.log('Token refresh successful, retrying request...')
         // Retry the original request with the new token
@@ -139,7 +140,9 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
 
         return retryResponse
       } else {
-        console.log('Token refresh failed, logging out...')
+        console.log(
+          `Token refresh failed, logging out... (${await tokenRefreshPromise})`,
+        )
         await globalLogout()
         throw new Error('Token refresh failed - logged out')
       }
