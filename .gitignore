@@ -138,7 +138,6 @@ test_*.png
 *.debug.png
 
 # Recordings and media files
-recordings/
 hls_*/
 
 # Thumbnails

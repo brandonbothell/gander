@@ -5,8 +5,8 @@ import Hls from 'hls.js'
 import { useViewportSize } from '@mantine/hooks'
 import { LoadingOverlay } from '@mantine/core'
 import { Video } from '@gfazioli/mantine-video'
-import { API_BASE, fetchWithRetry, authFetch } from '../main'
-import { type Stream } from '../../../source/types/shared'
+import { API_BASE, fetchWithRetry, authFetch } from '../../main'
+import { type Stream } from 'c:/Users/shado/Documents/_GitRepositories/gander/source/types/shared'
 
 export default function StreamVideo(props: {
   stream: Stream

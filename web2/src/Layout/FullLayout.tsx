@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import { useDisclosure, useLocalStorage, useViewportSize } from '@mantine/hooks'
 import { AppShell, Burger, Group, Text } from '@mantine/core'
 import { authFetch } from '../main'
-import StreamsGrid from '../Component/StreamsGrid'
-import { SessionsLogoutButton } from '../Component/SessionsLogoutButton'
-import RecordingsPages from '../Component/RecordingsPages'
+import StreamsGrid from '../Component/Streams/StreamsGrid'
+import { SessionsLogoutButton } from '../Component/Sessions/SessionsLogoutButton'
+import RecordingsPages from '../Component/Recordings/RecordingsPages'
 import { type Stream } from '../../../source/types/shared'
-// import StreamVideoLayout from './StreamVideoLayout'
 
 export default function FullLayout(props: {
   logout: (skipBroadcast?: boolean) => Promise<void>
@@ -87,7 +86,6 @@ export default function FullLayout(props: {
           Aside is hidden on on md breakpoint and cannot be opened when it is
           collapsed
         </Text>
-        {/* <LoadingOverlay visible={streams instanceof Promise} />*/}
       </AppShell.Main>
       <AppShell.Aside p="md">Aside</AppShell.Aside>
       <AppShell.Footer p="md">

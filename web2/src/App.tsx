@@ -1,4 +1,5 @@
 import '@mantine/core/styles.css'
+import '@mantine/lightbox/styles.css'
 import '@gfazioli/mantine-video/styles.css'
 import { useState, useEffect } from 'react'
 import { useLocalStorage } from '@mantine/hooks'

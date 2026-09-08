@@ -10,9 +10,9 @@ import {
   Title,
   useCombobox,
 } from '@mantine/core'
-import { Recording } from '../types'
-import { API_BASE, authFetch } from '../main'
-import { type Stream } from '../../../source/types/shared'
+import { Recording } from '../../types'
+import { API_BASE, authFetch } from '../../main'
+import { type Stream } from 'c:/Users/shado/Documents/_GitRepositories/gander/source/types/shared'
 import RecordingsGrid from './RecordingsGrid'
 
 export default function RecordingsPages(props: { streams: Stream[] }) {

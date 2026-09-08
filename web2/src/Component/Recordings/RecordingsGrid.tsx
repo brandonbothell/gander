@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { useMap } from '@mantine/hooks'
 import { Paper, SimpleGrid, Text, Image, LoadingOverlay } from '@mantine/core'
-import { Recording } from '../types'
-import { API_BASE, authFetch } from '../main'
+import { Recording } from '../../types'
+import { API_BASE, authFetch } from '../../main'
 
 export default function RecordingsGrid(props: {
   recordings: Recording[]
