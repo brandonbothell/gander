@@ -1,0 +1,12 @@
+.recordingDurationBadge {
+  position: absolute;
+  bottom: 10;
+  right: 10;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 0.8em;
+  font-weight: 700;
+  padding: 0.25em 0.55em;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  z-index: 5;
+}

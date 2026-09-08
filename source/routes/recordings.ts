@@ -171,6 +171,7 @@ export default function initializeRecordingRoutes(
           filename: true,
           motionTimestamps: true,
           duration: true,
+          nickname: true,
         },
         skip: (pageNum - 1) * PAGE_SIZE,
         take: PAGE_SIZE,

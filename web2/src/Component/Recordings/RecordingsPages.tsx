@@ -84,12 +84,7 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
 
         const page = (await res.json()) as {
           total: number
-          recordings: {
-            streamId: string
-            filename: string
-            motionTimestamps: string
-            duration: number
-          }[]
+          recordings: (Recording & { motionTimestamps: string })[]
           deletedRecordings: string[]
         }
 
@@ -102,10 +97,8 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
         }
 
         const newRecordings: Recording[] = page.recordings.map((rec) => ({
-          filename: rec.filename,
-          motionTimestamps: JSON.parse(rec.motionTimestamps),
-          streamId: rec.streamId,
-          duration: rec.duration,
+          ...rec,
+          motionTimestamps: JSON.parse(rec.motionTimestamps) as number[],
         }))
 
         totalRecordings.set(activeStream.id, page.total)
