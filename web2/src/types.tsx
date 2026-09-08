@@ -5,3 +5,13 @@ export type Recording = {
   duration: number
   motionTimestamps: number[]
 }
+
+export interface Stream {
+  id: string
+  nickname: string
+  ffmpegInput: string
+  rtspUser?: string
+  rtspPass?: string
+  createdAt: string
+  updatedAt?: string
+}

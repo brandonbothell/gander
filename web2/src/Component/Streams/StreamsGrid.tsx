@@ -6,7 +6,7 @@ import {
   useViewportSize,
 } from '@mantine/hooks'
 import { type CSSProperties, Group, Splitter } from '@mantine/core'
-import { type Stream } from 'c:/Users/shado/Documents/_GitRepositories/gander/source/types/shared'
+import { type Stream } from '../../types'
 import StreamVideo from './StreamVideo'
 
 type StoredSplitterLayout = {
