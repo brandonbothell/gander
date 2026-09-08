@@ -1,3 +1,4 @@
+import './styles.css'
 import '@mantine/core/styles.css'
 import '@mantine/lightbox/styles.css'
 import '@gfazioli/mantine-video/styles.css'

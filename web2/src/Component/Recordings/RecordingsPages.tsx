@@ -201,6 +201,20 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
         </Box>
       )}
       {activeStream && getItems()}
+      {activeStream && (
+        <Box pos="relative">
+          <Pagination
+            total={
+              totalRecordings.has(activeStream.id)
+                ? Math.ceil(totalRecordings.get(activeStream.id)! / 20)
+                : 0
+            }
+            value={activePage}
+            onChange={setPage}
+            mt="sm"
+          />
+        </Box>
+      )}
     </>
   )
 }

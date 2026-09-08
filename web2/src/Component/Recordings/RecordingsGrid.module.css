@@ -1,3 +1,12 @@
+.thumbnailFrame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  margin-bottom: var(--mantine-spacing-sm);
+  overflow: hidden;
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-dark-6);
+}
+
 .recordingDurationBadge {
   position: absolute;
   bottom: 10;

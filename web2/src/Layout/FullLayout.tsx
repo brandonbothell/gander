@@ -110,8 +110,9 @@ export default function FullLayout(props: {
           <NavLink
             href="#"
             label="Layouts"
-            style={{ paddingLeft: 0 }}
-            onClick={() => {
+            style={{ paddingLeft: 5 }}
+            onClick={(e) => {
+              e.preventDefault()
               toggleLayouts()
             }}
             leftSection={<FiLayout size={16} />}
@@ -132,8 +133,8 @@ export default function FullLayout(props: {
                 <NavLink
                   href="#"
                   key={id}
-                  onClick={(event) => {
-                    event.preventDefault()
+                  onClick={(e) => {
+                    e.preventDefault()
                     setActiveLayout(id)
                     toggleMenu()
                   }}
@@ -208,7 +209,7 @@ export default function FullLayout(props: {
           setOnLayoutDeleted={setOnLayoutDeleted}
         />
         <RecordingsPages streams={streams} />
-        <Text mt="sm">
+        <Text mt="xl">
           AppShell example with all elements: Navbar, Header, Aside, Footer.
         </Text>
         <Text>All elements except AppShell.Main have fixed position.</Text>

@@ -63,11 +63,13 @@ export default function RecordingsGrid(props: {
       />
       {props.recordings?.map((recording, index) => (
         <Paper mt="sm" shadow="xs" withBorder p="xl" key={index}>
-          {signedUrlsMap.has(`${recording.streamId}-${recording.filename}`) && (
-            <div style={{ position: 'relative' }}>
+          <div className={classes.thumbnailFrame}>
+            {signedUrlsMap.has(
+              `${recording.streamId}-${recording.filename}`,
+            ) && (
               <Image
-                mb="sm"
                 radius="md"
+                h="100%"
                 src={
                   signedUrlsMap.get(
                     `${recording.streamId}-${recording.filename}`,
@@ -80,24 +82,24 @@ export default function RecordingsGrid(props: {
                   )
                 }}
               />
-              <span
-                className={classes.recordingDurationBadge}
-                style={{
-                  display: loadedThumbnailMap.has(
-                    `${recording.streamId}-${recording.filename}`,
-                  )
-                    ? loadedThumbnailMap.get(
-                        `${recording.streamId}-${recording.filename}`,
-                      )
-                      ? 'block'
-                      : 'none'
-                    : 'none',
-                }}
-              >
-                {formatTime(recording.duration)}
-              </span>
-            </div>
-          )}
+            )}
+            <span
+              className={classes.recordingDurationBadge}
+              style={{
+                display: loadedThumbnailMap.has(
+                  `${recording.streamId}-${recording.filename}`,
+                )
+                  ? loadedThumbnailMap.get(
+                      `${recording.streamId}-${recording.filename}`,
+                    )
+                    ? 'block'
+                    : 'none'
+                  : 'none',
+              }}
+            >
+              {formatTime(recording.duration)}
+            </span>
+          </div>
           <Text style={{ textAlign: 'center' }}>
             <Text span td="underline">
               {recording.nickname}
