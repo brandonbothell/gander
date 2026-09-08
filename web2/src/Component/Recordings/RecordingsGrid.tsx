@@ -61,8 +61,8 @@ export default function RecordingsGrid(props: {
         zIndex={1000}
         overlayProps={{ radius: 'sm', blur: 2 }}
       />
-      {props.recordings?.map((recording) => (
-        <Paper mt="sm" shadow="xs" withBorder p="xl">
+      {props.recordings?.map((recording, index) => (
+        <Paper mt="sm" shadow="xs" withBorder p="xl" key={index}>
           {signedUrlsMap.has(`${recording.streamId}-${recording.filename}`) && (
             <div style={{ position: 'relative' }}>
               <Image

@@ -9,24 +9,49 @@ import { type CSSProperties, Group, Splitter } from '@mantine/core'
 import { type Stream } from 'c:/Users/shado/Documents/_GitRepositories/gander/source/types/shared'
 import StreamVideo from './StreamVideo'
 
-export default function StreamsGrid(props: { streams: Stream[] }) {
-  if (!props.streams || props.streams.length === 0) {
-    return <div>No streams available</div>
-  }
+type StoredSplitterLayout = {
+  sizes: SplitterPaneSize[]
+  collapsed: boolean[]
+}
 
+export default function StreamsGrid(props: {
+  streams: Stream[]
+  layout: number
+  setOnLayoutDeleted: React.Dispatch<
+    React.SetStateAction<(layoutId: number) => void>
+  >
+}) {
   const splitterRef = useRef<UseSplitterReturnValue>(null)
   const splitter2Ref = useRef<UseSplitterReturnValue>(null)
   const splitter3Ref = useRef<UseSplitterReturnValue>(null)
   const splitters = [splitterRef, splitter2Ref, splitter3Ref]
 
-  const [storedSplitterState, setStoredSplitterState] = useLocalStorage<
-    {
-      sizes: SplitterPaneSize[]
-      collapsed: boolean[]
-    }[]
+  // eslint-disable-next-line func-call-spacing
+  const [storedSplitterLayouts, setStoredSplitterLayouts] = useLocalStorage<
+    (StoredSplitterLayout[] | null)[]
   >({
     key: 'splitterState',
+    defaultValue: [
+      [
+        { sizes: [50, 50], collapsed: [false, false] },
+        { sizes: [50, 50], collapsed: [false, false] },
+        { sizes: [50, 50], collapsed: [false, false] },
+      ],
+    ],
   })
+
+  const onLayoutDeleted = useCallback(
+    (layoutId: number) => {
+      setStoredSplitterLayouts((prev) => {
+        if (!prev || !prev[layoutId]) return prev
+
+        const next = [...prev]
+        next[layoutId] = null
+        return next
+      })
+    },
+    [setStoredSplitterLayouts],
+  )
 
   const getAspectRatio = useCallback(() => {
     if (splitterRef.current?.collapsed.includes(true)) {
@@ -50,29 +75,45 @@ export default function StreamsGrid(props: { streams: Stream[] }) {
   })
 
   useEffect(() => {
-    if (localStorage.getItem('splitterState')) return
-    if (width !== 0 && width < 768) {
-      setStoredSplitterState([
-        { sizes: [100, 0], collapsed: [false, true] },
-        { sizes: [50, 50], collapsed: [false, false] },
-        { sizes: [50, 50], collapsed: [false, false] },
-      ])
-    }
-  }, [setStoredSplitterState, width])
+    props.setOnLayoutDeleted(onLayoutDeleted)
+  }, [props.setOnLayoutDeleted])
 
   useEffect(() => {
-    if (!storedSplitterState) {
+    if (props.streams.length === 0) return
+
+    if (!storedSplitterLayouts || !storedSplitterLayouts[props.layout]) {
+      setStoredSplitterLayouts((prev) => {
+        const next = prev ? [...prev] : []
+        while (next.length <= props.layout) next.push(null)
+        next[props.layout] ??= [
+          { sizes: [50, 50], collapsed: [false, false] },
+          { sizes: [50, 50], collapsed: [false, false] },
+          { sizes: [50, 50], collapsed: [false, false] },
+        ]
+        return next
+      })
       return
     }
 
+    const layoutState = storedSplitterLayouts[props.layout]
+
     splitters.forEach((splitter, index) => {
-      if (!splitter.current || !storedSplitterState[index]) return
-      splitter.current!.setSizes(storedSplitterState[index].sizes)
-      splitter.current!.collapsed = storedSplitterState[index].collapsed
+      if (!splitter.current || !layoutState?.[index]) {
+        return
+      }
+      splitter.current.setSizes(layoutState[index].sizes)
+      splitter.current.collapsed = layoutState[index].collapsed
     })
-  }, [storedSplitterState])
+  }, [
+    setStoredSplitterLayouts,
+    storedSplitterLayouts,
+    props.layout,
+    props.streams.length,
+  ])
 
   useEffect(() => {
+    if (props.streams.length === 0) return
+
     let previousState: string[] = ['', '', '', '']
 
     const saveSplitterState = () => {
@@ -92,19 +133,21 @@ export default function StreamsGrid(props: { streams: Stream[] }) {
 
         if (serializedState !== previousState[index]) {
           previousState[index] = serializedState
-          setStoredSplitterState((prev) => {
+          setStoredSplitterLayouts((prev) => {
             const newState = prev ? [...prev] : []
-            newState[index] = state
+            if (!newState[props.layout]) newState[props.layout] = []
+            newState[props.layout]![index] = state
+
             return newState
           })
         }
       })
     }
 
-    const interval = window.setInterval(saveSplitterState, 2000)
+    const interval = window.setInterval(saveSplitterState, 500)
 
     return () => window.clearInterval(interval)
-  }, [setStoredSplitterState])
+  }, [props.layout, props.streams.length])
 
   useEffect(() => {
     let cancelled = false
@@ -124,6 +167,10 @@ export default function StreamsGrid(props: { streams: Stream[] }) {
       cancelled = true
     }
   }, [])
+
+  if (!props.streams || props.streams.length === 0) {
+    return <div>No streams available</div>
+  }
 
   return (
     <Group justify="center" mb="md">
