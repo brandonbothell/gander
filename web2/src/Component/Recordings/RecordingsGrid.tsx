@@ -98,7 +98,7 @@ export default function RecordingsGrid(props: {
                 />
                 <div
                   className={
-                    inlineFullscreen
+                    inlineFullscreen && width < 500
                       ? classes.inlineFullscreenFrame
                       : classes.videoFrame
                   }
@@ -112,7 +112,7 @@ export default function RecordingsGrid(props: {
                     h={'100%'}
                     style={{ display: loading ? 'none' : 'block' }}
                     className={
-                      inlineFullscreen
+                      inlineFullscreen && width < 500
                         ? classes.inlineFullscreenVideo
                         : undefined
                     }
@@ -121,7 +121,7 @@ export default function RecordingsGrid(props: {
                     <Video.Controls>
                       <Video.PlayButton />
                       {width >= 500 ||
-                        (inlineFullscreen && (
+                        (inlineFullscreen && width < 500 && (
                           <>
                             <Video.SkipButton seconds={-10} />
                             <Video.SkipButton seconds={10} />
@@ -136,22 +136,26 @@ export default function RecordingsGrid(props: {
                       {canFullscreen ? (
                         <Video.FullscreenButton />
                       ) : (
-                        <ActionIcon
-                          variant="subtle"
-                          color="white"
-                          aria-label={
-                            inlineFullscreen
-                              ? 'Exit fullscreen'
-                              : 'Enter fullscreen'
-                          }
-                          onClick={() => setInlineFullscreen((value) => !value)}
-                        >
-                          {inlineFullscreen ? (
-                            <IconArrowsMinimize size={20} />
-                          ) : (
-                            <IconArrowsMaximize size={20} />
-                          )}
-                        </ActionIcon>
+                        width < 500 && (
+                          <ActionIcon
+                            variant="subtle"
+                            color="white"
+                            aria-label={
+                              inlineFullscreen
+                                ? 'Exit fullscreen'
+                                : 'Enter fullscreen'
+                            }
+                            onClick={() =>
+                              setInlineFullscreen((value) => !value)
+                            }
+                          >
+                            {inlineFullscreen ? (
+                              <IconArrowsMinimize size={20} />
+                            ) : (
+                              <IconArrowsMaximize size={20} />
+                            )}
+                          </ActionIcon>
+                        )
                       )}
                     </Video.Controls>
                   </Video>
@@ -320,7 +324,7 @@ export default function RecordingsGrid(props: {
         onIndexChange={(index) => setRecording(props.recordings[index])}
         withThumbnails
         withDownload
-        closeOnSwipeDown={!inlineFullscreen}
+        closeOnSwipeDown={!(inlineFullscreen && width < 500)}
         withFullscreen={canFullscreen}
         closeOnClickOutside
         emblaOptions={{ watchDrag: false }}

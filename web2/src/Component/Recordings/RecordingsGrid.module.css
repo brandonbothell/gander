@@ -32,8 +32,8 @@
   left: 0;
   inset: 0;
   z-index: 1003;
-  width: 100vw;
   height: 80vh;
+  aspect-ratio: '9 / 16';
   background: var(--mantine-color-black);
   isolation: isolate;
   overflow: hidden;
@@ -64,7 +64,7 @@
     top: 50%;
     left: 50%;
     width: 80vh;
-    height: 100vw !important;
+    height: 80vw !important;
     transform: translate(-50%, -50%) rotate(90deg);
   }
 }
