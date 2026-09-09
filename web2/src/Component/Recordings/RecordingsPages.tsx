@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useMap } from '@mantine/hooks'
+import { useLocalStorage, useMap } from '@mantine/hooks'
 import {
   Box,
   Code,
@@ -12,12 +12,18 @@ import {
 } from '@mantine/core'
 import { Recording, type Stream } from '../../types'
 import { API_BASE, authFetch } from '../../main'
-import RecordingsGrid from './RecordingsGrid'
+import RecordingsGrid, { SignedThumbnailUrl } from './RecordingsGrid'
 
 export default function RecordingsPages(props: { streams: Stream[] }) {
   const [loading, setLoading] = useState(false)
 
   const totalRecordings = useMap<string, number>()
+  const signedUrlsCache = useMap<
+    string,
+    // eslint-disable-next-line func-call-spacing
+    Map<number, (SignedThumbnailUrl | null)[]>
+  >()
+  const signedUrlRequests = useMap<string, Promise<void>>()
 
   const recordings = useMap<
     // eslint-disable-next-line func-call-spacing
@@ -27,6 +33,9 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
   const [activePage, setPage] = useState(1)
   const [lastFailedPage, setLastFailedPage] = useState(0)
   const [activeStream, setStream] = useState<Stream | null>(null)
+  const [selectedStream, saveSelectedStream] = useLocalStorage({
+    key: 'activeStream',
+  })
 
   const streamCombobox = useCombobox({
     onDropdownClose: () => streamCombobox.resetSelectedOption(),
@@ -62,13 +71,22 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
         currentPage={recordingsToRender}
         pageLoading={loading}
         activeStream={activeStream}
+        signedUrlsCache={signedUrlsCache}
+        signedUrlRequests={signedUrlRequests}
       />
     )
   }, [activePage, activeStream, recordings, loading])
 
   useEffect(() => {
     if (lastFailedPage !== 0 && activePage === lastFailedPage) return
-    if (!activeStream && props.streams.length) setStream(props.streams[0])
+    if (!activeStream && props.streams.length) {
+      let stream = selectedStream
+        ? (props.streams.find((s) => s.id === selectedStream) ??
+          props.streams[0])
+        : props.streams[0]
+      setStream(stream)
+      saveSelectedStream(stream.id)
+    }
     ;(async () => {
       console.log(`Active stream: ${activeStream?.id}`)
       if (activeStream) {
@@ -165,6 +183,7 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
             const stream = props.streams[Number(val)]
             setPage(1)
             setStream(stream)
+            saveSelectedStream(stream.id)
             streamCombobox.closeDropdown()
           }}
         >

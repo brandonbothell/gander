@@ -1,5 +1,4 @@
 import ReactDOM from 'react-dom/client'
-import React from 'react'
 import App from './App'
 
 function isIOS() {
@@ -55,7 +54,14 @@ let isRefreshInProgress = false
 export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   const token = getTokenOrApiKey()
 
-  if (!token && globalTryRefreshToken && globalLogout && !isRefreshInProgress) {
+  if (
+    !token &&
+    (!init.headers ||
+      !(init.headers as { [key: string]: string })['Authorization']) &&
+    globalTryRefreshToken &&
+    globalLogout &&
+    !isRefreshInProgress
+  ) {
     isRefreshInProgress = true
     try {
       const refreshed = await globalTryRefreshToken()
@@ -74,13 +80,14 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   const makeRequest = (authToken?: { token: string; type: 'jwt' | 'api' }) => {
     return fetch(input, {
       ...init,
+      // Normalize Authorization headers
       headers: {
-        ...(init.headers ?? {}),
         Authorization: authToken
           ? `${authToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${authToken.token}`
           : finalToken
             ? `${finalToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${finalToken.token}`
             : '',
+        ...(init.headers ?? {}),
       },
     })
   }
@@ -203,7 +210,5 @@ export async function fetchWithRetry<T extends Response>(
 }
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <App />,
 )

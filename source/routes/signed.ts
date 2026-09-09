@@ -349,8 +349,8 @@ export default function initializeSignedRoutes(
 
   const streamSignedUrlLimiter = rateLimit({
     validate: { ip: false },
-    windowMs: 30 * 1000, // 30 seconds
-    max: 8,
+    windowMs: 2 * 1000, // 2 seconds
+    max: 10,
     standardHeaders: true,
     legacyHeaders: false,
   })

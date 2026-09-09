@@ -19,13 +19,18 @@ import { type Stream } from '../../../source/types/shared'
 
 export default function FullLayout(props: {
   logout: (skipBroadcast?: boolean) => Promise<void>
+  lastFailedJwt: string | undefined
+  setFailedJwt: React.Dispatch<React.SetStateAction<string | undefined>>
 }) {
   const [openedMenu, { toggle: toggleMenu }] = useDisclosure()
   const [openedLayouts, { toggle: toggleLayouts }] = useDisclosure(true)
-  const jwt = useLocalStorage({
+  const [jwt] = useLocalStorage({
     key: 'jwt',
+    serialize: (v) => v,
+    deserialize: (v) => v ?? '',
   })
-  const [streams, setStreams] = useState<Stream[]>([])
+  const [streams, setStreams] = useState<Stream[]>()
+  const [loadingStreams, setLoadingStreams] = useState(false)
   const [layouts, setLayouts] = useLocalStorage<{ id: number }[]>({
     key: 'streamLayouts',
     defaultValue: [{ id: 0 }],
@@ -41,31 +46,32 @@ export default function FullLayout(props: {
   >(() => {
     /* empty */
   })
-
   const { width } = useViewportSize()
   const { colors } = useMantineTheme()
+
   const hasMouse = window.matchMedia('(pointer:fine)').matches
 
   useEffect(() => {
-    let cancelled = false
+    if (jwt === props.lastFailedJwt) return
 
-    authFetch('/api/streams', {
-      headers: { Authorization: `Bearer ${jwt}` },
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Failed to fetch streams: ${res.statusText}`)
-        }
-        return res.json() as Promise<Stream[]>
+    if (!streams && !loadingStreams) {
+      setLoadingStreams(true)
+      authFetch('/api/streams', {
+        headers: { Authorization: `Bearer ${jwt}` },
       })
-      .then((nextStreams) => {
-        if (!cancelled) setStreams(nextStreams)
-      })
-
-    return () => {
-      cancelled = true
+        .then((res) => {
+          if (!res.ok) {
+            setLoadingStreams(false)
+            throw new Error(`Failed to fetch streams: ${res.statusText}`)
+          }
+          return res.json() as Promise<Stream[]>
+        })
+        .then((nextStreams) => {
+          setStreams(nextStreams)
+          setLoadingStreams(false)
+        })
     }
-  }, [])
+  }, [streams, jwt, loadingStreams])
 
   return (
     <AppShell
@@ -205,12 +211,12 @@ export default function FullLayout(props: {
       </AppShell.Navbar>
       <AppShell.Main style={{ display: 'grid' }}>
         <StreamsGrid
-          streams={streams}
+          streams={streams ?? []}
           layout={activeLayout}
           setOnLayoutDeleted={setOnLayoutDeleted}
         />
         <Space h="md" />
-        <RecordingsPages streams={streams} />
+        <RecordingsPages streams={streams ?? []} />
         <Text mt="xl">
           AppShell example with all elements: Navbar, Header, Aside, Footer.
         </Text>

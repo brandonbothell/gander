@@ -67,7 +67,7 @@ export default function App() {
   const [showSessionMonitor, setShowSessionMonitor] = useState(false)
   const [hasCheckedSessions, setHasCheckedSessions] = useState(false)
   const [sessions, setSessions] = useState<(Session & TrustedDevice)[]>([])
-
+  const [lastFailedJwt, setFailedJwt] = useState<string>()
   // Helper: Try to refresh token
   const tryRefreshToken = async (): Promise<boolean> => {
     debugLog('=== STARTING TOKEN REFRESH ===')
@@ -372,9 +372,9 @@ export default function App() {
         debugLog('No JWT found, attempting token refresh')
         await tryRefreshToken()
       }
-    }
 
-    debugLog('=== INITIAL AUTH CHECK COMPLETE ===')
+      debugLog('=== INITIAL AUTH CHECK COMPLETE ===')
+    }
 
     initAuth().catch((error) => {
       debugLog(`Critical error in initAuth: ${error}`, 'error')
@@ -504,7 +504,7 @@ export default function App() {
         navigationEntries[0].type === 'reload'
       ) {
         // Only on refresh, not on navigation
-        localStorage.removeItem('jwt')
+        // localStorage.removeItem('jwt')
       }
     }
 
@@ -565,7 +565,11 @@ export default function App() {
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
       {authenticated ? (
-        <FullLayout logout={logout} />
+        <FullLayout
+          lastFailedJwt={lastFailedJwt}
+          setFailedJwt={setFailedJwt}
+          logout={logout}
+        />
       ) : (
         <LoadingOverlay
           visible={true}
