@@ -38,7 +38,6 @@ export default function RecordingsGrid(props: {
   signedUrlsCache: SignedUrlsCache
   signedUrlRequests: Map<string, Promise<void>>
 }) {
-  const [, setSignedUrlsVersion] = useState(0)
   const signedUrlsMap = props.signedUrlsCache
   const loadedThumbnailMap = useMap<string, boolean>()
 
@@ -314,7 +313,6 @@ export default function RecordingsGrid(props: {
             }
           }),
         )
-        setSignedUrlsVersion((version) => version + 1)
       })()
 
       props.signedUrlRequests.set(requestKey, request)
