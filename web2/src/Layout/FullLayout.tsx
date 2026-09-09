@@ -7,6 +7,7 @@ import {
   Group,
   NavLink,
   ScrollArea,
+  Space,
   Text,
   useMantineTheme,
 } from '@mantine/core'
@@ -208,6 +209,7 @@ export default function FullLayout(props: {
           layout={activeLayout}
           setOnLayoutDeleted={setOnLayoutDeleted}
         />
+        <Space h="md" />
         <RecordingsPages streams={streams} />
         <Text mt="xl">
           AppShell example with all elements: Navbar, Header, Aside, Footer.

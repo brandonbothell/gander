@@ -58,12 +58,13 @@ export default function StreamsGrid(props: {
       const uncollapsedIndex = splitterRef.current.collapsed.findIndex(
         (c) => c === false,
       )
+      if (uncollapsedIndex === -1) return '16 / 9'
       if (splitters[uncollapsedIndex + 1].current?.collapsed.includes(true)) {
         return '16 / 9'
       } else return '16 / 18'
     }
     return '16 / 9'
-  }, [splitterRef, splitter2Ref, splitter3Ref])
+  }, [splitterRef.current, splitter2Ref.current, splitter3Ref.current])
 
   const { width } = useViewportSize()
   const [splitterStyles, setSplitterStyles] = useLocalStorage<CSSProperties>({
@@ -179,6 +180,20 @@ export default function StreamsGrid(props: {
         w={width < 768 ? '95vw' : undefined}
         h={width < 768 ? undefined : '70vh'}
         splitterRef={splitterRef}
+        styles={{
+          thumb: {
+            transform:
+              width >= 768 && splitterRef.current?.collapsed[1]
+                ? 'translateX(0px)'
+                : undefined,
+          },
+          handle: {
+            transform:
+              width >= 768 && splitterRef.current?.collapsed[1]
+                ? 'translateX(-59px)'
+                : undefined,
+          },
+        }}
       >
         <Splitter.Pane
           defaultSize={50}
@@ -186,7 +201,27 @@ export default function StreamsGrid(props: {
           display={'initial'}
           collapsible
         >
-          <Splitter splitterRef={splitter2Ref} orientation="vertical" h="100%">
+          <Splitter
+            splitterRef={splitter2Ref}
+            orientation="vertical"
+            h="100%"
+            styles={{
+              thumb: {
+                bottom: (() => {
+                  const splitter2 = splitter2Ref.current
+                  if (!splitter2) return
+                  if (splitter2.collapsed[0]) return -19
+                  if (splitter2.collapsed[1]) return 10
+                })(),
+              },
+            }}
+            style={{
+              aspectRatio:
+                splitterRef.current?.collapsed[1] === true
+                  ? getAspectRatio()
+                  : undefined,
+            }}
+          >
             <Splitter.Pane defaultSize={50} min={10} bg="blue" collapsible>
               <StreamVideo
                 stream={props.streams[0]}
@@ -207,7 +242,27 @@ export default function StreamsGrid(props: {
           display={'initial'}
           collapsible
         >
-          <Splitter splitterRef={splitter3Ref} orientation="vertical" h="100%">
+          <Splitter
+            splitterRef={splitter3Ref}
+            orientation="vertical"
+            h="100%"
+            styles={{
+              thumb: {
+                bottom: (() => {
+                  const splitter3 = splitter3Ref.current
+                  if (!splitter3) return
+                  if (splitter3.collapsed[0]) return -19
+                  if (splitter3.collapsed[1]) return 10
+                })(),
+              },
+            }}
+            style={{
+              aspectRatio:
+                splitterRef.current?.collapsed[0] === true
+                  ? getAspectRatio()
+                  : undefined,
+            }}
+          >
             <Splitter.Pane defaultSize={50} min={10} bg="teal" collapsible>
               Editor
             </Splitter.Pane>

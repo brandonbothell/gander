@@ -1,6 +1,6 @@
 .thumbnailFrame {
   position: relative;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: '16 / 9';
   margin-bottom: var(--mantine-spacing-sm);
   overflow: hidden;
   border-radius: var(--mantine-radius-md);
