@@ -286,13 +286,13 @@ export default function RecordingsGrid(props: {
 
       if (Number.isFinite(expires)) {
         refreshTimer = window.setTimeout(
-          () => void loadRecording(),
+          () => loadRecording(),
           Math.max(0, expires * 1000 - Date.now() - 5_000),
         )
       }
     }
 
-    void loadRecording()
+    loadRecording()
 
     return () => {
       cancelled = true

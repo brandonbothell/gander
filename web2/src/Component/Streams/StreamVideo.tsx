@@ -52,7 +52,7 @@ export default function StreamVideo(props: {
   useEffect(() => {
     streamRequestId.current++
     setStreamUrl(undefined)
-    void fetchStreamUrl()
+    fetchStreamUrl()
   }, [props.stream.id])
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function StreamVideo(props: {
     if (!Number.isFinite(expires)) return
 
     const refreshTimer = window.setTimeout(
-      () => void fetchStreamUrl(streamUrl, true),
+      () => fetchStreamUrl(streamUrl, true),
       Math.max(0, expires * 1000 - Date.now() - 5_000),
     )
 
@@ -110,7 +110,7 @@ export default function StreamVideo(props: {
           data.response.code === 403
         ) {
           console.warn('HLS 403 Forbidden')
-          void fetchStreamUrl(streamUrl, true)
+          fetchStreamUrl(streamUrl, true)
           return
         }
       })
