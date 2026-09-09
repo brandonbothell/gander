@@ -61,6 +61,7 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
         recordingsCount={totalRecordings}
         currentPage={recordingsToRender}
         pageLoading={loading}
+        activeStream={activeStream}
       />
     )
   }, [activePage, activeStream, recordings, loading])

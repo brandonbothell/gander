@@ -13,7 +13,7 @@ import {
 } from '@mantine/core'
 import { useVideo, Video } from '@gfazioli/mantine-video'
 import CollapsedLightbox from '../Lightbox/CollapsedLightbox'
-import { Recording } from '../../types'
+import { Recording, Stream } from '../../types'
 import { API_BASE, authFetch, fetchWithRetry } from '../../main'
 import { onRecordingDeleted } from '../../event-listeners'
 import classes from './RecordingsGrid.module.css'
@@ -23,8 +23,13 @@ export default function RecordingsGrid(props: {
   recordings: Map<string, (Recording & { page: number; index: number })[][]>
   recordingsCount: Map<string, number>
   pageLoading: boolean
+  activeStream: Stream
 }) {
-  const signedUrlsMap = useMap<string, { url: string; expiresAt: number }>()
+  const signedUrlsMap = useMap<
+    // eslint-disable-next-line func-call-spacing
+    number,
+    ({ url: string; expiresAt: number } | null)[]
+  >() // Mapped by page
   const loadedThumbnailMap = useMap<string, boolean>()
 
   const { width } = useViewportSize()
@@ -185,9 +190,8 @@ export default function RecordingsGrid(props: {
             bg="blue.6"
             style={{ borderRadius: 4 }}
           >
-            {signedUrlsMap.has(
-              `${recording.streamId}-${recording.filename}`,
-            ) ? (
+            {signedUrlsMap.has(recording.page) &&
+            recording.index < signedUrlsMap.get(recording.page)!.length ? (
               <>
                 <span
                   className={classes.recordingDurationBadge}
@@ -204,11 +208,7 @@ export default function RecordingsGrid(props: {
                 <Image
                   radius="md"
                   h="100%"
-                  src={
-                    signedUrlsMap.get(
-                      `${recording.streamId}-${recording.filename}`,
-                    )!.url
-                  }
+                  src={signedUrlsMap.get(recording.page)![recording.page]!.url}
                 />
               </>
             ) : (
@@ -227,40 +227,45 @@ export default function RecordingsGrid(props: {
   }, [activeRecording, lightboxOpen])
 
   useEffect(() => {
-    props.currentPage.forEach(async function getSignedUrl(recording) {
+    ;(async function getSignedUrls() {
+      if (props.currentPage.length === 0) return
+      const page = props.currentPage[0]?.page
+
       if (
-        !signedUrlsMap.has(`${recording.streamId}-${recording.filename}`) ||
-        signedUrlsMap.get(`${recording.streamId}-${recording.filename}`)!
-          .expiresAt -
-          10 <
-          Date.now() / 1000
+        !signedUrlsMap.has(page) ||
+        (signedUrlsMap.get(page)![0]?.expiresAt ?? 0) - 10 < Date.now() / 1000
       ) {
         const res = await authFetch(
-          `${API_BASE}/api/signed-url/${recording.streamId}?filename=${recording.filename.replace('.mp4', '.jpg')}&type=thumbnail`,
+          `${API_BASE}/api/signed-urls/${props.activeStream.id}?filenames=${props.currentPage.map((rec) => rec.filename.replace('.mp4', '.jpg')).join(',')}&type=thumbnail`,
         )
         if (!res.ok) {
-          setTimeout(() => getSignedUrl(recording), 1000) // Try again every second
+          setTimeout(() => getSignedUrls(), 1000) // Try again every second
           return console.error(
             'Failed to load recordings: ' + (await res.text()),
           )
         }
-        const signedUrl = (await res.json()) as {
+        const signedUrls = (await res.json()) as {
           filename: string
           url: string
           expiresAt: number
-        }
-        if (!signedUrl.url || !signedUrl.expiresAt || !signedUrl.filename) {
-          return console.error(`Invalid URL signing output: ${signedUrl}`)
-        }
+        }[]
 
-        signedUrlsMap.set(`${recording.streamId}-${recording.filename}`, {
-          url: signedUrl.url,
-          expiresAt: signedUrl.expiresAt,
-        })
+        signedUrlsMap.set(
+          page,
+          signedUrls.map((signedUrl) => {
+            if (!signedUrl.url || !signedUrl.expiresAt || !signedUrl.filename) {
+              console.error(`Invalid URL signing output: ${signedUrl}`)
+              return null
+            }
 
-        return signedUrl
+            return {
+              url: signedUrl.url,
+              expiresAt: signedUrl.expiresAt,
+            }
+          }),
+        )
       }
-    })
+    })()
   }, [props.currentPage, signedUrlsMap])
 
   useEffect(() => {
@@ -366,25 +371,20 @@ export default function RecordingsGrid(props: {
           }}
         >
           <div className={classes.thumbnailFrame}>
-            {signedUrlsMap.has(
-              `${recording.streamId}-${recording.filename}`,
-            ) && (
-              <Image
-                radius="md"
-                h="100%"
-                src={
-                  signedUrlsMap.get(
-                    `${recording.streamId}-${recording.filename}`,
-                  )!.url
-                }
-                onLoad={() => {
-                  loadedThumbnailMap.set(
-                    `${recording.streamId}-${recording.filename}`,
-                    true,
-                  )
-                }}
-              />
-            )}
+            {signedUrlsMap.has(recording.page) &&
+              recording.index < signedUrlsMap.get(recording.page)!.length && (
+                <Image
+                  radius="md"
+                  h="100%"
+                  src={signedUrlsMap.get(recording.page)![recording.index]!.url}
+                  onLoad={() => {
+                    loadedThumbnailMap.set(
+                      `${recording.streamId}-${recording.filename}`,
+                      true,
+                    )
+                  }}
+                />
+              )}
             <span
               className={classes.recordingDurationBadge}
               style={{
