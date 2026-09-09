@@ -855,6 +855,14 @@ const thumbnailLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const staticResourceLimiter = rateLimit({
+  validate: { ip: false },
+  windowMs: 60 * 1000, // 1 minute
+  max: 240,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // --- Static & API Routes ---
 app.use(express.static(path.join(__dirname, '..', 'web2', 'dist')))
 app.use(
@@ -863,15 +871,23 @@ app.use(
   jwtAuth,
   express.static(path.join(config.recordingsDirectory, 'thumbnails')),
 )
-app.get(/^\/(?!hls|api|recordings|signed|sounds).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web2', 'dist', 'index.html'))
-})
+app.get(
+  /^\/(?!hls|api|recordings|signed|sounds).*/,
+  staticResourceLimiter,
+  (_req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'web2', 'dist', 'index.html'))
+  },
+)
 
-app.get(/^\/recordings(\/[^/]+)(\/[^/]+)?$/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web2', 'dist', 'index.html'))
-})
+app.get(
+  /^\/recordings(\/[^/]+)(\/[^/]+)?$/,
+  staticResourceLimiter,
+  (_req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'web2', 'dist', 'index.html'))
+  },
+)
 
-app.get('/api/vapid-public-key', (req, res) => {
+app.get('/api/vapid-public-key', (_req, res) => {
   res.json({ publicKey: config.vapid.publicKey })
 })
 
