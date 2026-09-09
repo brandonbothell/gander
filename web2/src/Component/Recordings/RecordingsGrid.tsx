@@ -15,6 +15,7 @@ import { useVideo, Video } from '@gfazioli/mantine-video'
 import CollapsedLightbox from '../Lightbox/CollapsedLightbox'
 import { Recording } from '../../types'
 import { API_BASE, authFetch, fetchWithRetry } from '../../main'
+import { onRecordingDeleted } from '../../event-listeners'
 import classes from './RecordingsGrid.module.css'
 
 export default function RecordingsGrid(props: {
@@ -333,82 +334,15 @@ export default function RecordingsGrid(props: {
         onIndexChange={(index) => setRecording(props.currentPage[index])}
         withThumbnails
         withDownload
-        onRecordingDeleted={() => {
-          setTimeout(async () => {
-            setLoading(true)
-            // Refresh the current page and delete cache of future pages
-            if (activeRecording) {
-              const streamRecordings = props.recordings.get(
-                activeRecording.streamId,
-              )!
-              const res = await authFetch(
-                `${API_BASE}/api/recordings/${activeRecording.streamId}/${activeRecording.page}`,
-              )
-              if (!res.ok) {
-                console.error(`Error loading recordings: ${await res.text()}`)
-                setLoading(false)
-                return
-              }
-              const page = (await res.json()) as {
-                total: number
-                recordings: (Recording & { motionTimestamps: string })[]
-                deletedRecordings: string[]
-              }
-              if (!page.total || !page.recordings?.length) {
-                console.error('Error loading recordings', page)
-                setLoading(false)
-                return
-              }
-              const newRecordings = page.recordings.map((rec, index) => ({
-                ...rec,
-                motionTimestamps: JSON.parse(rec.motionTimestamps) as number[],
-                page: activeRecording.page,
-                index,
-              }))
-              streamRecordings[activeRecording.page - 1] = newRecordings
-              for (
-                let i = activeRecording.page;
-                i < streamRecordings.length;
-                i++
-              ) {
-                streamRecordings[i] = []
-              }
-              props.recordings.set(activeRecording.streamId, streamRecordings)
-            }
-            const streamRecordings = activeRecording
-              ? props.recordings.get(activeRecording.streamId)
-              : null
-            if (
-              activeRecording &&
-              activeRecording.index <
-                streamRecordings![activeRecording.page - 1].length
-            ) {
-              setRecording(
-                streamRecordings![activeRecording.page - 1][
-                  activeRecording.index
-                ],
-              )
-            } else if (
-              activeRecording &&
-              activeRecording.index - 1 <
-                streamRecordings![activeRecording.page - 1].length
-            ) {
-              setRecording(
-                streamRecordings![activeRecording.page - 1][
-                  activeRecording.index - 1
-                ],
-              )
-            } else {
-              console.warn('Next recording not found', activeRecording)
-              console.log(
-                `Current page length: ${activeRecording ? streamRecordings![activeRecording.page - 1].length : 'No active recording!'}`,
-              )
-              setLightboxOpen(false)
-            }
-
-            setLoading(false)
-          }, 500) // Give time for the recordings to shift pages
-        }}
+        onRecordingDeleted={() =>
+          onRecordingDeleted(
+            activeRecording!,
+            props.recordings,
+            setLoading,
+            setRecording,
+            setLightboxOpen,
+          )
+        }
         recordingsCount={props.recordingsCount}
         recordings={props.recordings}
         activeRecording={activeRecording}
