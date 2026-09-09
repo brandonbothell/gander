@@ -375,19 +375,34 @@ export default function RecordingsGrid(props: {
               }
               props.recordings.set(activeRecording.streamId, streamRecordings)
             }
+            const streamRecordings = activeRecording
+              ? props.recordings.get(activeRecording.streamId)
+              : null
             if (
               activeRecording &&
-              activeRecording.index < props.currentPage.length
+              activeRecording.index <
+                streamRecordings![activeRecording.page - 1].length
             ) {
-              setRecording(props.currentPage[activeRecording.index])
+              setRecording(
+                streamRecordings![activeRecording.page - 1][
+                  activeRecording.index
+                ],
+              )
             } else if (
               activeRecording &&
-              activeRecording.index - 1 < props.currentPage.length
+              activeRecording.index - 1 <
+                streamRecordings![activeRecording.page - 1].length
             ) {
-              setRecording(props.currentPage[activeRecording.index - 1])
+              setRecording(
+                streamRecordings![activeRecording.page - 1][
+                  activeRecording.index - 1
+                ],
+              )
             } else {
               console.warn('Next recording not found', activeRecording)
-              console.log(`Current page length: ${props.currentPage.length}`)
+              console.log(
+                `Current page length: ${activeRecording ? streamRecordings![activeRecording.page - 1].length : 'No active recording!'}`,
+              )
               setLightboxOpen(false)
             }
 
