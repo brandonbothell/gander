@@ -186,6 +186,11 @@ export default function StreamsGrid(props: {
               width >= 768 && splitterRef.current?.collapsed[1]
                 ? 'translateX(0px)'
                 : undefined,
+            right: splitterRef.current?.collapsed[1]
+              ? 10
+              : splitterRef.current?.collapsed[0]
+                ? -19
+                : undefined,
           },
           handle: {
             transform:

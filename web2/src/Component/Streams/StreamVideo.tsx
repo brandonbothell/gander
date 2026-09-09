@@ -151,7 +151,14 @@ export default function StreamVideo(props: {
         zIndex={1000}
         overlayProps={{ radius: 'sm', blur: 2 }}
       />
-      <Video autoPlay muted clickToToggle={false} ref={videoRef}>
+      <Video
+        w={'100%'}
+        autoPlay
+        muted
+        clickToToggle={false}
+        doubleClickToFullscreen
+        ref={videoRef}
+      >
         <div
           style={{
             position: 'absolute',
