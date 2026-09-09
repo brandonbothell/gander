@@ -24,11 +24,6 @@ export default function FullLayout(props: {
 }) {
   const [openedMenu, { toggle: toggleMenu }] = useDisclosure()
   const [openedLayouts, { toggle: toggleLayouts }] = useDisclosure(true)
-  const [jwt] = useLocalStorage({
-    key: 'jwt',
-    serialize: (v) => v,
-    deserialize: (v) => v ?? '',
-  })
   const [streams, setStreams] = useState<Stream[]>()
   const [loadingStreams, setLoadingStreams] = useState(false)
   const [layouts, setLayouts] = useLocalStorage<{ id: number }[]>({
@@ -52,13 +47,9 @@ export default function FullLayout(props: {
   const hasMouse = window.matchMedia('(pointer:fine)').matches
 
   useEffect(() => {
-    if (jwt === props.lastFailedJwt) return
-
     if (!streams && !loadingStreams) {
       setLoadingStreams(true)
-      authFetch('/api/streams', {
-        headers: { Authorization: `Bearer ${jwt}` },
-      })
+      authFetch('/api/streams')
         .then((res) => {
           if (!res.ok) {
             setLoadingStreams(false)
@@ -70,8 +61,11 @@ export default function FullLayout(props: {
           setStreams(nextStreams)
           setLoadingStreams(false)
         })
+        .catch((err) => {
+          console.error(err)
+        })
     }
-  }, [streams, jwt, loadingStreams])
+  }, [streams, loadingStreams])
 
   return (
     <AppShell

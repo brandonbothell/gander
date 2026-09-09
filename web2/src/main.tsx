@@ -113,8 +113,8 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
       const refreshSuccess = await tokenRefreshPromise
       if (refreshSuccess) {
         // Retry the original request with the new token
-        const newToken = getTokenOrApiKey()
-        return makeRequest(newToken)
+        const newToken = localStorage.getItem('jwt')!
+        return makeRequest({ token: newToken, type: 'jwt' })
       } else {
         // Refresh failed, logout
         await globalLogout()
@@ -133,8 +133,11 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
       if (tokenRefreshSuccess) {
         console.log('Token refresh successful, retrying request...')
         // Retry the original request with the new token
-        const newToken = getTokenOrApiKey()
-        const retryResponse = await makeRequest(newToken)
+        const newToken = localStorage.getItem('jwt')!
+        const retryResponse = await makeRequest({
+          token: newToken,
+          type: 'jwt',
+        })
 
         // If the retry also fails with 401, logout
         if (retryResponse.status === 401) {
