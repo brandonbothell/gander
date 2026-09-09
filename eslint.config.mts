@@ -27,6 +27,7 @@ export default defineConfig([
     '.yarn/',
     'android/',
     'source/generated/',
+    'web2/dist/',
   ]),
   {
     extends: fixupConfigRules(compat.extends('plugin:import/recommended')),

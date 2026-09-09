@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3000",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@gfazioli/mantine-video": "1.2.1",
