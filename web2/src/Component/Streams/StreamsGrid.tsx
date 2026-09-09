@@ -182,20 +182,16 @@ export default function StreamsGrid(props: {
         splitterRef={splitterRef}
         styles={{
           thumb: {
-            transform:
-              width >= 768 && splitterRef.current?.collapsed[1]
-                ? 'translateX(0px)'
-                : undefined,
             right: splitterRef.current?.collapsed[1]
               ? 10
               : splitterRef.current?.collapsed[0]
-                ? -19
+                ? -19 // This offset is primarily to help with use with small touchscreens
                 : undefined,
           },
           handle: {
             transform:
               width >= 768 && splitterRef.current?.collapsed[1]
-                ? 'translateX(-59px)'
+                ? 'translateX(-59px)' // This offset is due to resizing the remaning splitter to 16:18
                 : undefined,
           },
         }}

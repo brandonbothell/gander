@@ -1,3 +1,4 @@
+import { FiTrash } from 'react-icons/fi'
 import { useEffect, useRef, useState } from 'react'
 import {
   createCloseToolbarItem,
@@ -9,9 +10,17 @@ import {
   type ToolbarItem,
   type ToolbarItemsPayload,
 } from '@mantine/lightbox'
+import { Recording } from '../../types'
+import { authFetch } from '../../main'
 
 type CollapsedLightboxProps = LightboxProps & {
   currentSrc: string
+  activeRecording: (Recording & { page: number; index: number }) | null
+  recordings: Map<string, (Recording & { page: number; index: number })[][]>
+  recordingsCount: Map<string, number>
+  onRecordingDeleted?: (
+    recording: Recording & { page: number; index: number },
+  ) => void | Promise<void>
 }
 
 export default function CollapsedLightbox({
@@ -54,6 +63,79 @@ export default function CollapsedLightbox({
         thumbnailsVisible,
         payload.labels,
       ),
+      {
+        key: 'edit',
+        icon: <FiTrash />,
+        label: 'Delete recording',
+        onClick: async () => {
+          if (!props.activeRecording) return
+          if (!window.confirm(`Delete ${props.activeRecording.filename}?`)) {
+            return
+          }
+          const res = await authFetch(
+            `/api/recordings/${props.activeRecording.streamId}/${props.activeRecording.filename}`,
+            {
+              method: 'DELETE',
+            },
+          )
+          /* if (res.ok) {
+            const streamRecordings = props.recordings.get(
+              props.activeRecording.streamId,
+            )!
+            let currentPage = streamRecordings[props.activeRecording.page - 1]
+            const deletedIndex = currentPage.findIndex(
+              (r) => props.activeRecording!.filename === r.filename,
+            )
+
+            currentPage.splice(deletedIndex, 1)
+            let lastPage = {
+              items: currentPage,
+              index: props.activeRecording.page - 1,
+            }
+
+            // Shift the recordings to keep page sizes consistent with the API
+            for (
+              let i = props.activeRecording.page;
+              i < streamRecordings.length;
+              i++
+            ) {
+              let nextPage = streamRecordings[i]
+              const shiftedRecording = nextPage.shift()
+              if (shiftedRecording) {
+                nextPage = nextPage.map((rec, index) =>
+                  index > shiftedRecording.index
+                    ? { ...rec, index: rec.index-- }
+                    : rec,
+                )
+                lastPage.items.push(shiftedRecording)
+                streamRecordings[lastPage.index] = lastPage.items
+                lastPage = { items: nextPage, index: lastPage.index + 1 }
+              } else if (lastPage.items.length === 0) {
+                delete streamRecordings[lastPage.index]
+              }
+              streamRecordings[i] = nextPage
+            }
+
+            streamRecordings[props.activeRecording.page - 1] = currentPage
+            props.recordings.set(
+              props.activeRecording.streamId,
+              streamRecordings,
+            )
+            props.recordingsCount.set(
+              props.activeRecording.streamId,
+              props.recordingsCount.get(props.activeRecording.streamId)! - 1,
+            ) 
+            props.onRecordingDeleted?.(props.activeRecording)
+          } else {
+            alert('Failed to delete recording.')
+          }*/
+
+          if (res.ok && (await res.json()).success) {
+            props.onRecordingDeleted?.(props.activeRecording)
+          }
+        },
+        position: 'right',
+      },
       createDownloadToolbarItem(props.currentSrc, payload.labels),
       createFullscreenToolbarItem(
         payload.toggleFullscreen,

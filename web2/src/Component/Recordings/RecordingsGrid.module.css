@@ -60,6 +60,10 @@
   transform: none;
 }
 
+.recording:hover {
+  cursor: pointer;
+}
+
 @media (orientation: portrait) {
   .inlineFullscreenVideo :global(video) {
     top: 50%;

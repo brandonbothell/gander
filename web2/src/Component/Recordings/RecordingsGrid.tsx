@@ -18,7 +18,9 @@ import { API_BASE, authFetch, fetchWithRetry } from '../../main'
 import classes from './RecordingsGrid.module.css'
 
 export default function RecordingsGrid(props: {
-  recordings: Recording[]
+  currentPage: (Recording & { page: number; index: number })[]
+  recordings: Map<string, (Recording & { page: number; index: number })[][]>
+  recordingsCount: Map<string, number>
   pageLoading: boolean
 }) {
   const signedUrlsMap = useMap<string, { url: string; expiresAt: number }>()
@@ -27,7 +29,10 @@ export default function RecordingsGrid(props: {
   const { width } = useViewportSize()
   const { canFullscreen } = useVideo()
   const [loading, setLoading] = useState(false)
-  const [activeRecording, setRecording] = useState<Recording | null>(null)
+  // eslint-disable-next-line func-call-spacing
+  const [activeRecording, setRecording] = useState<
+    (Recording & { page: number; index: number }) | null
+  >(null)
   const videoRef = useRef<HTMLDivElement>(null)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
     null,
@@ -72,7 +77,7 @@ export default function RecordingsGrid(props: {
 
   const currentLightboxIndex = useMemo(
     () =>
-      props.recordings.findIndex((recording) => {
+      props.currentPage.findIndex((recording) => {
         if (activeRecording) {
           return (
             recording.filename === activeRecording.filename &&
@@ -80,12 +85,12 @@ export default function RecordingsGrid(props: {
           )
         }
       }),
-    [props.recordings, activeRecording],
+    [props.currentPage, activeRecording],
   )
   const [lightboxOpen, { set: setLightboxOpen }] = useDisclosure(false)
   const lightboxSlides = useMemo<LightboxSlideData[]>(
     () =>
-      props.recordings.map((recording) => ({
+      props.currentPage.map((recording) => ({
         type: 'custom',
         autoPlay: true,
         render: ({ active }) => (
@@ -213,7 +218,7 @@ export default function RecordingsGrid(props: {
           </Center>
         ),
       })),
-    [canFullscreen, inlineFullscreen, props.recordings, loading, width],
+    [canFullscreen, inlineFullscreen, props.currentPage, loading, width],
   )
 
   useEffect(() => {
@@ -221,7 +226,7 @@ export default function RecordingsGrid(props: {
   }, [activeRecording, lightboxOpen])
 
   useEffect(() => {
-    props.recordings.forEach(async function getSignedUrl(recording) {
+    props.currentPage.forEach(async function getSignedUrl(recording) {
       if (
         !signedUrlsMap.has(`${recording.streamId}-${recording.filename}`) ||
         signedUrlsMap.get(`${recording.streamId}-${recording.filename}`)!
@@ -255,7 +260,7 @@ export default function RecordingsGrid(props: {
         return signedUrl
       }
     })
-  }, [props.recordings, signedUrlsMap])
+  }, [props.currentPage, signedUrlsMap])
 
   useEffect(() => {
     if (!lightboxOpen || !activeRecording) return
@@ -325,22 +330,87 @@ export default function RecordingsGrid(props: {
         onClose={() => setLightboxOpen(false)}
         slides={lightboxSlides}
         currentIndex={currentLightboxIndex}
-        onIndexChange={(index) => setRecording(props.recordings[index])}
+        onIndexChange={(index) => setRecording(props.currentPage[index])}
         withThumbnails
         withDownload
+        onRecordingDeleted={() => {
+          setTimeout(async () => {
+            setLoading(true)
+            // Refresh the current page and delete cache of future pages
+            if (activeRecording) {
+              const streamRecordings = props.recordings.get(
+                activeRecording.streamId,
+              )!
+              const res = await authFetch(
+                `${API_BASE}/api/recordings/${activeRecording.streamId}/${activeRecording.page}`,
+              )
+              if (!res.ok) {
+                console.error(`Error loading recordings: ${await res.text()}`)
+                setLoading(false)
+                return
+              }
+              const page = (await res.json()) as {
+                total: number
+                recordings: (Recording & { motionTimestamps: string })[]
+                deletedRecordings: string[]
+              }
+              if (!page.total || !page.recordings?.length) {
+                console.error('Error loading recordings', page)
+                setLoading(false)
+                return
+              }
+              const newRecordings = page.recordings.map((rec, index) => ({
+                ...rec,
+                motionTimestamps: JSON.parse(rec.motionTimestamps) as number[],
+                page: activeRecording.page,
+                index,
+              }))
+              streamRecordings[activeRecording.page - 1] = newRecordings
+              for (
+                let i = activeRecording.page;
+                i < streamRecordings.length;
+                i++
+              ) {
+                streamRecordings[i] = []
+              }
+              props.recordings.set(activeRecording.streamId, streamRecordings)
+            }
+            if (
+              activeRecording &&
+              activeRecording.index < props.currentPage.length
+            ) {
+              setRecording(props.currentPage[activeRecording.index])
+            } else if (
+              activeRecording &&
+              activeRecording.index - 1 < props.currentPage.length
+            ) {
+              setRecording(props.currentPage[activeRecording.index - 1])
+            } else {
+              console.warn('Next recording not found', activeRecording)
+              console.log(`Current page length: ${props.currentPage.length}`)
+              setLightboxOpen(false)
+            }
+
+            setLoading(false)
+          }, 500) // Give time for the recordings to shift pages
+        }}
+        recordingsCount={props.recordingsCount}
+        recordings={props.recordings}
+        activeRecording={activeRecording}
         currentSrc={videoElement?.src || ''}
         closeOnSwipeDown={!(inlineFullscreen && width < 500)}
         withFullscreen={canFullscreen}
         closeOnClickOutside={false}
         emblaOptions={{ watchDrag: false }}
       />
-      {props.recordings?.map((recording, index) => (
+      {props.currentPage?.map((recording, index) => (
         <Paper
           mt="sm"
           shadow="xs"
           withBorder
           p="xl"
           key={index}
+          className={classes.recording}
           onClick={() => {
             setRecording(recording)
             setLightboxOpen(true)

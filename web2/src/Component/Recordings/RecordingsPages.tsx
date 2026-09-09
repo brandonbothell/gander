@@ -18,7 +18,12 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
   const [loading, setLoading] = useState(false)
 
   const totalRecordings = useMap<string, number>()
-  const recordings = useMap<string, Recording[][]>()
+
+  const recordings = useMap<
+    // eslint-disable-next-line func-call-spacing
+    string,
+    (Recording & { page: number; index: number })[][]
+  >()
   const [activePage, setPage] = useState(1)
   const [lastFailedPage, setLastFailedPage] = useState(0)
   const [activeStream, setStream] = useState<Stream | null>(null)
@@ -51,7 +56,12 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
     }
 
     return (
-      <RecordingsGrid recordings={recordingsToRender} pageLoading={loading} />
+      <RecordingsGrid
+        recordings={recordings}
+        recordingsCount={totalRecordings}
+        currentPage={recordingsToRender}
+        pageLoading={loading}
+      />
     )
   }, [activePage, activeStream, recordings, loading])
 
@@ -95,9 +105,11 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
           return
         }
 
-        const newRecordings: Recording[] = page.recordings.map((rec) => ({
+        const newRecordings = page.recordings.map((rec, index) => ({
           ...rec,
           motionTimestamps: JSON.parse(rec.motionTimestamps) as number[],
+          page: activePage,
+          index,
         }))
 
         totalRecordings.set(activeStream.id, page.total)
@@ -125,7 +137,6 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
               ...(() => {
                 const blankPages: [][] = []
 
-                // 20 items per page
                 for (let i = currentRecordings.length; i < activePage; i++) {
                   blankPages.push([])
                 }
