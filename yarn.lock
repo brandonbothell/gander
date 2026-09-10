@@ -1631,15 +1631,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mantine/modals@npm:9.6.0":
-  version: 9.6.0
-  resolution: "@mantine/modals@npm:9.6.0"
+"@mantine/modals@npm:9.6.1":
+  version: 9.6.1
+  resolution: "@mantine/modals@npm:9.6.1"
   peerDependencies:
-    "@mantine/core": 9.6.0
-    "@mantine/hooks": 9.6.0
+    "@mantine/core": 9.6.1
+    "@mantine/hooks": 9.6.1
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/3468842f586f47cf424444c7c77933060a31980d5c2b4eb9967be674aefd7d5c836ec6010f68c06f1265854aac2942bbb3fdf1bf57c5d12cb9866615ef0184cc
+  checksum: 10c0/1aab37e63067f98c36c96cda384600bd14735c45a510ba76f679d03d6e7819ea8093f457cf3a8d394c6f7f8893d16c0eb0d0afc471a13c9f7dc3c070f6039068
   languageName: node
   linkType: hard
 
@@ -11713,7 +11713,7 @@ __metadata:
     "@mantine/form": "npm:9.6.0"
     "@mantine/hooks": "npm:9.6.0"
     "@mantine/lightbox": "npm:9.6.0"
-    "@mantine/modals": "npm:9.6.0"
+    "@mantine/modals": "npm:9.6.1"
     "@mantine/notifications": "npm:9.6.0"
     "@mantine/nprogress": "npm:9.6.0"
     "@tabler/icons-react": "npm:3.46.0"

@@ -3,6 +3,7 @@ import '@mantine/core/styles.css'
 import '@mantine/lightbox/styles.css'
 import '@gfazioli/mantine-video/styles.css'
 import { useState, useEffect } from 'react'
+import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
 import theme from './theme'
@@ -554,10 +555,12 @@ export default function App() {
   if (authenticated === false) {
     return (
       <MantineProvider theme={theme} defaultColorScheme="dark">
-        <LoginLayout
-          onLogin={handleLogin}
-          setAuthenticated={setAuthenticated}
-        />
+        <ModalsProvider>
+          <LoginLayout
+            onLogin={handleLogin}
+            setAuthenticated={setAuthenticated}
+          />
+        </ModalsProvider>
       </MantineProvider>
     )
   }
@@ -565,11 +568,13 @@ export default function App() {
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
       {authenticated ? (
-        <FullLayout
-          lastFailedJwt={lastFailedJwt}
-          setFailedJwt={setFailedJwt}
-          logout={logout}
-        />
+        <ModalsProvider>
+          <FullLayout
+            lastFailedJwt={lastFailedJwt}
+            setFailedJwt={setFailedJwt}
+            logout={logout}
+          />
+        </ModalsProvider>
       ) : (
         <LoadingOverlay
           visible={true}

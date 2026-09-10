@@ -1,19 +1,33 @@
 import { FiTrash } from 'react-icons/fi'
 import { useEffect, useRef, useState } from 'react'
+import { modals } from '@mantine/modals'
 import {
   createCloseToolbarItem,
   createDownloadToolbarItem,
   createFullscreenToolbarItem,
   createThumbnailsToolbarItem,
-  Lightbox,
+  type LightboxSlideData,
   type LightboxProps,
   type ToolbarItem,
   type ToolbarItemsPayload,
 } from '@mantine/lightbox'
+import { Text } from '@mantine/core'
 import { Recording } from '../../types'
 import { authFetch } from '../../main'
+import { LightboxSlides } from './Slides/LightboxSlides'
+import { LightboxSlide } from './Slides/LightboxSlide'
+import { LightboxToolbar } from './LightboxToolbar'
+import { LightboxThumbnails } from './LightboxThumbnails'
+import { LightboxRoot } from './LightboxRoot'
+import { LightboxNavigation } from './LightboxNavigation'
+import { LightboxCaption } from './LightboxCaption'
 
-type CollapsedLightboxProps = LightboxProps & {
+export type CollapsedLightboxSlideData = LightboxSlideData & {
+  title?: React.ReactNode
+  recording: Recording & { page: number; index: number }
+}
+
+export interface CollapsedLightboxProps extends LightboxProps {
   currentSrc: string
   activeRecording: (Recording & { page: number; index: number }) | null
   recordings: Map<string, (Recording & { page: number; index: number })[][]>
@@ -21,6 +35,7 @@ type CollapsedLightboxProps = LightboxProps & {
   onRecordingDeleted?: (
     recording: Recording & { page: number; index: number },
   ) => void | Promise<void>
+  slides: CollapsedLightboxSlideData[]
 }
 
 export default function CollapsedLightbox({
@@ -30,6 +45,17 @@ export default function CollapsedLightbox({
 }: CollapsedLightboxProps) {
   const payloadRef = useRef<ToolbarItemsPayload | null>(null)
   const [thumbnailsVisible, setThumbnailsVisible] = useState(false)
+  const openDeleteModal = (filename: string) =>
+    new Promise<boolean>((resolve) =>
+      modals.openConfirmModal({
+        title: 'Delete recording',
+        children: <Text size="sm">Delete {filename}?</Text>,
+        labels: { confirm: 'Delete', cancel: 'Cancel' },
+        onCancel: () => resolve(false),
+        onConfirm: () => resolve(true),
+        zIndex: 1003,
+      }),
+    )
 
   useEffect(() => {
     if (!props.opened) {
@@ -51,9 +77,6 @@ export default function CollapsedLightbox({
     }
 
     const toggleThumbnails = () => {
-      if (thumbnailsVisible) {
-        payload.toggleThumbnails()
-      }
       setThumbnailsVisible((visible) => !visible)
     }
 
@@ -64,14 +87,13 @@ export default function CollapsedLightbox({
         payload.labels,
       ),
       {
-        key: 'edit',
+        key: 'delete',
         icon: <FiTrash />,
         label: 'Delete recording',
-        onClick: async () => {
+        async onClick() {
           if (!props.activeRecording) return
-          if (!window.confirm(`Delete ${props.activeRecording.filename}?`)) {
-            return
-          }
+          if (!(await openDeleteModal(props.activeRecording!.filename))) return
+
           const res = await authFetch(
             `/api/recordings/${props.activeRecording.streamId}/${props.activeRecording.filename}`,
             {
@@ -95,23 +117,32 @@ export default function CollapsedLightbox({
   }
 
   return (
-    <Lightbox.Root {...props}>
+    <LightboxRoot
+      {...{
+        ...props,
+        onRecordingDeleted: undefined,
+        recordingsCount: undefined,
+        activeRecording: undefined,
+        currentSrc: undefined,
+        recordings: undefined,
+      }}
+    >
       {children ?? (
         <>
-          <Lightbox.Toolbar toolbarItems={resolvedToolbarItems} />
-          <Lightbox.Slides>
+          <LightboxToolbar toolbarItems={resolvedToolbarItems} />
+          <LightboxSlides>
             {props.slides.map((slide, index) => (
-              <Lightbox.Slide key={index} slide={slide} index={index} />
+              <LightboxSlide key={index} slide={slide} index={index} />
             ))}
-          </Lightbox.Slides>
-          <Lightbox.Navigation />
-          <Lightbox.Caption />
-          <Lightbox.Thumbnails
+          </LightboxSlides>
+          <LightboxNavigation />
+          <LightboxCaption />
+          <LightboxThumbnails
             style={{ display: thumbnailsVisible ? undefined : 'none' }}
           />
         </>
       )}
-    </Lightbox.Root>
+    </LightboxRoot>
   )
 }
 

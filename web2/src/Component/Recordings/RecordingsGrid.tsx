@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-react'
-import { type LightboxSlideData } from '@mantine/lightbox'
 import { useDisclosure, useMap, useViewportSize } from '@mantine/hooks'
 import {
   Paper,
@@ -10,9 +9,12 @@ import {
   LoadingOverlay,
   Center,
   ActionIcon,
+  Grid,
 } from '@mantine/core'
 import { useVideo, Video } from '@gfazioli/mantine-video'
-import CollapsedLightbox from '../Lightbox/CollapsedLightbox'
+import CollapsedLightbox, {
+  type CollapsedLightboxSlideData,
+} from '../Lightbox/CollapsedLightbox'
 import { Recording, Stream } from '../../types'
 import { API_BASE, authFetch, fetchWithRetry } from '../../main'
 import { onRecordingDeleted } from '../../event-listeners'
@@ -103,10 +105,35 @@ export default function RecordingsGrid(props: {
     [props.currentPage, activeRecording],
   )
   const [lightboxOpen, { set: setLightboxOpen }] = useDisclosure(false)
-  const lightboxSlides = useMemo<LightboxSlideData[]>(
+  const lightboxSlides = useMemo<CollapsedLightboxSlideData[]>(
     () =>
       props.currentPage.map((recording) => ({
         type: 'custom',
+        recording,
+        title: (
+          <Grid gap={0}>
+            {recording.nickname ? (
+              <Grid.Col span={'content'}>
+                <Text span>{recording.nickname}&nbsp;&mdash;&nbsp;</Text>
+              </Grid.Col>
+            ) : null}
+            <Grid.Col span={'content'}>
+              <Text span>
+                {formatTime(recording.duration)}&nbsp;&mdash;&nbsp;
+              </Text>
+            </Grid.Col>
+            <Grid.Col span={'content'}>
+              <Text span>{formatTimestamp(recording.filename)}</Text>
+            </Grid.Col>
+          </Grid>
+        ),
+        /* <>
+            {recording.nickname ? `"${recording.nickname}"` : ''}
+            {recording.nickname ? <>&nbsp;&mdash;&nbsp;</> : null}
+            {formatTime(recording.duration)}
+            <>&nbsp;&mdash;&nbsp;</>
+            {formatTimestamp(recording.filename)}
+          </> */
         autoPlay: true,
         render: ({ active }) => (
           <Center h="100%" w="100%" display={'grid'} pos="relative">
@@ -180,13 +207,14 @@ export default function RecordingsGrid(props: {
                       )}
                     </Video.Controls>
                   </Video>
-                  <Text
+                  {/* <Text
                     pos="absolute"
                     bottom={-50}
                     style={{ display: loading ? 'none' : 'block' }}
                   >
                     {`${recording.nickname ? `${recording.nickname} (` : ''}${formatTime(recording.duration)}${recording.nickname ? ')' : ''}`}
-                  </Text>
+                  </Text> */}
+                  <RecordingInfo recording={recording} loading={loading} />
                 </div>
               </>
             )}
@@ -488,7 +516,32 @@ export default function RecordingsGrid(props: {
   )
 }
 
-function formatTime(sec: number) {
+function RecordingInfo(props: { recording: Recording; loading: boolean }) {
+  const { width } = useViewportSize()
+
+  return (
+    width <= 600 &&
+    !props.loading && (
+      <Grid gap={0} mt="md">
+        {props.recording.nickname ? (
+          <Grid.Col span={'content'}>
+            <Text span>{props.recording.nickname}&nbsp;&mdash;&nbsp;</Text>
+          </Grid.Col>
+        ) : null}
+        <Grid.Col span={'content'}>
+          <Text span>
+            {formatTime(props.recording.duration)}&nbsp;&mdash;&nbsp;
+          </Text>
+        </Grid.Col>
+        <Grid.Col span={'content'}>
+          <Text span>{formatTimestamp(props.recording.filename)}</Text>
+        </Grid.Col>
+      </Grid>
+    )
+  )
+}
+
+export function formatTime(sec: number) {
   if (!isFinite(sec)) return '0:00'
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
