@@ -171,7 +171,12 @@ export default function FullLayout(props: {
                               ? 'block'
                               : 'none'
                             : 'block',
-                          backgroundColor: '#ab0000',
+                          backgroundColor:
+                            colorScheme === 'light' ? '#ff0000' : '#ab0000',
+                          color:
+                            colorScheme === 'light'
+                              ? colors.gray[0]
+                              : colors.gray[4],
                           padding: 4,
                           borderRadius: 4,
                         }}
