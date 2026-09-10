@@ -18,3 +18,14 @@
     height: rem(16px) !important;
   }
 }
+
+.mantine-Splitter-pane {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden !important;
+}
+
+.mantine-Combobox-dropdown {
+  z-index: 1001 !important;
+}
