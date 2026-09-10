@@ -9,6 +9,9 @@ import {
   Pagination,
   Title,
   useCombobox,
+  useMantineColorScheme,
+  Text,
+  useMantineTheme,
 } from '@mantine/core'
 import { Recording, type Stream } from '../../types'
 import { API_BASE, authFetch } from '../../main'
@@ -16,6 +19,8 @@ import RecordingsGrid, { SignedThumbnailUrl } from './RecordingsGrid'
 
 export default function RecordingsPages(props: { streams: Stream[] }) {
   const [loading, setLoading] = useState(false)
+  const { colorScheme } = useMantineColorScheme()
+  const { colors } = useMantineTheme()
 
   const totalRecordings = useMap<string, number>()
   const signedUrlsCache = useMap<
@@ -44,9 +49,26 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
     <Combobox.Option value={index} key={index}>
       <Code
         style={{ fontSize: '1em' }}
-        color={activeStream?.id === stream.id ? 'blue.9' : undefined}
+        color={
+          activeStream?.id === stream.id
+            ? colorScheme === 'light'
+              ? 'blue.6'
+              : 'blue.9'
+            : undefined
+        }
       >
-        {stream.nickname}
+        <Text
+          span
+          size="1em"
+          style={{
+            color:
+              colorScheme === 'light' && stream.id === activeStream?.id
+                ? colors.gray[0]
+                : undefined,
+          }}
+        >
+          {stream.nickname}
+        </Text>
       </Code>
     </Combobox.Option>
   ))
@@ -88,7 +110,6 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
       saveSelectedStream(stream.id)
     }
     ;(async () => {
-      console.log(`Active stream: ${activeStream?.id}`)
       if (activeStream) {
         const currentRecordings = recordings.get(activeStream.id)
         if (currentRecordings && currentRecordings.length >= activePage) {
@@ -97,6 +118,9 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
           if (currentPage.length !== 0) return
         }
 
+        console.log(
+          `Fetching page ${activePage} of stream: ${activeStream?.id} (${activeStream.nickname})`,
+        )
         setLoading(true)
         const res = await authFetch(
           `${API_BASE}/api/recordings/${activeStream.id}/${activePage}`,
@@ -208,8 +232,22 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
               <Title order={2}>
                 {activeStream ? (
                   <>
-                    <Code color="blue.9" style={{ fontSize: '1em' }}>
-                      {activeStream.nickname}
+                    <Code
+                      color={colorScheme === 'light' ? 'blue.6' : 'blue.9'}
+                      style={{ fontSize: '1em' }}
+                    >
+                      <Text
+                        span
+                        size="1em"
+                        style={{
+                          color:
+                            colorScheme === 'light'
+                              ? colors.gray[0]
+                              : colors.gray[4],
+                        }}
+                      >
+                        {activeStream.nickname}
+                      </Text>
                     </Code>{' '}
                     recordings
                   </>

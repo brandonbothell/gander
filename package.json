@@ -19,7 +19,7 @@
     "build:server:safe": "copyfiles -u 1 \"source/generated/**/*\" \"compiled-temp\" && tsc --project tsconfig.build.json --outDir compiled-temp && tsx --tsconfig tsconfig.build.json scripts/safeReplace.ts",
     "build:server:force": "copyfiles -u 1 \"source/generated/**/*\" \"compiled\" && tsc --project tsconfig.build.json",
     "build:client": "dotenvx run -- yarn workspace web2 build",
-    "dev:client": "cross-env NODE_ENV=development dotenvx run -- yarn workspace web2 vite build --watch --mode development",
+    "dev:client": "cross-env NODE_ENV=development dotenvx run -- yarn workspace web2 vite build --watch --mode development --minify false",
     "dev:server": "nodemon --watch source --ext ts --exec \"tsx --tsconfig tsconfig.build.json ./source/camera.ts\"",
     "db:generate": "yarn prisma generate",
     "db:push": "yarn prisma db push",

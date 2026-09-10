@@ -10,7 +10,7 @@ export function SessionsLogoutButton(
   const theme = useMantineTheme()
 
   return (
-    <Group wrap="nowrap" gap={0} {...props}>
+    <Group wrap="nowrap" gap={0} style={props?.style}>
       <Button leftSection={<FiUsers size={16} />} className={classes.button}>
         Sessions
       </Button>
@@ -30,7 +30,13 @@ export function SessionsLogoutButton(
             <FiChevronDown size={16} />
           </ActionIcon>
         </Menu.Target>
-        <Menu.Dropdown>
+        <Menu.Dropdown
+          styles={{
+            dropdown: {
+              zIndex: 1002,
+            },
+          }}
+        >
           <Menu.Item
             onClick={() => props?.logout()}
             leftSection={<FiLogOut size={16} color={theme.colors.red[5]} />}

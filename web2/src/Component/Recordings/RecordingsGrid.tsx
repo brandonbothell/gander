@@ -468,6 +468,7 @@ export default function RecordingsGrid(props: {
                     ? 'block'
                     : 'none'
                   : 'none',
+                color: 'white',
               }}
             >
               {formatTime(recording.duration)}

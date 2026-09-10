@@ -9,9 +9,11 @@ import {
   ScrollArea,
   Space,
   Text,
+  useMantineColorScheme,
   useMantineTheme,
 } from '@mantine/core'
 import { authFetch } from '../main'
+import { ThemeToggle } from '../Component/ThemeToggle'
 import StreamsGrid from '../Component/Streams/StreamsGrid'
 import { SessionsLogoutButton } from '../Component/Sessions/SessionsLogoutButton'
 import RecordingsPages from '../Component/Recordings/RecordingsPages'
@@ -43,6 +45,7 @@ export default function FullLayout(props: {
   })
   const { width } = useViewportSize()
   const { colors } = useMantineTheme()
+  const { colorScheme } = useMantineColorScheme()
 
   const hasMouse = window.matchMedia('(pointer:fine)').matches
 
@@ -95,9 +98,11 @@ export default function FullLayout(props: {
             }}
           />
           Gander
+          <ThemeToggle />
           <SessionsLogoutButton
             logout={props.logout}
             style={{
+              zIndex: 1002,
               marginLeft: 'auto',
               pointerEvents: 'auto',
             }}
@@ -141,7 +146,12 @@ export default function FullLayout(props: {
                   }}
                   style={
                     id === activeLayout
-                      ? { backgroundColor: colors.dark[6] }
+                      ? {
+                          backgroundColor:
+                            colorScheme === 'light'
+                              ? colors.gray[2]
+                              : colors.dark[6],
+                        }
                       : undefined
                   }
                   onPointerOver={() =>
@@ -184,6 +194,7 @@ export default function FullLayout(props: {
                 <NavLink
                   href="#"
                   label="Create layout"
+                  key="create-layout-button"
                   leftSection={<FiPlus size={16} />}
                   onClick={(e) => {
                     setLayouts((prev) => {
