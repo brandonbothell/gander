@@ -17,7 +17,7 @@ import {
   UnstyledButton,
   useProps,
 } from '@mantine/core'
-import RecordingRenamePopover from '../RecordingRenamePopover'
+import RecordingRenamePopover from '../Recordings/RecordingRenamePopover'
 import { Recording } from '../../types'
 import classes from './CollapsedLightbox.module.css'
 import { useCollapsedLightboxContext } from './CollapsedLightbox.context'

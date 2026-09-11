@@ -17,7 +17,9 @@ import { Recording, type Stream } from '../../types'
 import { API_BASE, authFetch } from '../../main'
 import RecordingsGrid, { SignedThumbnailUrl } from './RecordingsGrid'
 
-export default function RecordingsPages(props: { streams: Stream[] }) {
+export default function RecordingsPages(props: {
+  streams: Map<string, Stream>
+}) {
   const [loading, setLoading] = useState(false)
   const { colorScheme } = useMantineColorScheme()
   const { colors } = useMantineTheme()
@@ -45,33 +47,36 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
   const streamCombobox = useCombobox({
     onDropdownClose: () => streamCombobox.resetSelectedOption(),
   })
-  const streamComboboxOptions = props.streams.map((stream, index) => (
-    <Combobox.Option value={index} key={index}>
-      <Code
-        style={{ fontSize: '1em' }}
-        color={
-          activeStream?.id === stream.id
-            ? colorScheme === 'light'
-              ? 'blue.6'
-              : 'blue.9'
-            : undefined
-        }
-      >
-        <Text
-          span
-          size="1em"
-          style={{
-            color:
-              colorScheme === 'light' && stream.id === activeStream?.id
-                ? colors.gray[0]
-                : undefined,
-          }}
+  const streamComboboxOptions = props.streams
+    .entries()
+    .toArray()
+    .map((stream, index) => (
+      <Combobox.Option value={stream[0]} key={index}>
+        <Code
+          style={{ fontSize: '1em' }}
+          color={
+            activeStream?.id === stream[0]
+              ? colorScheme === 'light'
+                ? 'blue.6'
+                : 'blue.9'
+              : undefined
+          }
         >
-          {stream.nickname}
-        </Text>
-      </Code>
-    </Combobox.Option>
-  ))
+          <Text
+            span
+            size="1em"
+            style={{
+              color:
+                colorScheme === 'light' && stream[0] === activeStream?.id
+                  ? colors.gray[0]
+                  : undefined,
+            }}
+          >
+            {stream[1].nickname}
+          </Text>
+        </Code>
+      </Combobox.Option>
+    ))
 
   const getItems = useCallback(() => {
     if (!activeStream) return <>Select a stream to view recordings.</>
@@ -101,11 +106,11 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
 
   useEffect(() => {
     if (lastFailedPage !== 0 && activePage === lastFailedPage) return
-    if (!activeStream && props.streams.length) {
+    if (!activeStream && props.streams.size) {
       let stream = selectedStream
-        ? (props.streams.find((s) => s.id === selectedStream) ??
-          props.streams[0])
-        : props.streams[0]
+        ? (props.streams.get(selectedStream) ??
+          props.streams.values().toArray()[0])
+        : props.streams.values().toArray()[0]
       setStream(stream)
       saveSelectedStream(stream.id)
     }
@@ -203,8 +208,8 @@ export default function RecordingsPages(props: { streams: Stream[] }) {
       {activeStream && (
         <Combobox
           store={streamCombobox}
-          onOptionSubmit={(val) => {
-            const stream = props.streams[Number(val)]
+          onOptionSubmit={(streamId) => {
+            const stream = props.streams.get(streamId)!
             setPage(1)
             setStream(stream)
             saveSelectedStream(stream.id)

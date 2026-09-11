@@ -1,6 +1,12 @@
 import { FiChevronRight, FiLayout, FiPlus, FiTrash } from 'react-icons/fi'
 import { useEffect, useState } from 'react'
-import { useDisclosure, useLocalStorage, useViewportSize } from '@mantine/hooks'
+import {
+  useCounter,
+  useDisclosure,
+  useLocalStorage,
+  useMap,
+  useViewportSize,
+} from '@mantine/hooks'
 import {
   AppShell,
   Burger,
@@ -26,11 +32,18 @@ export default function FullLayout(props: {
 }) {
   const [openedMenu, { toggle: toggleMenu }] = useDisclosure()
   const [openedLayouts, { toggle: toggleLayouts }] = useDisclosure(true)
-  const [streams, setStreams] = useState<Stream[]>()
+  const streams = useMap<string, Stream>()
   const [loadingStreams, setLoadingStreams] = useState(false)
-  const [layouts, setLayouts] = useLocalStorage<{ id: number }[]>({
+  const [streamsLoaded, setStreamsLoaded] = useState(false)
+  const [
+    loadingFailed,
+    { increment: incrementLoadingFailed, reset: resetLoadingFailed },
+  ] = useCounter(0)
+  const [layouts, setLayouts] = useLocalStorage<
+    { id: number; splitterStreams: string[] }[]
+  >({
     key: 'streamLayouts',
-    defaultValue: [{ id: 0 }],
+    defaultValue: [{ id: 0, splitterStreams: [] }],
   })
   const [hoveredLayouts, setHoveredLayouts] = useState<number[]>([])
   const [activeLayout, setActiveLayout] = useLocalStorage<number>({
@@ -50,25 +63,30 @@ export default function FullLayout(props: {
   const hasMouse = window.matchMedia('(pointer:fine)').matches
 
   useEffect(() => {
-    if (!streams && !loadingStreams) {
+    if (loadingFailed < 3 && !loadingStreams && !streamsLoaded) {
       setLoadingStreams(true)
       authFetch('/api/streams')
         .then((res) => {
           if (!res.ok) {
+            incrementLoadingFailed()
             setLoadingStreams(false)
             throw new Error(`Failed to fetch streams: ${res.statusText}`)
           }
           return res.json() as Promise<Stream[]>
         })
         .then((nextStreams) => {
-          setStreams(nextStreams)
+          resetLoadingFailed()
+          nextStreams.forEach((stream) => streams.set(stream.id, stream))
           setLoadingStreams(false)
+          setStreamsLoaded(true)
         })
         .catch((err) => {
-          console.error(err)
+          incrementLoadingFailed()
+          setLoadingStreams(false)
+          throw new Error(`Failed to fetch streams: ${err}`)
         })
     }
-  }, [streams, loadingStreams])
+  }, [streams, loadingStreams, loadingFailed, streamsLoaded])
 
   return (
     <AppShell
@@ -208,7 +226,10 @@ export default function FullLayout(props: {
                           (maxId, layout) => Math.max(maxId, layout.id),
                           -1,
                         ) + 1
-                      return prev.concat({ id: nextId })
+                      return prev.concat({
+                        id: nextId,
+                        splitterStreams: [],
+                      })
                     })
                     e.preventDefault()
                   }}
@@ -221,12 +242,16 @@ export default function FullLayout(props: {
       </AppShell.Navbar>
       <AppShell.Main style={{ display: 'grid' }}>
         <StreamsGrid
-          streams={streams ?? []}
-          layout={activeLayout}
+          streams={streams}
+          layout={layouts.find((layout) => layout.id === activeLayout)!}
           setOnLayoutDeleted={setOnLayoutDeleted}
+          setLayoutStreams={(streams) => {
+            layouts[activeLayout].splitterStreams = streams
+            setLayouts(layouts)
+          }}
         />
         <Space h="md" />
-        <RecordingsPages streams={streams ?? []} />
+        <RecordingsPages streams={streams} />
         <Text mt="xl">
           AppShell example with all elements: Navbar, Header, Aside, Footer.
         </Text>

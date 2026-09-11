@@ -10,9 +10,9 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
-import { Recording } from '../types'
-import { authFetch, API_BASE } from '../main'
-import { formatTime, formatTimestamp } from './Recordings/RecordingsGrid'
+import { Recording } from '../../types'
+import { authFetch, API_BASE } from '../../main'
+import { formatTime, formatTimestamp } from './RecordingsGrid'
 
 export default function RecordingRenamePopover(props: {
   recordings: Map<string, (Recording & { page: number; index: number })[][]>

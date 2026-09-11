@@ -1,9 +1,10 @@
 /* eslint-disable import/no-named-as-default-member */
+import { FiTrash } from 'react-icons/fi'
 import { useCallback, useEffect, useRef, useState } from 'react'
 // eslint-disable-next-line import/no-named-as-default
 import Hls from 'hls.js'
-import { useViewportSize } from '@mantine/hooks'
-import { LoadingOverlay } from '@mantine/core'
+import { useHover, useViewportSize } from '@mantine/hooks'
+import { ActionIcon, LoadingOverlay } from '@mantine/core'
 import { Video } from '@gfazioli/mantine-video'
 import { type Stream } from '../../types'
 import { API_BASE, fetchWithRetry, authFetch } from '../../main'
@@ -11,11 +12,13 @@ import { API_BASE, fetchWithRetry, authFetch } from '../../main'
 export default function StreamVideo(props: {
   stream: Stream
   getAspectRatio: () => string
+  removeFromLayout: () => void | Promise<void>
 }) {
   const [streamUrl, setStreamUrl] = useState<string>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const videoRef = useRef<HTMLDivElement>(null)
+  const { hovered: videoHovered, ref: hoveredRef } = useHover<HTMLDivElement>()
   const streamRequestId = useRef(0)
   const { width } = useViewportSize()
 
@@ -157,7 +160,10 @@ export default function StreamVideo(props: {
         muted
         clickToToggle={false}
         doubleClickToFullscreen
-        ref={videoRef}
+        ref={(ref) => {
+          videoRef.current = ref
+          hoveredRef(ref)
+        }}
       >
         <div
           style={{
@@ -165,11 +171,34 @@ export default function StreamVideo(props: {
             top: 8,
             left: 8,
             color: 'white',
+            height: 20,
+            marginTop: 4,
             textShadow: '0 1px 2px black',
             pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'end',
           }}
         >
           {props.stream.nickname}
+          {videoHovered && (
+            <ActionIcon
+              onClick={(event) => {
+                event.preventDefault()
+                console.log('clicked')
+                props.removeFromLayout()
+              }}
+              variant="light"
+              ml={'sm'}
+              color="white"
+              radius="md"
+              aria-label="Remove stream from layout"
+              style={{
+                pointerEvents: 'auto',
+              }}
+            >
+              <FiTrash size={16} />
+            </ActionIcon>
+          )}
         </div>
         <Video.Controls />
       </Video>
