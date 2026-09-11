@@ -1,8 +1,10 @@
 import './styles.css'
 import '@mantine/core/styles.css'
 import '@mantine/lightbox/styles.css'
+import '@mantine/notifications/styles.css'
 import '@gfazioli/mantine-video/styles.css'
 import { useState, useEffect } from 'react'
+import { Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
@@ -561,6 +563,7 @@ export default function App() {
             setAuthenticated={setAuthenticated}
           />
         </ModalsProvider>
+        <Notifications />
       </MantineProvider>
     )
   }
@@ -582,6 +585,7 @@ export default function App() {
           overlayProps={{ radius: 'sm', blur: 2 }}
         />
       )}
+      <Notifications zIndex={10000} />
     </MantineProvider>
   )
 }

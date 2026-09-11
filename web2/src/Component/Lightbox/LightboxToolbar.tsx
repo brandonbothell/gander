@@ -18,6 +18,7 @@ import {
   useProps,
 } from '@mantine/core'
 import RecordingRenamePopover from '../RecordingRenamePopover'
+import { Recording } from '../../types'
 import classes from './CollapsedLightbox.module.css'
 import { useCollapsedLightboxContext } from './CollapsedLightbox.context'
 
@@ -34,6 +35,7 @@ export interface LightboxToolbarProps
     ElementProps<'div'> {
   /** Custom toolbar items, overrides default toolbar actions. Can be a function that receives the current lightbox state and handlers. */
   toolbarItems?: ToolbarItems
+  recordings: Map<string, (Recording & { page: number; index: number })[][]>
 }
 
 export type LightboxToolbarFactory = Factory<{
@@ -129,12 +131,13 @@ export const LightboxToolbar = factory<LightboxToolbarFactory>((props) => {
 
       {width > 600 && (
         <span {...ctx.getStyles('title', stylesApiProps)}>
-          {ctx.slides[ctx.currentIndex].title ?? null}
+          {ctx.currentTitle ?? null}
         </span>
       )}
 
       <div {...ctx.getStyles('toolbarGroup', stylesApiProps)}>
         <RecordingRenamePopover
+          recordings={props.recordings}
           key="edit"
           recording={ctx.slides[ctx.currentIndex].recording}
         />

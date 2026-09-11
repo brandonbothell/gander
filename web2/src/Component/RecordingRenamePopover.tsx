@@ -1,5 +1,5 @@
 import { FiEdit } from 'react-icons/fi'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useViewportSize } from '@mantine/hooks'
 import {
   Button,
@@ -11,9 +11,11 @@ import {
   TextInput,
 } from '@mantine/core'
 import { Recording } from '../types'
+import { authFetch, API_BASE } from '../main'
 import { formatTime, formatTimestamp } from './Recordings/RecordingsGrid'
 
 export default function RecordingRenamePopover(props: {
+  recordings: Map<string, (Recording & { page: number; index: number })[][]>
   recording: Recording & { page: number; index: number }
   onNicknameChange?: (
     recording: Recording & { page: number; index: number },
@@ -32,10 +34,31 @@ export default function RecordingRenamePopover(props: {
     setNicknameInputValue(props.recording.nickname || '')
   }, [props.recording])
 
-  const saveNickname = () => {
+  const saveNickname = useCallback(async () => {
+    const oldNickname = nickname
     setNickname(nicknameInputValue)
+    authFetch(
+      `${API_BASE}/api/recordings/${props.recording.streamId}/${encodeURIComponent(props.recording.filename)}/nickname`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: nicknameInputValue }),
+      },
+    ).then((res) => {
+      if (!res.ok) {
+        console.error('Failed to save nickname:', res.statusText)
+        return setNickname(oldNickname) // Reset on error
+      }
+
+      props.recording.nickname = nicknameInputValue
+      const streamRecordings = props.recordings.get(props.recording.streamId)!
+      streamRecordings[props.recording.page - 1][props.recording.index] =
+        props.recording
+      props.recordings.set(props.recording.streamId, streamRecordings)
+    })
+
     props.onNicknameChange?.(props.recording, nicknameInputValue.trim())
-  }
+  }, [nicknameInputValue])
 
   const cancelNicknameChange = () => {
     setNicknameInputValue(props.recording.nickname)
@@ -90,7 +113,7 @@ export default function RecordingRenamePopover(props: {
                 <Button variant="default" onClick={cancelNicknameChange}>
                   Cancel
                 </Button>
-                <Button onClick={saveNickname}>Save</Button>
+                <Button onClick={() => void saveNickname()}>Save</Button>
               </>
             )}
           </Group>

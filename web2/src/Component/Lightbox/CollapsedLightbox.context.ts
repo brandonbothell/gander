@@ -25,6 +25,7 @@ export interface CollapsedLightboxContextValue {
   opened: boolean
   slides: CollapsedLightboxSlideData[]
   currentIndex: number
+  currentTitle: React.ReactNode
   setIndex: (index: number) => void
   next: () => void
   prev: () => void

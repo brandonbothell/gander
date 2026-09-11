@@ -110,30 +110,6 @@ export default function RecordingsGrid(props: {
       props.currentPage.map((recording) => ({
         type: 'custom',
         recording,
-        title: (
-          <Grid gap={0}>
-            {recording.nickname ? (
-              <Grid.Col span={'content'}>
-                <Text span>{recording.nickname}&nbsp;&mdash;&nbsp;</Text>
-              </Grid.Col>
-            ) : null}
-            <Grid.Col span={'content'}>
-              <Text span>
-                {formatTime(recording.duration)}&nbsp;&mdash;&nbsp;
-              </Text>
-            </Grid.Col>
-            <Grid.Col span={'content'}>
-              <Text span>{formatTimestamp(recording.filename)}</Text>
-            </Grid.Col>
-          </Grid>
-        ),
-        /* <>
-            {recording.nickname ? `"${recording.nickname}"` : ''}
-            {recording.nickname ? <>&nbsp;&mdash;&nbsp;</> : null}
-            {formatTime(recording.duration)}
-            <>&nbsp;&mdash;&nbsp;</>
-            {formatTimestamp(recording.filename)}
-          </> */
         autoPlay: true,
         render: ({ active }) => (
           <Center h="100%" w="100%" display={'grid'} pos="relative">

@@ -16,10 +16,12 @@ import {
   factory,
   type Factory,
   FocusTrap,
+  Grid,
   type MantineTransition,
   OptionalPortal,
   RemoveScroll,
   type StylesApiProps,
+  Text,
   Transition,
   type TransitionOverride,
   useDirection,
@@ -28,6 +30,8 @@ import {
   useStyles,
   VisuallyHidden,
 } from '@mantine/core'
+import { formatTime, formatTimestamp } from '../Recordings/RecordingsGrid'
+import { Recording } from '../../types'
 import { useLightboxZoom } from './hooks/use-lightbox-zoom'
 import { useLightboxLockScroll } from './hooks/use-lightbox-lock-scroll'
 import { useLightboxKeyboard } from './hooks/use-lightbox-keyboard'
@@ -88,6 +92,10 @@ export interface LightboxRootProps
     BoxProps,
     StylesApiProps<LightboxRootFactory>,
     ElementProps<'div', 'children'> {
+  recordings: Map<string, (Recording & { page: number; index: number })[][]>
+
+  activeRecording: Recording & { page: number; index: number }
+
   /** Controls whether the lightbox is opened */
   opened: boolean
 
@@ -226,7 +234,9 @@ function exitDocumentFullscreen() {
     _document.mozCancelFullScreen
 
   if (typeof exit === 'function') {
-    Promise.resolve(exit.call(_document)).catch(() => {})
+    Promise.resolve(exit.call(_document)).catch(() => {
+      /* empty */
+    })
   }
 }
 
@@ -271,6 +281,8 @@ export const LightboxRoot = factory<LightboxRootFactory>((_props) => {
     withinPortal,
     zIndex,
     transitionDuration,
+    recordings,
+    activeRecording,
     transitionProps,
     emblaOptions,
     zoomMaxScale,
@@ -632,6 +644,31 @@ export const LightboxRoot = factory<LightboxRootFactory>((_props) => {
         ? undefined
         : currentSlide?.alt
 
+  const currentTitle = useMemo(() => {
+    if (!activeRecording) return ''
+    const streamRecordings = recordings.get(activeRecording.streamId)!
+    console.log(streamRecordings)
+    const recording =
+      streamRecordings[props.activeRecording.page - 1][
+        props.activeRecording.index
+      ]
+    return (
+      <Grid gap={0}>
+        {recording.nickname ? (
+          <Grid.Col span={'content'}>
+            <Text span>{recording.nickname}&nbsp;&mdash;&nbsp;</Text>
+          </Grid.Col>
+        ) : null}
+        <Grid.Col span={'content'}>
+          <Text span>{formatTime(recording.duration)}&nbsp;&mdash;&nbsp;</Text>
+        </Grid.Col>
+        <Grid.Col span={'content'}>
+          <Text span>{formatTimestamp(recording.filename)}</Text>
+        </Grid.Col>
+      </Grid>
+    )
+  }, [recordings, activeRecording])
+
   const contextValue = useMemo(
     () => ({
       getStyles: stableGetStyles,
@@ -642,8 +679,9 @@ export const LightboxRoot = factory<LightboxRootFactory>((_props) => {
       setIndex,
       next: handleNext,
       prev: handlePrev,
-      embla: embla ?? null,
       emblaRef,
+      embla: embla ?? null,
+      currentTitle,
       withZoom: !!withZoom,
       withThumbnails: !!withThumbnails,
       withFullscreen: !!withFullscreen,

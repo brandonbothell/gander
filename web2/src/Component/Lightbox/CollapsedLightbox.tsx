@@ -1,5 +1,6 @@
 import { FiTrash } from 'react-icons/fi'
 import { useEffect, useRef, useState } from 'react'
+import { notifications } from '@mantine/notifications'
 import { modals } from '@mantine/modals'
 import {
   createCloseToolbarItem,
@@ -23,7 +24,6 @@ import { LightboxNavigation } from './LightboxNavigation'
 import { LightboxCaption } from './LightboxCaption'
 
 export type CollapsedLightboxSlideData = LightboxSlideData & {
-  title?: React.ReactNode
   recording: Recording & { page: number; index: number }
 }
 
@@ -51,7 +51,14 @@ export default function CollapsedLightbox({
         title: 'Delete recording',
         children: <Text size="sm">Delete {filename}?</Text>,
         labels: { confirm: 'Delete', cancel: 'Cancel' },
-        onCancel: () => resolve(false),
+        onCancel: () => {
+          notifications.show({
+            title: 'Cancelled',
+            message: 'Recording deletion cancelled.',
+            color: 'gray',
+          })
+          resolve(false)
+        },
         onConfirm: () => resolve(true),
         zIndex: 1003,
       }),
@@ -93,6 +100,12 @@ export default function CollapsedLightbox({
         async onClick() {
           if (!props.activeRecording) return
           if (!(await openDeleteModal(props.activeRecording!.filename))) return
+          const notification = notifications.show({
+            autoClose: false,
+            title: 'Loading',
+            message: 'Deleting recording...',
+            color: 'blue',
+          })
 
           const res = await authFetch(
             `/api/recordings/${props.activeRecording.streamId}/${props.activeRecording.filename}`,
@@ -100,8 +113,20 @@ export default function CollapsedLightbox({
               method: 'DELETE',
             },
           )
+          notifications.hide(notification)
           if (res.ok && (await res.json()).success) {
+            notifications.show({
+              title: 'Success',
+              message: 'Recording deleted.',
+              color: 'teal',
+            })
             props.onRecordingDeleted?.(props.activeRecording)
+          } else {
+            notifications.show({
+              title: 'Failure',
+              message: 'Recording deletion failed, please try again.',
+              color: 'gray',
+            })
           }
         },
         position: 'right',
@@ -117,19 +142,21 @@ export default function CollapsedLightbox({
   }
 
   return (
+    // @ts-ignore
     <LightboxRoot
       {...{
         ...props,
         onRecordingDeleted: undefined,
         recordingsCount: undefined,
-        activeRecording: undefined,
         currentSrc: undefined,
-        recordings: undefined,
       }}
     >
       {children ?? (
         <>
-          <LightboxToolbar toolbarItems={resolvedToolbarItems} />
+          <LightboxToolbar
+            toolbarItems={resolvedToolbarItems}
+            recordings={props.recordings}
+          />
           <LightboxSlides>
             {props.slides.map((slide, index) => (
               <LightboxSlide key={index} slide={slide} index={index} />
