@@ -8,8 +8,16 @@
       content="minimum-scale=1, initial-scale=1, width=device-width, user-scalable=no"
     />
     <title>Gander</title>
+    <script>
+      // to prevent Firefox FOUC, this must be here
+      let FF_FOUC_FIX
+    </script>
   </head>
   <body>
+    // to prevent warning of Firefox FOUC, this must be here
+    <script>
+      0
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
