@@ -1,4 +1,5 @@
 import ReactDOM from 'react-dom/client'
+import { StrictMode } from 'react'
 import App from './App'
 
 function isIOS() {
@@ -213,5 +214,7 @@ export async function fetchWithRetry<T extends Response>(
 }
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <App />,
+  <StrictMode>
+    <App />,
+  </StrictMode>,
 )

@@ -154,6 +154,7 @@ export default function CollapsedLightbox({
         recordingsCount: undefined,
         currentSrc: undefined,
         setInlineFullscreen: undefined,
+        toggleInlineFullscreen: undefined,
       }}
     >
       {children ?? (

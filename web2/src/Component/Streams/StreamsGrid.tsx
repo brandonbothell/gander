@@ -73,7 +73,7 @@ export default function StreamsGrid(props: {
   })
 
   useEffect(() => {
-    props.setOnLayoutDeleted(onLayoutDeleted)
+    props.setOnLayoutDeleted(() => onLayoutDeleted)
   }, [props.setOnLayoutDeleted])
 
   useEffect(() => {

@@ -647,7 +647,6 @@ export const LightboxRoot = factory<LightboxRootFactory>((_props) => {
   const currentTitle = useMemo(() => {
     if (!activeRecording) return ''
     const streamRecordings = recordings.get(activeRecording.streamId)!
-    console.log(streamRecordings)
     const recording =
       streamRecordings[props.activeRecording.page - 1][
         props.activeRecording.index
