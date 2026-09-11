@@ -83,7 +83,6 @@ export default function StreamsGrid(props: {
       setStoredSplitterLayouts((prev) => {
         const next = prev ? [...prev] : []
         while (next.length <= props.layout.id) next.push(null)
-        const streamIds = props.streams.keys().toArray()
         next[props.layout.id] ??= [
           {
             sizes: [50, 50],
@@ -194,7 +193,9 @@ export default function StreamsGrid(props: {
         styles={{
           thumb: {
             right: splitterRef.current?.collapsed[1]
-              ? 10
+              ? width < 768
+                ? 10
+                : 115
               : splitterRef.current?.collapsed[0]
                 ? -19 // This offset is primarily to help with use with small touchscreens
                 : undefined,
