@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-react'
 import { useDisclosure, useMap, useViewportSize } from '@mantine/hooks'
 import {
@@ -12,13 +12,12 @@ import {
   Grid,
 } from '@mantine/core'
 import { useVideo, Video } from '@gfazioli/mantine-video'
-import CollapsedLightbox, {
-  type CollapsedLightboxSlideData,
-} from '../Lightbox/CollapsedLightbox'
+import type { CollapsedLightboxSlideData } from '../Lightbox/CollapsedLightbox'
 import { Recording, Stream } from '../../types'
 import { API_BASE, authFetch, fetchWithRetry } from '../../main'
 import { onRecordingDeleted } from '../../event-listeners'
 import classes from './RecordingsGrid.module.css'
+const CollapsedLightbox = lazy(() => import('../Lightbox/CollapsedLightbox'))
 
 export type SignedThumbnailUrl = {
   filename: string
@@ -108,6 +107,7 @@ export default function RecordingsGrid(props: {
     [props.currentPage, activeRecording],
   )
   const [lightboxOpen, { set: setLightboxOpen }] = useDisclosure(false)
+  const [loadLightbox, { set: setLoadLightbox }] = useDisclosure(false)
   const lightboxSlides = useMemo<CollapsedLightboxSlideData[]>(
     () =>
       props.currentPage.map((recording) => ({
@@ -400,33 +400,35 @@ export default function RecordingsGrid(props: {
         zIndex={1000}
         overlayProps={{ radius: 'sm', blur: 2 }}
       />
-      <CollapsedLightbox
-        opened={lightboxOpen}
-        onClose={() => setLightboxOpen(false)}
-        slides={lightboxSlides}
-        currentIndex={currentLightboxIndex}
-        onIndexChange={(index) => setRecording(props.currentPage[index])}
-        withThumbnails
-        withDownload
-        onRecordingDeleted={() =>
-          onRecordingDeleted(
-            activeRecording!,
-            props.recordings,
-            setLoading,
-            setRecording,
-            setLightboxOpen,
-          )
-        }
-        toggleInlineFullscreen={toggleInlineFullscreen}
-        recordingsCount={props.recordingsCount}
-        recordings={props.recordings}
-        activeRecording={activeRecording}
-        currentSrc={videoElement?.src || ''}
-        closeOnSwipeDown={!(inlineFullscreen && width < 500)}
-        withFullscreen={canFullscreen}
-        closeOnClickOutside={false}
-        emblaOptions={{ watchDrag: false }}
-      />
+      {loadLightbox && (
+        <CollapsedLightbox
+          opened={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          slides={lightboxSlides}
+          currentIndex={currentLightboxIndex}
+          onIndexChange={(index) => setRecording(props.currentPage[index])}
+          withThumbnails
+          withDownload
+          onRecordingDeleted={() =>
+            onRecordingDeleted(
+              activeRecording!,
+              props.recordings,
+              setLoading,
+              setRecording,
+              setLightboxOpen,
+            )
+          }
+          toggleInlineFullscreen={toggleInlineFullscreen}
+          recordingsCount={props.recordingsCount}
+          recordings={props.recordings}
+          activeRecording={activeRecording}
+          currentSrc={videoElement?.src || ''}
+          closeOnSwipeDown={!(inlineFullscreen && width < 500)}
+          withFullscreen={canFullscreen}
+          closeOnClickOutside={false}
+          emblaOptions={{ watchDrag: false }}
+        />
+      )}
       {props.currentPage?.map((recording, index) => (
         <Paper
           mt="sm"
@@ -436,8 +438,9 @@ export default function RecordingsGrid(props: {
           key={index}
           className={classes.recording}
           onClick={() => {
+            if (!loadLightbox) setLoadLightbox(true)
             setRecording(recording)
-            setLightboxOpen(true)
+            setTimeout(() => setLightboxOpen(true), loadLightbox ? 0 : 50) // Try to lightbox code load
           }}
         >
           <div className={classes.thumbnailFrame}>

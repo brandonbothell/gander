@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { lazy, useCallback, useEffect, useRef } from 'react'
 import {
   type SplitterPaneSize,
   useLocalStorage,
@@ -6,9 +6,9 @@ import {
   useViewportSize,
 } from '@mantine/hooks'
 import { type CSSProperties, Group, Splitter } from '@mantine/core'
-import StreamAddButton from '../SplitButton/StreamAddButton'
 import { type Stream } from '../../types'
 import StreamVideo from './StreamVideo'
+const StreamAddButton = lazy(() => import('../SplitButton/StreamAddButton'))
 
 type StoredSplitterLayout = {
   sizes: SplitterPaneSize[]
