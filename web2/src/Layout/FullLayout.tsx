@@ -262,8 +262,9 @@ export default function FullLayout(props: {
         </Text>
       </AppShell.Main>
       <AppShell.Aside p="md">Aside</AppShell.Aside>
-      <AppShell.Footer p="md">
-        Gander © 2026 Brandon Bothell. All rights reserved. - Privacy is a right
+      <AppShell.Footer p="sm">
+        Gander © 2026 Brandon Bothell. All rights reserved&mdash;Privacy is a
+        right.
       </AppShell.Footer>
     </AppShell>
   )

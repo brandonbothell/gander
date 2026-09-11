@@ -184,7 +184,6 @@ export default function StreamVideo(props: {
             <ActionIcon
               onClick={(event) => {
                 event.preventDefault()
-                console.log('clicked')
                 props.removeFromLayout()
               }}
               variant="light"

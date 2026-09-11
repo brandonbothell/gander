@@ -5,14 +5,15 @@ import { modals } from '@mantine/modals'
 import {
   createCloseToolbarItem,
   createDownloadToolbarItem,
-  createFullscreenToolbarItem,
   createThumbnailsToolbarItem,
   type LightboxSlideData,
   type LightboxProps,
   type ToolbarItem,
   type ToolbarItemsPayload,
+  createFullscreenToolbarItem,
 } from '@mantine/lightbox'
 import { Text } from '@mantine/core'
+import { useVideo } from '@gfazioli/mantine-video'
 import { Recording } from '../../types'
 import { authFetch } from '../../main'
 import { LightboxSlides } from './Slides/LightboxSlides'
@@ -36,6 +37,7 @@ export interface CollapsedLightboxProps extends LightboxProps {
     recording: Recording & { page: number; index: number },
   ) => void | Promise<void>
   slides: CollapsedLightboxSlideData[]
+  toggleInlineFullscreen: () => void
 }
 
 export default function CollapsedLightbox({
@@ -45,6 +47,7 @@ export default function CollapsedLightbox({
 }: CollapsedLightboxProps) {
   const payloadRef = useRef<ToolbarItemsPayload | null>(null)
   const [thumbnailsVisible, setThumbnailsVisible] = useState(false)
+  const { canFullscreen } = useVideo()
   const openDeleteModal = (filename: string) =>
     new Promise<boolean>((resolve) =>
       modals.openConfirmModal({
@@ -72,6 +75,7 @@ export default function CollapsedLightbox({
 
   const resolvedToolbarItems = (
     payload: ToolbarItemsPayload,
+    canFullscreen: boolean,
   ): ToolbarItem[] => {
     payloadRef.current = payload
 
@@ -133,7 +137,7 @@ export default function CollapsedLightbox({
       },
       createDownloadToolbarItem(props.currentSrc, payload.labels),
       createFullscreenToolbarItem(
-        payload.toggleFullscreen,
+        canFullscreen ? payload.toggleFullscreen : props.toggleInlineFullscreen,
         payload.isFullscreen,
         payload.labels,
       ),
@@ -149,12 +153,15 @@ export default function CollapsedLightbox({
         onRecordingDeleted: undefined,
         recordingsCount: undefined,
         currentSrc: undefined,
+        setInlineFullscreen: undefined,
       }}
     >
       {children ?? (
         <>
           <LightboxToolbar
-            toolbarItems={resolvedToolbarItems}
+            toolbarItems={(payload) =>
+              resolvedToolbarItems(payload, canFullscreen)
+            }
             recordings={props.recordings}
           />
           <LightboxSlides>

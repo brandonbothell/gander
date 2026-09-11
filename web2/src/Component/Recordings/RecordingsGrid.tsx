@@ -54,7 +54,10 @@ export default function RecordingsGrid(props: {
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
     null,
   )
-  const [inlineFullscreen, setInlineFullscreen] = useState(false)
+  const [
+    inlineFullscreen,
+    { set: setInlineFullscreen, toggle: toggleInlineFullscreen },
+  ] = useDisclosure(false)
   const recordingRequestId = useRef(0)
 
   const setVideoContainer = useCallback((element: HTMLDivElement | null) => {
@@ -169,9 +172,7 @@ export default function RecordingsGrid(props: {
                                 ? 'Exit fullscreen'
                                 : 'Enter fullscreen'
                             }
-                            onClick={() =>
-                              setInlineFullscreen((value) => !value)
-                            }
+                            onClick={toggleInlineFullscreen}
                           >
                             {inlineFullscreen ? (
                               <IconArrowsMinimize size={20} />
@@ -416,6 +417,7 @@ export default function RecordingsGrid(props: {
             setLightboxOpen,
           )
         }
+        toggleInlineFullscreen={toggleInlineFullscreen}
         recordingsCount={props.recordingsCount}
         recordings={props.recordings}
         activeRecording={activeRecording}
