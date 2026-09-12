@@ -1,0 +1,31 @@
+.mantine-NavLink-root {
+  border-radius: 5px;
+}
+
+.mantine-Lightbox-overlay,
+.mantine-Lightbox-content {
+  z-index: 1002 !important;
+}
+
+.mantine-Splitter-thumb {
+  &:where([data-orientation='horizontal']) {
+    width: rem(16px) !important;
+    height: rem(60px);
+  }
+
+  &:where([data-orientation='vertical']) {
+    width: rem(60px);
+    height: rem(16px) !important;
+  }
+}
+
+.mantine-Splitter-pane {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden !important;
+}
+
+.mantine-Combobox-dropdown {
+  z-index: 1001 !important;
+}

@@ -16,20 +16,40 @@ interface SignedUrlCache {
   urls: Record<SignedUrlKey, SignedUrlEntry>
 }
 
+let signedUrlCacheExpirationsSorted: Array<{
+  key: SignedUrlKey
+  expiresAt: number
+}> = []
+
 // --- in-memory cache ---
 let memoryCache: SignedUrlCache | null = null
+let cacheCleanInterval: number
 
-function loadCache(): SignedUrlCache {
+function getCache(): SignedUrlCache {
+  if (!cacheCleanInterval) {
+    cacheCleanInterval = setInterval(cleanupExpiredCacheEntries, 60 * 1000)
+  }
   if (memoryCache) return memoryCache
+
   try {
-    const cached = JSON.parse(localStorage.getItem('signedUrlCache') || 'null')
+    const cached: SignedUrlCache = JSON.parse(
+      localStorage.getItem('signedUrlCache') || 'null',
+    )
+
     if (cached && cached.urls) {
       memoryCache = cached
+      signedUrlCacheExpirationsSorted = Object.entries(cached.urls)
+        .map(([key, entry]) => ({
+          key: key as SignedUrlKey,
+          expiresAt: entry.expiresAt,
+        }))
+        .sort((a, b) => a.expiresAt - b.expiresAt)
       return memoryCache || { urls: {} }
     }
   } catch {
     // Ignore parse errors
   }
+
   memoryCache = { urls: {} }
   return memoryCache
 }
@@ -51,6 +71,26 @@ function getCacheKey(
   streamId: string,
 ): SignedUrlKey {
   return `${streamId}_${type}_${filename}`
+}
+
+function cleanupExpiredCacheEntries() {
+  const cache = getCache()
+  const now = Math.floor(Date.now() / 1000)
+  let removed = false
+
+  for (const entry of signedUrlCacheExpirationsSorted) {
+    if (entry.expiresAt > now + 10) break
+    if (cache.urls[entry.key]) {
+      delete cache.urls[entry.key]
+      removed = true
+    }
+  }
+
+  signedUrlCacheExpirationsSorted = signedUrlCacheExpirationsSorted.filter(
+    (entry) => entry.expiresAt > now + 10 && cache.urls[entry.key],
+  )
+
+  if (removed) saveCache()
 }
 
 const queuedForFetching: {
@@ -85,7 +125,7 @@ export function useSignedUrl(
   useEffect(() => {
     let isMounted = true
 
-    const cache = loadCache()
+    const cache = getCache()
     const cacheKey = getCacheKey(filename, type, streamId)
     const cached = cache.urls[cacheKey]
     const now = Math.floor(Date.now() / 1000)
@@ -108,7 +148,7 @@ export function useSignedUrl(
         return
       }
 
-      const cache = loadCache()
+      const cache = getCache()
       const cacheKey = getCacheKey(filename, type, streamId)
       const cached = cache.urls[cacheKey]
       const now = Math.floor(Date.now() / 1000)
@@ -120,15 +160,15 @@ export function useSignedUrl(
       }
 
       if (!signedUrlsToFetch[streamId]) {
-signedUrlsToFetch[streamId] = {
+        signedUrlsToFetch[streamId] = {
           thumbnail: [],
           video: [],
         }
-}
+      }
 
       if (isMounted) {
-signedUrlsToFetch[streamId][type].push(encodeURIComponent(filename))
-}
+        signedUrlsToFetch[streamId][type].push(encodeURIComponent(filename))
+      }
 
       if (isMounted && !queuedForFetching[streamId]) {
         queuedForFetching[streamId] = {
@@ -210,7 +250,7 @@ export function clearSignedUrlCache() {
 
 // Export function to get cache statistics
 export function getSignedUrlCacheStats() {
-  const cache = loadCache()
+  const cache = getCache()
   const now = Math.floor(Date.now() / 1000)
 
   const expiredUrls = Object.values(cache.urls).filter(
@@ -226,7 +266,7 @@ export function getSignedUrlCacheStats() {
 
 // Export function to clear cache for specific stream (useful when stream is deleted)
 export function clearStreamCache(streamId: string) {
-  const cache = loadCache()
+  const cache = getCache()
   const keysToRemove = Object.keys(cache.urls).filter((key) =>
     key.startsWith(`${streamId}_`),
   ) as Array<`${string}_video_${string}` | `${string}_thumbnail_${string}`>

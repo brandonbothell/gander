@@ -3,6 +3,7 @@ import fs from 'fs'
 import { exec, spawn } from 'child_process'
 import { StreamMotionState } from './types/stream'
 import { logMotion } from './logMotion'
+import { isNvidiaAvailable } from './hardwareCheck'
 import {
   saveMotionSegments,
   setupStreamMotionMonitoring,
@@ -350,7 +351,7 @@ export class StreamManager {
     const inputUrl = inputIsRtsp
       ? this.getRtspUrlWithAuth()
       : this.config.ffmpegInput
-    let ffmpegArgs: string[]
+    let ffmpegArgs: (string | string[])[]
     if (inputIsRtsp) {
       ffmpegArgs = [
         '-y',
@@ -370,8 +371,44 @@ export class StreamManager {
         '-i',
         inputUrl,
 
-        '-c:v',
-        'copy',
+        // TODO: Add drop-down options to stream settings
+        (() => {
+          if (isNvidiaAvailable()) {
+            return [
+              '-c:v',
+              'h264_nvenc',
+
+              '-preset',
+              'p1', // Lowest latency, highest speed profile for NVENC
+
+              '-tune',
+              'ull', // Ultra-low latency tuning
+
+              '-g',
+              '30', // Strictly force a keyframe every 30 frames (fixes Chrome's seek crash)
+
+              '-sc_threshold', // Disable scene-change detection to enforce strict GOP structure
+              '0',
+            ]
+          } else {
+            return [
+              '-c:v',
+              'libx264',
+
+              '-preset',
+              'veryfast',
+
+              '-tune',
+              'zerolatency',
+
+              '-g',
+              '30',
+
+              '-sc_threshold',
+              '0',
+            ]
+          }
+        })(),
 
         '-map',
         '0:v:0',
@@ -492,7 +529,7 @@ export class StreamManager {
       `[${this.config.id}] Starting FFmpeg with args:`,
       ffmpegArgs.join(' '),
     )
-    const ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
+    const ffmpegProcess = spawn('ffmpeg', ffmpegArgs.flat(), {
       stdio: ['ignore', 'ignore', 'pipe'],
       shell: false,
     })
