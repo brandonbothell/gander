@@ -37,7 +37,7 @@ export function onRecordingDeleted(
         recordings: (Recording & { motionTimestamps: string })[]
         deletedRecordings: string[]
       }
-      if (!page.total || !page.recordings?.length) {
+      if (page.total === undefined || !Array.isArray(page.recordings)) {
         console.error('Error loading recordings', page)
         setLoading(false)
         return

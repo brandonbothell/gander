@@ -585,7 +585,7 @@ export default function App() {
           overlayProps={{ radius: 'sm', blur: 2 }}
         />
       )}
-      <Notifications zIndex={10000} />
+      <Notifications zIndex={10001} />
     </MantineProvider>
   )
 }

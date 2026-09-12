@@ -1,17 +1,37 @@
 import { FiChevronDown, FiPlus } from 'react-icons/fi'
 import { ActionIcon, Button, Group, Menu } from '@mantine/core'
-import CreateStreamPopover from '../../CreateStream/CreateStreamPopover'
+import CreateEditStreamPopover from '../../CreateStream/CreateEditStreamPopover'
 import { Stream } from '../../../types'
 import classes from './StreamAddButton.module.css'
 
 export default function StreamAddButton(props: {
   color?: string
   streams: Map<string, Stream>
+  setLayouts: (
+    val:
+      | {
+          id: number
+          splitterStreams: string[]
+        }[]
+      | ((
+          prevState: {
+            id: number
+            splitterStreams: string[]
+          }[],
+        ) => {
+          id: number
+          splitterStreams: string[]
+        }[]),
+  ) => void
   setStream: (streamId: string) => void | Promise<void>
 }) {
   return (
     <Group wrap="nowrap" gap={0}>
-      <CreateStreamPopover streams={props.streams} setStream={props.setStream}>
+      <CreateEditStreamPopover
+        streams={props.streams}
+        setStream={props.setStream}
+        setLayouts={props.setLayouts}
+      >
         <Button
           leftSection={<FiPlus size={16} />}
           color={props.color}
@@ -19,7 +39,7 @@ export default function StreamAddButton(props: {
         >
           New camera
         </Button>
-      </CreateStreamPopover>
+      </CreateEditStreamPopover>
       <Menu
         transitionProps={{ transition: 'pop' }}
         position="bottom-end"

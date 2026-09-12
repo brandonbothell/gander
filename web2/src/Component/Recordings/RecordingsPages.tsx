@@ -105,6 +105,23 @@ export default function RecordingsPages(props: {
   }, [activePage, activeStream, recordings, loading])
 
   useEffect(() => {
+    // Check if there are no recordings
+    const streamRecordings = activeStream
+      ? recordings.get(activeStream.id)
+      : undefined
+    const total = activeStream
+      ? totalRecordings.get(activeStream!.id)
+      : undefined
+    if (total === 0) {
+      if (
+        activeStream &&
+        (!streamRecordings?.length || streamRecordings[0].length !== 0)
+      ) {
+        recordings.set(activeStream!.id, [[]])
+      }
+      return
+    }
+
     if (lastFailedPage !== 0 && activePage === lastFailedPage) return
     if (!activeStream && props.streams.size) {
       let stream = selectedStream
@@ -145,7 +162,7 @@ export default function RecordingsPages(props: {
           deletedRecordings: string[]
         }
 
-        if (!page.total || !page.recordings?.length) {
+        if (page.total === undefined || !Array.isArray(page.recordings)) {
           console.error(`Error loading recordings: ${JSON.stringify(page)}`)
           setLastFailedPage(activePage)
           totalRecordings.set(activeStream.id, page.total || 0)
@@ -201,7 +218,7 @@ export default function RecordingsPages(props: {
         setLoading(false)
       }
     })()
-  }, [props.streams, activeStream, recordings, activePage])
+  }, [props.streams, activeStream, recordings, activePage, totalRecordings])
 
   return (
     <>

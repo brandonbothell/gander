@@ -19,6 +19,22 @@ type StoredSplitterLayout = {
 export default function StreamsGrid(props: {
   streams: Map<string, Stream>
   layout: { id: number; splitterStreams: string[] }
+  setLayouts: (
+    val:
+      | {
+          id: number
+          splitterStreams: string[]
+        }[]
+      | ((
+          prevState: {
+            id: number
+            splitterStreams: string[]
+          }[],
+        ) => {
+          id: number
+          splitterStreams: string[]
+        }[]),
+  ) => void
   setLayoutStreams: (streams: string[]) => void | Promise<void>
   setOnLayoutDeleted: React.Dispatch<
     React.SetStateAction<(layoutId: number) => void>
@@ -236,8 +252,13 @@ export default function StreamsGrid(props: {
             }}
           >
             <Splitter.Pane defaultSize={50} min={10} bg="blue" collapsible>
-              {splitterStreams[0] ? (
+              {splitterStreams[0] && props.streams.get(splitterStreams[0]) ? (
                 <StreamVideo
+                  setStream={(streamId) => {
+                    splitterStreams[0] = streamId
+                    props.setLayoutStreams(splitterStreams)
+                  }}
+                  setLayouts={props.setLayouts}
                   stream={props.streams.get(splitterStreams[0])!}
                   streams={props.streams}
                   getAspectRatio={getAspectRatio}
@@ -251,6 +272,7 @@ export default function StreamsGrid(props: {
                   <StreamAddButton
                     color="grape"
                     streams={props.streams}
+                    setLayouts={props.setLayouts}
                     setStream={(streamId) => {
                       splitterStreams[0] = streamId
                       props.setLayoutStreams(splitterStreams)
@@ -260,13 +282,18 @@ export default function StreamsGrid(props: {
               )}
             </Splitter.Pane>
             <Splitter.Pane defaultSize={50} min={10} bg="violet" collapsible>
-              {splitterStreams[1] ? (
+              {splitterStreams[1] && props.streams.get(splitterStreams[1]) ? (
                 <StreamVideo
                   streams={props.streams}
                   stream={props.streams.get(splitterStreams[1])!}
+                  setLayouts={props.setLayouts}
                   getAspectRatio={getAspectRatio}
                   removeFromLayout={() => {
                     delete splitterStreams[1]
+                    props.setLayoutStreams(splitterStreams)
+                  }}
+                  setStream={(streamId) => {
+                    splitterStreams[1] = streamId
                     props.setLayoutStreams(splitterStreams)
                   }}
                 />
@@ -279,6 +306,7 @@ export default function StreamsGrid(props: {
                 >
                   <StreamAddButton
                     color="teal"
+                    setLayouts={props.setLayouts}
                     streams={props.streams}
                     setStream={(streamId) => {
                       splitterStreams[1] = streamId
@@ -318,13 +346,18 @@ export default function StreamsGrid(props: {
             }}
           >
             <Splitter.Pane defaultSize={50} min={10} bg="teal" collapsible>
-              {splitterStreams[2] ? (
+              {splitterStreams[2] && props.streams.get(splitterStreams[2]) ? (
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[2])!}
                   streams={props.streams}
                   getAspectRatio={getAspectRatio}
+                  setLayouts={props.setLayouts}
                   removeFromLayout={() => {
                     delete splitterStreams[2]
+                    props.setLayoutStreams(splitterStreams)
+                  }}
+                  setStream={(streamId) => {
+                    splitterStreams[2] = streamId
                     props.setLayoutStreams(splitterStreams)
                   }}
                 />
@@ -332,6 +365,7 @@ export default function StreamsGrid(props: {
                 <Splitter.Pane defaultSize={50} min={10} bg="teal" collapsible>
                   <StreamAddButton
                     color="violet"
+                    setLayouts={props.setLayouts}
                     streams={props.streams}
                     setStream={(streamId) => {
                       splitterStreams[2] = streamId
@@ -342,13 +376,18 @@ export default function StreamsGrid(props: {
               )}
             </Splitter.Pane>
             <Splitter.Pane defaultSize={50} min={10} bg="grape" collapsible>
-              {splitterStreams[3] ? (
+              {splitterStreams[3] && props.streams.get(splitterStreams[3]) ? (
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[3])!}
                   streams={props.streams}
                   getAspectRatio={getAspectRatio}
+                  setLayouts={props.setLayouts}
                   removeFromLayout={() => {
                     delete splitterStreams[3]
+                    props.setLayoutStreams(splitterStreams)
+                  }}
+                  setStream={(streamId) => {
+                    splitterStreams[3] = streamId
                     props.setLayoutStreams(splitterStreams)
                   }}
                 />
@@ -356,6 +395,7 @@ export default function StreamsGrid(props: {
                 <Splitter.Pane defaultSize={50} min={10} bg="grape" collapsible>
                   <StreamAddButton
                     color="blue"
+                    setLayouts={props.setLayouts}
                     streams={props.streams}
                     setStream={(streamId) => {
                       splitterStreams[3] = streamId

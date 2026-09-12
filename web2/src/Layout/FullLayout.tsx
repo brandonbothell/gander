@@ -243,6 +243,7 @@ export default function FullLayout(props: {
       <AppShell.Main style={{ display: 'grid' }}>
         <StreamsGrid
           streams={streams}
+          setLayouts={setLayouts}
           layout={layouts.find((layout) => layout.id === activeLayout)!}
           setOnLayoutDeleted={setOnLayoutDeleted}
           setLayoutStreams={(streams) => {

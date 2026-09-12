@@ -75,11 +75,9 @@ export default function initializeStreamRoutes(
         return
       }
       if (!nickname || !ffmpegInput) {
-        res
-          .status(400)
-          .json({
-            error: `Nickname and camera ${rtspUser || rtspPass ? 'IP' : 'information'} are required.`,
-          })
+        res.status(400).json({
+          error: `Nickname and camera ${rtspUser || rtspPass ? 'IP' : 'information'} are required.`,
+        })
         return
       }
       const validation = validateStreamInput({
@@ -267,7 +265,11 @@ export default function initializeStreamRoutes(
               `[StreamManager] Failed to destroy stream ${id}:`,
               err,
             )
-            res.status(500).json({ error: 'Failed to destroy stream.' })
+            res
+              .status(500)
+              .json({
+                error: 'Failed to shut down the camera monitor process.',
+              })
             return
           }
           stopStreamMotionMonitoring(id)

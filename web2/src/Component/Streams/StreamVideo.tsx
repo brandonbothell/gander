@@ -13,8 +13,25 @@ import StreamEditMenu from './StreamEditMenu'
 export default function StreamVideo(props: {
   streams: Map<string, Stream>
   stream: Stream
+  setLayouts: (
+    val:
+      | {
+          id: number
+          splitterStreams: string[]
+        }[]
+      | ((
+          prevState: {
+            id: number
+            splitterStreams: string[]
+          }[],
+        ) => {
+          id: number
+          splitterStreams: string[]
+        }[]),
+  ) => void
   getAspectRatio: () => string
   removeFromLayout: () => void | Promise<void>
+  setStream(streamId: string): Promise<void> | void
 }) {
   const [streamUrl, setStreamUrl] = useState<string>()
   const [loading, setLoading] = useState(false)
@@ -185,8 +202,14 @@ export default function StreamVideo(props: {
           }}
         >
           {props.stream.nickname}
-          {(videoHovered || popoverHovered) && !document.fullscreenElement && (
-            <StreamEditMenu ref={popoverHoveredRef} streams={props.streams}>
+          {!document.fullscreenElement && (
+            <StreamEditMenu
+              setLayouts={props.setLayouts}
+              ref={popoverHoveredRef}
+              streams={props.streams}
+              stream={props.stream}
+              setStream={props.setStream}
+            >
               <ActionIcon
                 variant="light"
                 ml={'sm'}
