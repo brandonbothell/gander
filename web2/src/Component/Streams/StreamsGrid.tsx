@@ -187,8 +187,8 @@ export default function StreamsGrid(props: {
     <Group justify="center" mb="md">
       <Splitter
         style={splitterStyles}
-        w={width < 768 ? '95vw' : undefined}
-        h={width < 768 ? undefined : '70vh'}
+        w={width < 768 ? '95dvw' : undefined}
+        h={width < 768 ? undefined : '70dvh'}
         splitterRef={splitterRef}
         styles={{
           thumb: {

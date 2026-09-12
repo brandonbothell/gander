@@ -149,8 +149,8 @@ export default function StreamVideo(props: {
       <LoadingOverlay
         visible={loading}
         style={{ aspectRatio: props.getAspectRatio() }}
-        w={width < 768 ? '95vw' : undefined}
-        h={width < 768 ? undefined : '70vh'}
+        w={width < 768 ? '95dvw' : undefined}
+        h={width < 768 ? undefined : '70dvh'}
         zIndex={1000}
         overlayProps={{ radius: 'sm', blur: 2 }}
       />

@@ -27,13 +27,18 @@ export default function CreateStreamPopover(props: {
 
   return (
     <Popover
-      width={width > 768 ? '50vw' : '90vw'}
+      width={width > 768 ? '50dvw' : '90dvw'}
       opened={open}
       onDismiss={() => setOpen(false)}
       shadow="md"
       withArrow
+      closeOnClickOutside={false}
+      hideDetached={false}
       withOverlay
-      overlayProps={{ zIndex: 10000, blur: '8px' }}
+      overlayProps={{
+        zIndex: 10000,
+        blur: '8px',
+      }}
       zIndex={10001}
     >
       <Popover.Target>
@@ -99,6 +104,7 @@ export default function CreateStreamPopover(props: {
                   setOpen(false)
                   setType('RTSP')
                   setNickname('')
+                  setRTSPUrl('')
                   setRTSPUsername('')
                   setRTSPPassword('')
                   setLocalVideo('')
