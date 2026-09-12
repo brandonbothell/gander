@@ -77,7 +77,9 @@ export default function initializeStreamRoutes(
       if (!nickname || !ffmpegInput) {
         res
           .status(400)
-          .json({ error: 'Nickname and ffmpegInput are required.' })
+          .json({
+            error: `Nickname and camera ${rtspUser || rtspPass ? 'IP' : 'information'} are required.`,
+          })
         return
       }
       const validation = validateStreamInput({
@@ -305,7 +307,8 @@ function validateStreamInput({
   if (isRtsp && ((rtspUser && !rtspPass) || (!rtspUser && rtspPass))) {
     return {
       valid: false,
-      error: 'Both rtspUser and rtspPass must be provided for RTSP streams.',
+      error:
+        'Either neither or both of rtspUser and rtspPass must be provided for RTSP streams.',
     }
   }
   return { valid: true }
