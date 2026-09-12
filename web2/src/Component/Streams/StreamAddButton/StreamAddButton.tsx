@@ -1,7 +1,7 @@
 import { FiChevronDown, FiPlus } from 'react-icons/fi'
 import { ActionIcon, Button, Group, Menu } from '@mantine/core'
-import CreateStreamPopover from '../CreateStream/CreateStreamPopover'
-import { Stream } from '../../types'
+import CreateStreamPopover from '../../CreateStream/CreateStreamPopover'
+import { Stream } from '../../../types'
 import classes from './StreamAddButton.module.css'
 
 export default function StreamAddButton(props: {

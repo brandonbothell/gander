@@ -8,7 +8,7 @@ import {
 import { type CSSProperties, Group, Splitter } from '@mantine/core'
 import { type Stream } from '../../types'
 import StreamVideo from './StreamVideo'
-const StreamAddButton = lazy(() => import('../SplitButton/StreamAddButton'))
+const StreamAddButton = lazy(() => import('./StreamAddButton/StreamAddButton'))
 
 type StoredSplitterLayout = {
   sizes: SplitterPaneSize[]
@@ -239,6 +239,7 @@ export default function StreamsGrid(props: {
               {splitterStreams[0] ? (
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[0])!}
+                  streams={props.streams}
                   getAspectRatio={getAspectRatio}
                   removeFromLayout={() => {
                     delete splitterStreams[0]
@@ -261,6 +262,7 @@ export default function StreamsGrid(props: {
             <Splitter.Pane defaultSize={50} min={10} bg="violet" collapsible>
               {splitterStreams[1] ? (
                 <StreamVideo
+                  streams={props.streams}
                   stream={props.streams.get(splitterStreams[1])!}
                   getAspectRatio={getAspectRatio}
                   removeFromLayout={() => {
@@ -319,6 +321,7 @@ export default function StreamsGrid(props: {
               {splitterStreams[2] ? (
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[2])!}
+                  streams={props.streams}
                   getAspectRatio={getAspectRatio}
                   removeFromLayout={() => {
                     delete splitterStreams[2]
@@ -342,6 +345,7 @@ export default function StreamsGrid(props: {
               {splitterStreams[3] ? (
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[3])!}
+                  streams={props.streams}
                   getAspectRatio={getAspectRatio}
                   removeFromLayout={() => {
                     delete splitterStreams[3]
