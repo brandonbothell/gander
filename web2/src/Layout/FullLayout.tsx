@@ -262,8 +262,10 @@ export default function FullLayout(props: {
           collapsed
         </Text>
       </AppShell.Main>
-      <AppShell.Aside p="md">Aside</AppShell.Aside>
-      <AppShell.Footer p="sm">
+      <AppShell.Aside p="md" zIndex={1001}>
+        Aside
+      </AppShell.Aside>
+      <AppShell.Footer p="sm" zIndex={1001}>
         Gander © 2026 Brandon Bothell. All rights reserved&mdash;Privacy is a
         right.
       </AppShell.Footer>

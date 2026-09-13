@@ -29,3 +29,19 @@
 .mantine-Combobox-dropdown {
   z-index: 1001 !important;
 }
+
+/* Hide scrollbar for the entire page */
+html,
+body {
+  /* Firefox */
+  scrollbar-width: none;
+
+  /* IE and Legacy Edge */
+  -ms-overflow-style: none;
+}
+
+/* Chrome, Safari, and Opera */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}

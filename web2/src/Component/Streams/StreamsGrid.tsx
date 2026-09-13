@@ -45,6 +45,8 @@ export default function StreamsGrid(props: {
   const splitter3Ref = useRef<UseSplitterReturnValue>(null)
   const splitters = [splitterRef, splitter2Ref, splitter3Ref]
 
+  const { width } = useViewportSize()
+
   // eslint-disable-next-line func-call-spacing
   const [storedSplitterLayouts, setStoredSplitterLayouts] = useLocalStorage<
     (StoredSplitterLayout[] | null)[]
@@ -79,7 +81,19 @@ export default function StreamsGrid(props: {
     return '16 / 9'
   }, [splitterRef.current, splitter2Ref.current, splitter3Ref.current])
 
-  const { width } = useViewportSize()
+  const getMarginLeft = useCallback(
+    () =>
+      splitterRef.current?.collapsed.includes(true)
+        ? splitter2Ref.current?.collapsed.includes(true) ||
+          splitter3Ref.current?.collapsed.includes(true)
+          ? width > 768
+            ? '50px'
+            : undefined
+          : undefined
+        : undefined,
+    [width, splitterRef.current, splitter2Ref.current, splitter3Ref.current],
+  )
+
   const [splitterStyles, setSplitterStyles] = useLocalStorage<CSSProperties>({
     key: 'splitterStyles',
     defaultValue: {
@@ -182,6 +196,7 @@ export default function StreamsGrid(props: {
       setSplitterStyles((prev) => ({
         ...prev,
         aspectRatio: getAspectRatio(),
+        /* marginLeft: getMarginLeft(), */
       }))
     }
 
@@ -200,7 +215,7 @@ export default function StreamsGrid(props: {
   const splitterStreams = props.layout.splitterStreams
 
   return (
-    <Group justify="center" mb="md">
+    <Group mb="md" display={'flex'} justify="center">
       <Splitter
         style={splitterStyles}
         w={width < 768 ? '95dvw' : undefined}
@@ -252,7 +267,7 @@ export default function StreamsGrid(props: {
             }}
           >
             <Splitter.Pane defaultSize={50} min={10} bg="blue" collapsible>
-              {splitterStreams[0] && props.streams.get(splitterStreams[0]) ? (
+              {splitterStreams?.[0] && props.streams.get(splitterStreams[0]) ? (
                 <StreamVideo
                   setStream={(streamId) => {
                     splitterStreams[0] = streamId
@@ -282,7 +297,7 @@ export default function StreamsGrid(props: {
               )}
             </Splitter.Pane>
             <Splitter.Pane defaultSize={50} min={10} bg="violet" collapsible>
-              {splitterStreams[1] && props.streams.get(splitterStreams[1]) ? (
+              {splitterStreams?.[1] && props.streams.get(splitterStreams[1]) ? (
                 <StreamVideo
                   streams={props.streams}
                   stream={props.streams.get(splitterStreams[1])!}
@@ -346,7 +361,7 @@ export default function StreamsGrid(props: {
             }}
           >
             <Splitter.Pane defaultSize={50} min={10} bg="teal" collapsible>
-              {splitterStreams[2] && props.streams.get(splitterStreams[2]) ? (
+              {splitterStreams?.[2] && props.streams.get(splitterStreams[2]) ? (
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[2])!}
                   streams={props.streams}
@@ -376,7 +391,7 @@ export default function StreamsGrid(props: {
               )}
             </Splitter.Pane>
             <Splitter.Pane defaultSize={50} min={10} bg="grape" collapsible>
-              {splitterStreams[3] && props.streams.get(splitterStreams[3]) ? (
+              {splitterStreams?.[3] && props.streams.get(splitterStreams[3]) ? (
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[3])!}
                   streams={props.streams}
