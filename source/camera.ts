@@ -350,6 +350,10 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       motionWatcherTimeouts.set(
         streamId,
         setTimeout(async () => {
+          if (!dynamicStreams[streamId]) {
+            motionWatcherTimeouts.delete(streamId)
+            return
+          }
           if (
             !streamStates[streamId] &&
             !dynamicStreams[streamId].restartInProgress
