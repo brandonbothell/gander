@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { notifications } from '@mantine/notifications'
+import { modals } from '@mantine/modals'
 import { useDisclosure, useViewportSize } from '@mantine/hooks'
-import { Button, Group, Popover, Stack, TextInput } from '@mantine/core'
+import { Button, Group, Popover, Stack, Text, TextInput } from '@mantine/core'
 import { Stream } from '../../types'
 import { API_BASE, authFetch } from '../../main'
 import StreamTypeControl from './StreamTypeControl'
@@ -43,18 +44,34 @@ export default function CreateEditStreamPopover(props: {
   const [rtspUsername, setRTSPUsername] = useState('')
   const [rtspPassword, setRTSPPassword] = useState('')
 
-  /* useEffect(() => {
-    if (props.create && props.edit) {
-      throw new TypeError(
-        'Cannot supply both "edit" and "create" to CreateStreamPopover',
-      )
-    }
-    if (!props.create && !props.edit) {
-      throw new TypeError(
-        'Missing one of "edit" or "create" in CreateStreamPopover',
-      )
-    }
-  }, [props.create, props.edit]) */
+  const openDeleteModal = () =>
+    new Promise<boolean>((resolve) =>
+      modals.openConfirmModal({
+        title: 'Delete recording',
+        children: (
+          <Text size="sm">
+            Delete {props.currentStream!.nickname}? This will also remove web
+            access to recordings.
+          </Text>
+        ),
+        labels: { confirm: 'Delete', cancel: 'Cancel' },
+        onCancel: () => {
+          notifications.show({
+            title: 'Cancelled',
+            message: 'Camera deletion cancelled.',
+            color: 'gray',
+          })
+          resolve(false)
+        },
+        onConfirm: () => resolve(true),
+        zIndex: 10002,
+        styles: {
+          root: {
+            zIndex: 10001,
+          },
+        },
+      }),
+    )
 
   const resetInputs = useCallback(() => {
     if (props.currentStream) {
@@ -169,6 +186,9 @@ export default function CreateEditStreamPopover(props: {
                   color="red"
                   disabled={loading}
                   onClick={async () => {
+                    const confirmed = await openDeleteModal()
+                    if (!confirmed) return
+
                     setLoading(true)
                     const res = await authFetch(
                       `${API_BASE}/api/streams/${props.currentStream!.id}`,
@@ -201,6 +221,10 @@ export default function CreateEditStreamPopover(props: {
                       }),
                     )
                     props.streams.delete(props.currentStream!.id)
+                    notifications.show({
+                      message: `${props.currentStream!.nickname} was succesfully deleted.`,
+                      color: 'teal',
+                    })
                   }}
                 >
                   Delete
