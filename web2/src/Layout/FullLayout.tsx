@@ -129,7 +129,6 @@ export default function FullLayout(props: {
         <Group h="100%" w="50%" px="md"></Group>
       </AppShell.Header>
       <AppShell.Navbar zIndex={1001} p="md">
-        <AppShell.Section p="md">Navbar header</AppShell.Section>
         <AppShell.Section grow my="md" component={ScrollArea} px="md">
           <NavLink
             href="#"
@@ -235,9 +234,6 @@ export default function FullLayout(props: {
                   }}
                 />,
               )}
-        </AppShell.Section>
-        <AppShell.Section p="md">
-          Navbar footer – always at the bottom
         </AppShell.Section>
       </AppShell.Navbar>
       <AppShell.Main style={{ display: 'grid' }}>
