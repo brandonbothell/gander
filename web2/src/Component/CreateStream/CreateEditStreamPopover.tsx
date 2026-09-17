@@ -113,6 +113,8 @@ export default function CreateEditStreamPopover(props: {
       withArrow
       closeOnClickOutside={false}
       hideDetached={false}
+      trapFocus={true}
+      returnFocus={true}
       withOverlay
       overlayProps={{
         zIndex: 10000,
@@ -138,7 +140,7 @@ export default function CreateEditStreamPopover(props: {
       </Popover.Target>
       <Popover.Dropdown>
         <Stack gap="sm">
-          <StreamTypeControl setType={setType} default={type} />
+          <StreamTypeControl data-autofocus setType={setType} default={type} />
           <TextInput
             label="Nickname"
             value={nickname}

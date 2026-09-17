@@ -42,6 +42,7 @@ export default function StreamEditMenu(props: {
             zIndex: 1003,
           },
         }}
+        menuItemTabIndex={0}
       >
         <Menu.Target>{props.children}</Menu.Target>
         <Menu.Dropdown ref={props.ref}>

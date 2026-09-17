@@ -18,6 +18,7 @@ export function SessionsLogoutButton(
         transitionProps={{ transition: 'pop' }}
         position="bottom-end"
         withinPortal
+        menuItemTabIndex={0}
       >
         <Menu.Target>
           <ActionIcon

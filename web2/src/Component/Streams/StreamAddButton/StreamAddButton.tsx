@@ -49,6 +49,7 @@ export default function StreamAddButton(props: {
             zIndex: 1003,
           },
         }}
+        menuItemTabIndex={0}
       >
         <Menu.Target>
           <ActionIcon
