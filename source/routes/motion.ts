@@ -19,6 +19,26 @@ import { recordingsLowSpaceThresholdMb } from '../../config.json'
 import { notify } from './notifications'
 import { rateLimit } from 'express-rate-limit'
 
+const streamOperationQueues = new Map<string, Promise<void>>()
+
+function queueStreamOperation<T>(
+  streamId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const previous = streamOperationQueues.get(streamId) ?? Promise.resolve()
+  const current = previous.catch(() => undefined).then(operation)
+  const settled = current.then(
+    () => undefined,
+    () => undefined,
+  )
+  streamOperationQueues.set(streamId, settled)
+  return current.finally(() => {
+    if (streamOperationQueues.get(streamId) === settled) {
+      streamOperationQueues.delete(streamId)
+    }
+  })
+}
+
 export default function initializeMotionRoutes(
   app: Express,
   streamStates: Record<string, StreamMotionState | undefined>,
@@ -203,9 +223,27 @@ export async function saveMotionSegmentsWithRetry(
   retryAttempt: number = 0,
   streamState?: StreamMotionState,
 ): Promise<void> {
+  return queueStreamOperation(streamId, () =>
+    saveMotionSegmentsWithRetryInternal(
+      streamStates,
+      dynamicStreams,
+      streamId,
+      retryAttempt,
+      streamState,
+    ),
+  )
+}
+
+async function saveMotionSegmentsWithRetryInternal(
+  streamStates: Record<string, StreamMotionState | undefined>,
+  dynamicStreams: Record<string, StreamManager>,
+  streamId: string,
+  retryAttempt: number,
+  streamState?: StreamMotionState,
+): Promise<void> {
   let state = streamStates[streamId]
   if (!state) {
-    await initializeStreamState(streamId)
+    state = await initializeStreamState(streamId)
     logMotion(
       `[${streamId}] Motion save failed due to missing stream state`,
       'error',
@@ -213,7 +251,7 @@ export async function saveMotionSegmentsWithRetry(
     return
   }
 
-  if (!streamState) streamState = { ...state }
+  if (!streamState) streamState = cloneStateForSave(state)
 
   // Reset state for new recordings
   resetStreamState(state)
@@ -262,6 +300,22 @@ export async function flushMotionSegmentsWithRetry(
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
   retryAttempt: number = 0,
+): Promise<void> {
+  return queueStreamOperation(streamId, () =>
+    flushMotionSegmentsWithRetryInternal(
+      streamStates,
+      dynamicStreams,
+      streamId,
+      retryAttempt,
+    ),
+  )
+}
+
+async function flushMotionSegmentsWithRetryInternal(
+  streamStates: Record<string, StreamMotionState | undefined>,
+  dynamicStreams: Record<string, StreamManager>,
+  streamId: string,
+  retryAttempt: number,
 ): Promise<void> {
   const state =
     streamStates[streamId] ?? (await initializeStreamState(streamId))
@@ -793,4 +847,20 @@ function resetStreamState(streamState: StreamMotionState) {
   streamState.motionStartedAt = 0
   streamState.segmentTimestampMap.clear()
   streamState.currentRecordingMotionTimestamps = []
+}
+
+function cloneStateForSave(state: StreamMotionState): StreamMotionState {
+  return {
+    ...state,
+    segmentTimestampMap: new Map(state.segmentTimestampMap),
+    motionSegments: [...state.motionSegments],
+    flushingSegments: [...state.flushingSegments],
+    recentSegments: [...state.recentSegments],
+    flushedSegments: [...state.flushedSegments],
+    flushRecordings: [...state.flushRecordings],
+    currentRecordingMotionTimestamps: [
+      ...state.currentRecordingMotionTimestamps,
+    ],
+    currentSaveProcess: null,
+  }
 }
