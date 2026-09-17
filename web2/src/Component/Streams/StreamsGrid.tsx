@@ -228,7 +228,7 @@ export default function StreamsGrid(props: {
                 ? 10
                 : 115
               : splitterRef.current?.collapsed[0]
-                ? -19 // This offset is primarily to help with use with small touchscreens
+                ? -19 // This offset is primarily to help with use of the stream resizer thumb with small touchscreens
                 : undefined,
           },
           handle: {

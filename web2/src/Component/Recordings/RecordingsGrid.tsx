@@ -134,6 +134,7 @@ export default function RecordingsGrid(props: {
                     autoPlay
                     muted
                     shortcuts
+                    clickToToggle={false}
                     controls={false}
                     ref={setVideoContainer}
                     h={'100%'}
