@@ -441,7 +441,7 @@ export default function RecordingsGrid(props: {
           onClick={() => {
             if (!loadLightbox) setLoadLightbox(true)
             setRecording(recording)
-            setTimeout(() => setLightboxOpen(true), loadLightbox ? 0 : 50) // Try to lightbox code load
+            setTimeout(() => setLightboxOpen(true), loadLightbox ? 0 : 50) // Try to let lightbox code load
           }}
         >
           <div className={classes.thumbnailFrame}>
@@ -489,7 +489,18 @@ export default function RecordingsGrid(props: {
               {recording.nickname}
             </Text>
           </Text>
-          <Text style={{ textAlign: 'center' }} c="gray.6">
+          <Text
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (!loadLightbox) setLoadLightbox(true)
+                setRecording(recording)
+                setTimeout(() => setLightboxOpen(true), loadLightbox ? 0 : 50) // Try to let lightbox code load
+              }
+            }}
+            tabIndex={0}
+            style={{ textAlign: 'center' }}
+            c="gray.6"
+          >
             {formatTimestamp(recording.filename)}
           </Text>
         </Paper>

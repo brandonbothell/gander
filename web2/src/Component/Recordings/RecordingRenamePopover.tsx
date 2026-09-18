@@ -101,6 +101,7 @@ export default function RecordingRenamePopover(props: {
             {formatTime(props.recording.duration)}
           </Text>
           <TextInput
+            data-autofocus
             label="Nickname"
             value={nicknameInputValue}
             onChange={(event) =>
