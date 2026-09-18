@@ -737,7 +737,9 @@ app.use(
   cors({
     origin: (origin, callback) => {
       const allowedOrigins = (
-        process.env.API_ENV === 'production' ? [] : ['http://localhost:3000']
+        process.env.API_ENV === 'production'
+          ? []
+          : [`http://localhost:${process.env.PORT ?? 3000}`]
       ).concat(config.domains ?? [])
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true)

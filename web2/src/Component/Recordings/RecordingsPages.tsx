@@ -88,7 +88,7 @@ export default function RecordingsPages(props: {
       : streamRecordings?.find((page) => page.length > 0)
 
     if (!recordingsToRender) {
-      return <>Failed to load page.</>
+      return <>No recordings to show.</>
     }
 
     return (

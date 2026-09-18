@@ -14,7 +14,6 @@ import {
   NavLink,
   ScrollArea,
   Space,
-  Text,
   useMantineColorScheme,
   useMantineTheme,
 } from '@mantine/core'
@@ -249,14 +248,6 @@ export default function FullLayout(props: {
         />
         <Space h="md" />
         <RecordingsPages streams={streams} />
-        <Text mt="xl">
-          AppShell example with all elements: Navbar, Header, Aside, Footer.
-        </Text>
-        <Text>All elements except AppShell.Main have fixed position.</Text>
-        <Text>
-          Aside is hidden on on md breakpoint and cannot be opened when it is
-          collapsed
-        </Text>
       </AppShell.Main>
       <AppShell.Aside p="md" zIndex={1001}>
         Aside
