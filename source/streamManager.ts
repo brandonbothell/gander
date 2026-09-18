@@ -377,6 +377,9 @@ export class StreamManager {
         (() => {
           if (isNvidiaAvailable()) {
             return [
+              '-bsf:v',
+              'h264_metadata=display_orientation=0',
+
               '-c:v',
               'h264_nvenc',
 
