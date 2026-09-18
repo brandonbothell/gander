@@ -221,8 +221,8 @@ export default function RecordingsPages(props: {
   }, [props.streams, activeStream, recordings, activePage, totalRecordings])
 
   return (
-    <>
-      {activeStream && (
+    activeStream && (
+      <>
         <Combobox
           returnFocus={true}
           store={streamCombobox}
@@ -289,8 +289,6 @@ export default function RecordingsPages(props: {
             <Combobox.Options>{streamComboboxOptions}</Combobox.Options>
           </Combobox.Dropdown>
         </Combobox>
-      )}
-      {activeStream && (
         <Box pos="relative">
           <Pagination
             total={
@@ -303,9 +301,7 @@ export default function RecordingsPages(props: {
             mt="sm"
           />
         </Box>
-      )}
-      {activeStream && getItems()}
-      {activeStream && (
+        {getItems()}
         <Box pos="relative">
           <Pagination
             total={
@@ -318,7 +314,7 @@ export default function RecordingsPages(props: {
             mt="sm"
           />
         </Box>
-      )}
-    </>
+      </>
+    )
   )
 }

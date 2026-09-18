@@ -208,10 +208,6 @@ export default function StreamsGrid(props: {
     }
   }, [])
 
-  if (!props.streams || props.streams.size === 0) {
-    return <div>No streams available</div>
-  }
-
   const splitterStreams = props.layout.splitterStreams
 
   return (
