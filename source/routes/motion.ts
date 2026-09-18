@@ -19,6 +19,26 @@ import { recordingsLowSpaceThresholdMb } from '../../config.json'
 import { notify } from './notifications'
 import { rateLimit } from 'express-rate-limit'
 
+const streamOperationQueues = new Map<string, Promise<void>>()
+
+function queueStreamOperation<T>(
+  streamId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const previous = streamOperationQueues.get(streamId) ?? Promise.resolve()
+  const current = previous.catch(() => undefined).then(operation)
+  const settled = current.then(
+    () => undefined,
+    () => undefined,
+  )
+  streamOperationQueues.set(streamId, settled)
+  return current.finally(() => {
+    if (streamOperationQueues.get(streamId) === settled) {
+      streamOperationQueues.delete(streamId)
+    }
+  })
+}
+
 export default function initializeMotionRoutes(
   app: Express,
   streamStates: Record<string, StreamMotionState | undefined>,
@@ -201,10 +221,29 @@ export async function saveMotionSegmentsWithRetry(
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
   retryAttempt: number = 0,
+  streamState?: StreamMotionState,
+): Promise<void> {
+  return queueStreamOperation(streamId, () =>
+    saveMotionSegmentsWithRetryInternal(
+      streamStates,
+      dynamicStreams,
+      streamId,
+      retryAttempt,
+      streamState,
+    ),
+  )
+}
+
+async function saveMotionSegmentsWithRetryInternal(
+  streamStates: Record<string, StreamMotionState | undefined>,
+  dynamicStreams: Record<string, StreamManager>,
+  streamId: string,
+  retryAttempt: number,
+  streamState?: StreamMotionState,
 ): Promise<void> {
   let state = streamStates[streamId]
   if (!state) {
-    await initializeStreamState(streamId)
+    state = await initializeStreamState(streamId)
     logMotion(
       `[${streamId}] Motion save failed due to missing stream state`,
       'error',
@@ -212,10 +251,20 @@ export async function saveMotionSegmentsWithRetry(
     return
   }
 
+  if (!streamState) streamState = cloneStateForSave(state)
+
+  // Reset state for new recordings
+  resetStreamState(state)
+
   const maxRetries = 2
 
   try {
-    await saveMotionSegments(streamStates, dynamicStreams, streamId)
+    await saveMotionSegments(
+      streamState,
+      streamStates,
+      dynamicStreams,
+      streamId,
+    )
     state.saveRetryCount = 0 // Reset retry count on success
   } catch (error) {
     logMotion(
@@ -234,19 +283,13 @@ export async function saveMotionSegmentsWithRetry(
           dynamicStreams,
           streamId,
           retryAttempt + 1,
+          streamState,
         )
       }, delay)
     } else {
       logMotion(
-        `[${streamId}] Failed to save motion segments after ${maxRetries + 1} attempts, giving up`,
+        `[${streamId}] Failed to save motion segments after ${maxRetries + 1} attempts, giving up (you can find temporary video files in the "flush" directory of recordings before the next restart)`,
       )
-      // Reset state on failure
-      state.savingInProgress = false
-      state.currentSaveProcess = null
-      state.saveRetryCount = 0
-      state.motionSegments = []
-      state.currentRecordingMotionTimestamps = []
-      state.segmentTimestampMap.clear()
     }
   }
 }
@@ -257,6 +300,22 @@ export async function flushMotionSegmentsWithRetry(
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
   retryAttempt: number = 0,
+): Promise<void> {
+  return queueStreamOperation(streamId, () =>
+    flushMotionSegmentsWithRetryInternal(
+      streamStates,
+      dynamicStreams,
+      streamId,
+      retryAttempt,
+    ),
+  )
+}
+
+async function flushMotionSegmentsWithRetryInternal(
+  streamStates: Record<string, StreamMotionState | undefined>,
+  dynamicStreams: Record<string, StreamManager>,
+  streamId: string,
+  retryAttempt: number,
 ): Promise<void> {
   const state =
     streamStates[streamId] ?? (await initializeStreamState(streamId))
@@ -528,19 +587,11 @@ async function flushMotionSegments(
 
 // --- Modified saveMotionSegments ---
 async function saveMotionSegments(
+  streamState: StreamMotionState,
   streamStates: Record<string, StreamMotionState | undefined>,
   dynamicStreams: Record<string, StreamManager>,
   streamId: string,
-): Promise<void> {
-  const state = streamStates[streamId]
-  if (!state) {
-    await initializeStreamState(streamId)
-    logMotion(
-      `[${streamId}] Motion save failed due to missing stream state`,
-      'error',
-    )
-    return
-  }
+): Promise<StreamMotionState> {
   const stream = dynamicStreams[streamId]
 
   // If low disk space, purge and skip save
@@ -552,50 +603,46 @@ async function saveMotionSegments(
   if (low) {
     logMotion(`[${streamId}] Skipping save due to low disk space`)
     // ensure state cleaned
-    state.savingInProgress = false
-    state.currentSaveProcess = null
-    state.motionSegments = []
-    state.flushedSegments = []
-    state.flushRecordings = []
-    state.currentRecordingMotionTimestamps = []
-    state.segmentTimestampMap.clear()
-    return
+    resetStreamState(streamState)
+    return streamState
   }
 
-  if (state.savingInProgress) {
+  if (streamState.savingInProgress) {
     logMotion(
       `[${streamId}] Save operation already in progress, rescheduling`,
       'warn',
     )
     setTimeout(
-      () => saveMotionSegments(streamStates, dynamicStreams, streamId),
+      () =>
+        saveMotionSegments(streamState, streamStates, dynamicStreams, streamId),
       1000,
     )
-    return
+    return streamState
   }
 
-  if (state.flushingSegments.length > 0) {
+  if (streamState.flushingSegments.length > 0) {
     console.warn(
       `[${streamId}] Flush and save operations called simultaneously, cancelling flush and rescheduling save`,
     )
-    state.cancelFlush = true
+    streamState.cancelFlush = true
     setTimeout(
-      () => saveMotionSegments(streamStates, dynamicStreams, streamId),
+      () =>
+        saveMotionSegments(streamState, streamStates, dynamicStreams, streamId),
       1000,
     )
-    return
+    return streamState
   }
 
-  state.savingInProgress = true
+  streamState.savingInProgress = true
 
   // Normalize motion timestamps at the end of motion events
-  state.currentRecordingMotionTimestamps =
-    state.currentRecordingMotionTimestamps.map(
+  streamState.currentRecordingMotionTimestamps =
+    streamState.currentRecordingMotionTimestamps.map(
       (timestamp) => timestamp + RECENT_SEGMENT_BUFFER * 2 * 500,
     ) // Push forward due to recent segment buffer (motion processing lag-behind)
 
   // Gather flushed recordings
-  const flushedFiles = [...new Set(state.flushRecordings)]
+  const flushedFiles = [...new Set(streamState.flushRecordings)]
   const existingFlushedPromises = flushedFiles
     .sort((a, b) => {
       const getNum = (fname: string) =>
@@ -616,7 +663,7 @@ async function saveMotionSegments(
     .map((f) => f.filePath)
 
   // Gather unflushed segments
-  const uniqueSegments = [...new Set(state.motionSegments)]
+  const uniqueSegments = [...new Set(streamState.motionSegments)]
   const existingSegmentsPromises = uniqueSegments.map(async (segmentPath) => {
     return {
       segmentPath,
@@ -641,18 +688,14 @@ async function saveMotionSegments(
 
   if (concatList.length === 0) {
     logMotion(`[${streamId}] No segments or flushed files to save`)
-    state.savingInProgress = false
-    state.motionSegments = []
-    state.flushedSegments = []
-    state.currentRecordingMotionTimestamps = []
-    state.segmentTimestampMap.clear()
-    return
+    resetStreamState(streamState)
+    return streamState
   }
 
   const listFile = path.join(stream.config.hlsDir, 'concat_list.txt')
   await fs.promises.writeFile(listFile, concatList.join('\n'))
 
-  const outFile = path.join(stream.config.recordDir, state.recordingTitle)
+  const outFile = path.join(stream.config.recordDir, streamState.recordingTitle)
   const thumbFile = path.join(
     stream.config.thumbDir,
     path.basename(outFile).replace(/\.mp4$/, '.jpg'),
@@ -665,31 +708,21 @@ async function saveMotionSegments(
     } flushed + ${existingSegments.length} segments) to ${path.basename(outFile)}`,
   )
 
-  return new Promise<void>((resolve) => {
+  return new Promise<StreamMotionState>((resolve) => {
     const ffmpegProcess = exec(ffmpegConcatCmd, async (err) => {
       if (ffmpegProcess.killed) {
         logMotion(`[${streamId}] Save operation was canceled`)
-        state.savingInProgress = false
-        state.currentSaveProcess = null
+        resetStreamState(streamState)
         await safeUnlinkWithRetry(listFile)
-        resolve()
+        resolve(streamState)
         return
       }
 
       if (err) {
         logMotion(`[${streamId}] FFmpeg concat failed: ${err}`, 'error')
-        state.savingInProgress = false
-        state.currentSaveProcess = null
-        state.motionSegments = []
-        state.flushedSegments = []
-        state.flushRecordings = []
-        state.currentRecordingMotionTimestamps = []
-        state.nextFlushNumber = 1
-        state.notificationSent = false
-        state.motionStartedAt = 0
-        state.segmentTimestampMap.clear()
+        resetStreamState(streamState)
         await safeUnlinkWithRetry(listFile)
-        resolve()
+        resolve(streamState)
         return
       }
 
@@ -700,27 +733,20 @@ async function saveMotionSegments(
         async () => {
           // Clean up segments and flushed files
           const promises = [
-            ...state.flushedSegments.concat(existingSegments).map((segment) => {
-              if (!state.recentSegments.includes(segment)) {
-                return safeUnlinkWithRetry(segment)
-              }
-              return Promise.resolve(void 0)
-            }),
+            ...streamState.flushedSegments
+              .concat(existingSegments)
+              .map((segment) => {
+                if (!streamState.recentSegments.includes(segment)) {
+                  return safeUnlinkWithRetry(segment)
+                }
+                return Promise.resolve(void 0)
+              }),
             ...existingFlushedFiles.map((f) => safeUnlinkWithRetry(f)),
             safeUnlinkWithRetry(listFile),
           ]
           await Promise.all(promises)
 
           logMotion(`[${streamId}] Cleared flushDir and saved segments`)
-          state.motionSegments = []
-          state.flushRecordings = []
-          state.flushedSegments = []
-          state.nextFlushNumber = 1
-          state.notificationSent = false
-          state.motionStartedAt = 0
-          state.savingInProgress = false
-          state.currentSaveProcess = null
-          state.segmentTimestampMap.clear()
 
           // Save to DB
           try {
@@ -735,7 +761,7 @@ async function saveMotionSegments(
               update: {
                 duration,
                 motionTimestamps: JSON.stringify(
-                  state.currentRecordingMotionTimestamps,
+                  streamState.currentRecordingMotionTimestamps,
                 ),
                 updatedAt: new Date(),
               },
@@ -744,14 +770,12 @@ async function saveMotionSegments(
                 filename,
                 duration,
                 motionTimestamps: JSON.stringify(
-                  state.currentRecordingMotionTimestamps,
+                  streamState.currentRecordingMotionTimestamps,
                 ),
                 recordedAt,
                 updatedAt: new Date(),
               },
             })
-
-            state.currentRecordingMotionTimestamps = []
 
             logMotion(
               `[${streamId}] Successfully saved ${filename} (${duration}s, ${concatList.length} items)`,
@@ -762,35 +786,34 @@ async function saveMotionSegments(
               'error',
             )
           }
-          resolve()
+
+          resetStreamState(streamState)
+          resolve(streamState)
         },
       )
 
       thumbProcess.on('exit', () => {
-        state.currentSaveProcess = null
+        streamState.currentSaveProcess = null
       })
 
-      state.currentSaveProcess = thumbProcess
+      streamState.currentSaveProcess = thumbProcess
     })
 
-    state.currentSaveProcess = ffmpegProcess
+    streamState.currentSaveProcess = ffmpegProcess
 
-    const saveTimeout = setTimeout(() => {
-      if (state.currentSaveProcess && !state.currentSaveProcess.killed) {
-        logMotion(`[${streamId}] Save operation timed out, killing process`)
-        state.currentSaveProcess.kill('SIGTERM')
-        state.motionSegments = []
-        state.flushRecordings = []
-        state.nextFlushNumber = 1
-        state.notificationSent = false
-        state.motionStartedAt = 0
-        state.savingInProgress = false
-        state.currentSaveProcess = null
-        state.currentRecordingMotionTimestamps = []
-        state.segmentTimestampMap.clear()
-        resolve()
-      }
-    }, 60000)
+    const saveTimeout = setTimeout(
+      () => {
+        if (
+          streamState.currentSaveProcess &&
+          !streamState.currentSaveProcess.killed
+        ) {
+          logMotion(`[${streamId}] Save operation timed out, killing process`)
+          resetStreamState(streamState)
+          resolve(streamState)
+        }
+      },
+      5 * 60 * 1000,
+    ) // 5 minute timeout
 
     ffmpegProcess.on('exit', () => {
       clearTimeout(saveTimeout)
@@ -809,4 +832,35 @@ async function getVideoDuration(filePath: string): Promise<number> {
       resolve(Math.round(Number(output)))
     })
   })
+}
+
+function resetStreamState(streamState: StreamMotionState) {
+  streamState.currentSaveProcess?.kill('SIGTERM')
+  streamState.savingInProgress = false
+  streamState.currentSaveProcess = null
+  streamState.motionSegments = []
+  streamState.flushedSegments = []
+  streamState.flushRecordings = []
+  streamState.currentRecordingMotionTimestamps = []
+  streamState.nextFlushNumber = 1
+  streamState.notificationSent = false
+  streamState.motionStartedAt = 0
+  streamState.segmentTimestampMap.clear()
+  streamState.currentRecordingMotionTimestamps = []
+}
+
+function cloneStateForSave(state: StreamMotionState): StreamMotionState {
+  return {
+    ...state,
+    segmentTimestampMap: new Map(state.segmentTimestampMap),
+    motionSegments: [...state.motionSegments],
+    flushingSegments: [...state.flushingSegments],
+    recentSegments: [...state.recentSegments],
+    flushedSegments: [...state.flushedSegments],
+    flushRecordings: [...state.flushRecordings],
+    currentRecordingMotionTimestamps: [
+      ...state.currentRecordingMotionTimestamps,
+    ],
+    currentSaveProcess: null,
+  }
 }
