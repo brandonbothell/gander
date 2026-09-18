@@ -224,6 +224,7 @@ export default function RecordingsPages(props: {
     <>
       {activeStream && (
         <Combobox
+          returnFocus={true}
           store={streamCombobox}
           onOptionSubmit={(streamId) => {
             const stream = props.streams.get(streamId)!
@@ -235,6 +236,10 @@ export default function RecordingsPages(props: {
         >
           <Combobox.Target>
             <InputBase
+              onBlur={() => {
+                streamCombobox.clickSelectedOption()
+                streamCombobox.closeDropdown()
+              }}
               component="button"
               type="button"
               pointer
