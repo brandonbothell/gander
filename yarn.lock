@@ -874,9 +874,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@gfazioli/mantine-video@npm:1.2.1":
-  version: 1.2.1
-  resolution: "@gfazioli/mantine-video@npm:1.2.1"
+"@gfazioli/mantine-video@npm:1.2.2":
+  version: 1.2.2
+  resolution: "@gfazioli/mantine-video@npm:1.2.2"
   peerDependencies:
     "@mantine/core": ">=9.0.0"
     "@mantine/hooks": ">=9.0.0"
@@ -886,7 +886,7 @@ __metadata:
   peerDependenciesMeta:
     "@tabler/icons-react":
       optional: true
-  checksum: 10c0/1b2ae14653770b52c1b0e84c4a165d777076e6c5828e1b8fa54910d7c0853661c5e589f9373206fa5ad82d6dac899d823567ecc59c7abf42844686245db4435d
+  checksum: 10c0/a2cd9da69eef2537cd107d704c4746171c790a323fe72c7ea48020bb1bfae33e3b367c3d81e8cff8d4b226ea9beecc8fce85bef1df375f649fdf401821e07bab
   languageName: node
   linkType: hard
 
@@ -11679,7 +11679,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "web2@workspace:web2"
   dependencies:
-    "@gfazioli/mantine-video": "npm:1.2.1"
+    "@gfazioli/mantine-video": "npm:1.2.2"
     "@mantine/carousel": "npm:9.6.1"
     "@mantine/core": "npm:9.6.1"
     "@mantine/dates": "npm:9.6.1"
