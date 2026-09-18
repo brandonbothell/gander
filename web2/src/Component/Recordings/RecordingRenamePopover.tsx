@@ -1,6 +1,6 @@
 import { FiEdit } from 'react-icons/fi'
-import { useCallback, useEffect, useState } from 'react'
-import { useViewportSize } from '@mantine/hooks'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useDisclosure, useViewportSize } from '@mantine/hooks'
 import {
   Button,
   Group,
@@ -23,10 +23,12 @@ export default function RecordingRenamePopover(props: {
   ) => void
   styles?: { button: MantineStyleProp }
 }) {
+  const [open, { set: setOpen }] = useDisclosure(false)
   const [nickname, setNickname] = useState(props.recording.nickname || '')
   const [nicknameInputValue, setNicknameInputValue] = useState(
     props.recording.nickname || '',
   )
+  const nicknameInputRef = useRef<HTMLInputElement>(null)
   const { width } = useViewportSize()
 
   useEffect(() => {
@@ -61,15 +63,20 @@ export default function RecordingRenamePopover(props: {
   }, [nicknameInputValue])
 
   const cancelNicknameChange = () => {
-    setNicknameInputValue(props.recording.nickname)
+    setOpen(false)
+    setNicknameInputValue(props.recording.nickname || '')
   }
 
   return (
     <Popover
       width={320}
       shadow="md"
+      opened={open}
       withArrow
       withOverlay
+      trapFocus={true}
+      returnFocus={true}
+      onDismiss={() => setOpen(false)}
       overlayProps={{ zIndex: 10000, blur: '8px' }}
       zIndex={10001}
     >
@@ -81,6 +88,7 @@ export default function RecordingRenamePopover(props: {
           pr={12}
           radius="md"
           style={props.styles?.button}
+          onClick={() => setOpen(true)}
         >
           {width > 600 ? 'Edit nickname' : 'Edit'}
         </Button>
@@ -101,21 +109,26 @@ export default function RecordingRenamePopover(props: {
             {formatTime(props.recording.duration)}
           </Text>
           <TextInput
+            ref={nicknameInputRef}
             data-autofocus
             label="Nickname"
             value={nicknameInputValue}
             onChange={(event) =>
               setNicknameInputValue(event.currentTarget.value)
             }
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                saveNickname()
+              }
+            }}
           />
           <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={cancelNicknameChange}>
+              Cancel
+            </Button>
             {nicknameInputValue !== nickname && (
-              <>
-                <Button variant="default" onClick={cancelNicknameChange}>
-                  Cancel
-                </Button>
-                <Button onClick={() => void saveNickname()}>Save</Button>
-              </>
+              <Button onClick={() => void saveNickname()}>Save</Button>
             )}
           </Group>
         </Stack>

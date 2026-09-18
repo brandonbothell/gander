@@ -36,7 +36,6 @@ export default function LoginLayout({
   const [ctrlHeld, setCtrlHeld] = useState(false)
   const [mobileApiKeyVisible, setMobileApiKeyVisible] = useState(false)
   const touchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const usernameInputRef = useRef<HTMLInputElement>(null)
   const passwordInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<LoginValues>({
@@ -60,36 +59,6 @@ export default function LoginLayout({
       if (touchTimeoutRef.current) clearTimeout(touchTimeoutRef.current)
     }
   }, [])
-
-  useEffect(() => {
-    if (!usernameInputRef.current || !passwordInputRef.current) return
-
-    const usernameInput = usernameInputRef.current
-    const passwordInput = passwordInputRef.current
-    const onkeydown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        passwordInput.focus()
-        document.removeEventListener('keydown', onkeydown)
-      }
-    }
-    const onfocus = () => {
-      document.addEventListener('keydown', onkeydown)
-    }
-    const onblur = () => {
-      document.removeEventListener('keydown', onkeydown)
-    }
-    usernameInput.addEventListener('focus', onfocus)
-    usernameInput.addEventListener('blur', onblur)
-    if (usernameInput === document.activeElement) {
-      document.addEventListener('keydown', onkeydown)
-    }
-
-    return () => {
-      usernameInput.removeEventListener('focus', onfocus)
-      usernameInput.removeEventListener('blur', onblur)
-    }
-  }, [usernameInputRef, passwordInputRef])
 
   useEffect(() => {
     if (!mobileApiKeyVisible) return
@@ -159,7 +128,6 @@ export default function LoginLayout({
             <form onSubmit={form.onSubmit(handleSubmit)} autoComplete="on">
               <Stack gap="md">
                 <TextInput
-                  ref={usernameInputRef}
                   label="Username"
                   placeholder="Username"
                   autoFocus
@@ -168,6 +136,12 @@ export default function LoginLayout({
                   key={form.key('username')}
                   {...form.getInputProps('username')}
                   disabled={loading}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && passwordInputRef.current) {
+                      event.preventDefault()
+                      passwordInputRef.current.focus()
+                    }
+                  }}
                 />
                 <PasswordInput
                   ref={passwordInputRef}
