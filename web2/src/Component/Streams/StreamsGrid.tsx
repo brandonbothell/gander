@@ -45,7 +45,7 @@ export default function StreamsGrid(props: {
   const splitter3Ref = useRef<UseSplitterReturnValue>(null)
   const splitters = [splitterRef, splitter2Ref, splitter3Ref]
 
-  const { width } = useViewportSize()
+  const { width, height } = useViewportSize()
 
   // eslint-disable-next-line func-call-spacing
   const [storedSplitterLayouts, setStoredSplitterLayouts] = useLocalStorage<
@@ -214,13 +214,13 @@ export default function StreamsGrid(props: {
     <Group mb="md" display={'flex'} justify="center">
       <Splitter
         style={splitterStyles}
-        w={width < 768 ? '95dvw' : undefined}
-        h={width < 768 ? undefined : '70dvh'}
+        w={width < 768 ? '95dvw' : height < 450 ? '50dvw' : undefined}
+        h={width < 768 || height < 450 ? undefined : '75dvh'}
         splitterRef={splitterRef}
         styles={{
           thumb: {
             right: splitterRef.current?.collapsed[1]
-              ? width < 768
+              ? width < 768 || height < 450
                 ? 10
                 : 115
               : splitterRef.current?.collapsed[0]
@@ -229,7 +229,9 @@ export default function StreamsGrid(props: {
           },
           handle: {
             transform:
-              width >= 768 && splitterRef.current?.collapsed[1]
+              width >= 768 &&
+              !(height < 450) &&
+              splitterRef.current?.collapsed[1]
                 ? 'translateX(-59px)' // This offset is due to resizing the remaning splitter to 16:18
                 : undefined,
           },
