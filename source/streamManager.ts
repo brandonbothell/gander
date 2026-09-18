@@ -368,7 +368,7 @@ export class StreamManager {
         '-probesize',
         '2000000',
 
-        '-autorotate',
+        '-noautorotate',
 
         '-i',
         inputUrl,
