@@ -368,6 +368,7 @@ export class StreamManager {
         '-probesize',
         '2000000',
 
+        // TODO: Add to stream settings
         '-noautorotate',
 
         '-i',
@@ -377,9 +378,6 @@ export class StreamManager {
         (() => {
           if (isNvidiaAvailable()) {
             return [
-              '-bsf:v',
-              'h264_metadata=display_orientation=0',
-
               '-c:v',
               'h264_nvenc',
 
@@ -390,7 +388,7 @@ export class StreamManager {
               'ull', // Ultra-low latency tuning
 
               '-g',
-              '30', // Strictly force a keyframe every 30 frames (fixes Chrome's seek crash)
+              '30', // Strictly force a keyframe every 30 frames
 
               '-sc_threshold', // Disable scene-change detection to enforce strict GOP structure
               '0',
