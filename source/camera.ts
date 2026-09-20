@@ -62,7 +62,6 @@ export const notifyLogPath = path.join(
 )
 export const socketDisconnectMap = new Map<string, number>()
 
-// Ensure logs directory exists
 const motionLogsDir = path.dirname(motionLogPath)
 if (!fs.existsSync(motionLogsDir)) {
   fs.mkdirSync(motionLogsDir, { recursive: true })
@@ -108,6 +107,7 @@ export interface RequestWithUser extends express.Request {
 }
 
 const streamStates: Record<string, StreamMotionState | undefined> = {}
+const streamStateInitializations = new Map<string, Promise<StreamMotionState>>()
 
 export const motionWatcherTimeouts = new Map<string, NodeJS.Timeout>()
 
@@ -119,36 +119,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       `[${streamId}] Monitoring started at ${new Date().toLocaleString()}`,
     )
 
-    if (!streamStates[streamId]) {
-      const persistedStates = await loadPersistedStreamStates()
-      streamStates[streamId] = {
-        segmentTimestampMap: new Map(),
-        processingSegment: false,
-        notificationSent: false,
-        motionRecordingActive: false,
-        motionRecordingTimeoutAt: 0,
-        motionSegments: [],
-        flushingSegments: [],
-        recentSegments: [],
-        flushedSegments: [],
-        motionPaused: persistedStates[streamId]?.motionPaused ?? false,
-        startupTime: Date.now(),
-        savingInProgress: false,
-        currentSaveProcess: null,
-        saveRetryCount: 0,
-        motionStartedAt: 0,
-        lastSegmentProcessAt: 0,
-        recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
-        flushRecordings: [],
-        nextFlushNumber: 1,
-        cleaningUp: false,
-        cancelFlush: false,
-        lowSpaceNotified: false,
-        lastNotifiedRestartCooldownAt: 0,
-        currentRecordingMotionTimestamps: [],
-        lastPlaylistUpdatedAt: 0,
-      }
-    }
+    await initializeStreamState(streamId)
 
     // --- Motion Detection Watcher ---
     watchers.set(
@@ -186,6 +157,7 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
                 'New segment observed while processing previous segment, rescheduling processing to avoid busy loop.',
               )
               setTimeout(() => processSegment(segmentPath), 300)
+              return
             }
 
             state.processingSegment = true
@@ -350,6 +322,10 @@ export async function setupStreamMotionMonitoring(streamId?: string) {
       motionWatcherTimeouts.set(
         streamId,
         setTimeout(async () => {
+          if (!dynamicStreams[streamId]) {
+            motionWatcherTimeouts.delete(streamId)
+            return
+          }
           if (
             !streamStates[streamId] &&
             !dynamicStreams[streamId].restartInProgress
@@ -658,7 +634,7 @@ loadStreamsFromDb()
       if (process.env.API_ENV === 'production') return
       setTimeout(() => {
         open(`http://localhost:${port}`)
-      }, 1500)
+      }, 3000)
     })
   })
 
@@ -761,7 +737,9 @@ app.use(
   cors({
     origin: (origin, callback) => {
       const allowedOrigins = (
-        process.env.API_ENV === 'production' ? [] : ['http://localhost:3000']
+        process.env.API_ENV === 'production'
+          ? []
+          : [`http://localhost:${process.env.PORT ?? 3000}`]
       ).concat(config.domains ?? [])
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true)
@@ -855,23 +833,39 @@ const thumbnailLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const staticResourceLimiter = rateLimit({
+  validate: { ip: false },
+  windowMs: 60 * 1000, // 1 minute
+  max: 240,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // --- Static & API Routes ---
-app.use(express.static(path.join(__dirname, '..', 'web', 'dist')))
+app.use(express.static(path.join(__dirname, '..', 'web2', 'dist')))
 app.use(
   '/recordings/thumbnails',
   thumbnailLimiter,
   jwtAuth,
   express.static(path.join(config.recordingsDirectory, 'thumbnails')),
 )
-app.get(/^\/(?!hls|api|recordings|signed|sounds).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'))
-})
+app.get(
+  /^\/(?!hls|api|recordings|signed|sounds).*/,
+  staticResourceLimiter,
+  (_req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'web2', 'dist', 'index.html'))
+  },
+)
 
-app.get(/^\/recordings(\/[^/]+)(\/[^/]+)?$/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web', 'dist', 'index.html'))
-})
+app.get(
+  /^\/recordings(\/[^/]+)(\/[^/]+)?$/,
+  staticResourceLimiter,
+  (_req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'web2', 'dist', 'index.html'))
+  },
+)
 
-app.get('/api/vapid-public-key', (req, res) => {
+app.get('/api/vapid-public-key', (_req, res) => {
   res.json({ publicKey: config.vapid.publicKey })
 })
 
@@ -960,36 +954,54 @@ export async function createStreamManager(stream: {
 }
 
 export async function initializeStreamState(streamId: string) {
-  streamStates[streamId] = {
-    segmentTimestampMap: new Map(),
-    processingSegment: false,
-    notificationSent: false,
-    motionRecordingActive: false,
-    motionRecordingTimeoutAt: 0,
-    motionSegments: [],
-    flushingSegments: [],
-    recentSegments: [],
-    flushedSegments: [],
-    motionPaused:
-      (await loadPersistedStreamState(streamId))?.motionPaused ?? false,
-    startupTime: Date.now(),
-    savingInProgress: false,
-    currentSaveProcess: null,
-    saveRetryCount: 0,
-    motionStartedAt: 0,
-    lastSegmentProcessAt: 0,
-    recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
-    flushRecordings: [],
-    nextFlushNumber: 1,
-    cleaningUp: false,
-    cancelFlush: false,
-    lowSpaceNotified: false,
-    lastNotifiedRestartCooldownAt: 0,
-    currentRecordingMotionTimestamps: [],
-    lastPlaylistUpdatedAt: 0,
-  }
+  const existingState = streamStates[streamId]
+  if (existingState) return existingState
 
-  return streamStates[streamId]
+  const existingInitialization = streamStateInitializations.get(streamId)
+  if (existingInitialization) return existingInitialization
+
+  const initialization = (async () => {
+    const state: StreamMotionState = {
+      segmentTimestampMap: new Map(),
+      processingSegment: false,
+      notificationSent: false,
+      motionRecordingActive: false,
+      motionRecordingTimeoutAt: 0,
+      motionSegments: [],
+      flushingSegments: [],
+      recentSegments: [],
+      flushedSegments: [],
+      motionPaused:
+        (await loadPersistedStreamState(streamId))?.motionPaused ?? false,
+      startupTime: Date.now(),
+      savingInProgress: false,
+      currentSaveProcess: null,
+      saveRetryCount: 0,
+      motionStartedAt: 0,
+      lastSegmentProcessAt: 0,
+      recordingTitle: `motion_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`,
+      flushRecordings: [],
+      nextFlushNumber: 1,
+      cleaningUp: false,
+      cancelFlush: false,
+      lowSpaceNotified: false,
+      lastNotifiedRestartCooldownAt: 0,
+      currentRecordingMotionTimestamps: [],
+      lastPlaylistUpdatedAt: 0,
+    }
+
+    // Publish once, after async persistence has completed, so every caller
+    // observes the same state object from this point onward.
+    streamStates[streamId] ??= state
+    return streamStates[streamId]!
+  })()
+
+  streamStateInitializations.set(streamId, initialization)
+  try {
+    return await initialization
+  } finally {
+    streamStateInitializations.delete(streamId)
+  }
 }
 
 async function loadPersistedStreamState(

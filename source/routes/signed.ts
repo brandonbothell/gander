@@ -349,8 +349,8 @@ export default function initializeSignedRoutes(
 
   const streamSignedUrlLimiter = rateLimit({
     validate: { ip: false },
-    windowMs: 30 * 1000, // 30 seconds
-    max: 8,
+    windowMs: 2 * 1000, // 2 seconds
+    max: 10,
     standardHeaders: true,
     legacyHeaders: false,
   })
@@ -373,7 +373,7 @@ export default function initializeSignedRoutes(
 
   const videoAndThumbnailSignedUrlLimiter = rateLimit({
     validate: { ip: false },
-    windowMs: 2 * 1000, // 2 seconds
+    windowMs: 500, // Half second
     max: 50,
     standardHeaders: true,
     legacyHeaders: false,
@@ -406,7 +406,7 @@ export default function initializeSignedRoutes(
   const videosAndThumbnailsSignedUrlLimiter = rateLimit({
     validate: { ip: false },
     windowMs: 2 * 1000, // 2 seconds
-    max: 2,
+    max: 5,
     standardHeaders: true,
     legacyHeaders: false,
   })
@@ -686,7 +686,7 @@ function verifySignedUrl(
 }
 
 // --- Helper to create a signed stream playlist URL for a specific stream ---
-function createSignedStreamUrl(streamId: string, expiresInSeconds = 300) {
+function createSignedStreamUrl(streamId: string, expiresInSeconds = 60) {
   const expires = Math.floor(Date.now() / 1000) + expiresInSeconds
   const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
   const data = `stream:${streamId}:${expires}`
