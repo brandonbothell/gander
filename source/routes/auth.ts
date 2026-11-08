@@ -285,6 +285,17 @@ export default function initializeAuthRoutes(
     } else {
       logAuth('[Refresh Token] No refresh token provided', 'error')
       res.status(401).json({ error: 'No refresh token provided' })
+      return
+    }
+
+    const decoded = jwt.verify(refreshToken, JWT_SECRET) as {
+      username: string
+      type: string
+    }
+    if (decoded.type !== 'refresh') {
+      logAuth('[Refresh Token] Invalid token type', 'error')
+      res.status(401).json({ error: 'No refresh token provided' })
+      return
     }
 
     const { deviceInfo }: { deviceInfo?: DeviceInfo } = req.body
@@ -324,15 +335,14 @@ export default function initializeAuthRoutes(
     }
 
     // Find the user whose refreshTokens array contains the given refreshToken
-    const user = await prisma.user.findFirst({
-      where: {
-        refreshTokens: {
-          contains: `"${refreshToken}"`,
-        },
-      },
+    const user = await prisma.user.findUnique({
+      where: { username: decoded.username },
     })
+    const hasRefreshToken = user
+      ? JSON.parse(user.refreshTokens).includes(refreshToken)
+      : false
 
-    if (!user) {
+    if (!hasRefreshToken || !user) {
       logAuth(
         `[Refresh Token] Refresh token not found for any user: ${refreshToken}`,
         'error',
@@ -341,6 +351,12 @@ export default function initializeAuthRoutes(
         `[Refresh Token] Bad Refresh Request Headers: ${JSON.stringify(req.headers, null, 2)}`,
       )
       res.status(401).json({ error: 'Invalid refresh token' })
+      return
+    }
+
+    if (decoded.username !== user.username) {
+      logAuth(`[Refresh Token] Invalid token user ${decoded.username}`, 'error')
+      res.status(401).json({ error: 'No refresh token provided' })
       return
     }
 
