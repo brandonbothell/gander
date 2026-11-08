@@ -8,6 +8,7 @@ import { Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
+import { Preferences } from '@capacitor/preferences'
 import { Capacitor } from '@capacitor/core'
 import { isLocalIPv4 } from './util'
 import theme from './theme'
@@ -217,9 +218,15 @@ export default function App() {
           debugLog('Token refresh successful, storing new tokens')
 
           localStorage.setItem('jwt', data.token)
-
           localStorage.removeItem('tokenRefreshInProgress')
+
           await SecureStorage.setRefreshToken(data.refreshToken)
+          if (Capacitor.isNativePlatform()) {
+            await Preferences.set({
+              key: 'statusToken',
+              value: data.statusToken,
+            })
+          }
 
           // Broadcast to all tabs
           const tokenChannel = new BroadcastChannel('tokenUpdates')
