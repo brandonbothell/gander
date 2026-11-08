@@ -8,6 +8,7 @@ import { Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
+import { isLocalIPv4 } from './util'
 import theme from './theme'
 import SecureStorage from './secure-storage'
 import { API_BASE, setAuthHandlers, authFetch } from './main'
@@ -528,7 +529,8 @@ export default function App() {
     if (
       !window.isSecureContext &&
       location.protocol !== 'https:' &&
-      location.hostname !== 'localhost'
+      location.hostname !== 'localhost' &&
+      !isLocalIPv4(location.hostname)
     ) {
       alert(
         'Note: For enhanced security on remote devices, consider using HTTPS. Authentication will work but tokens will use basic encoding.',

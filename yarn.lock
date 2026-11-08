@@ -11761,6 +11761,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "web2@workspace:web2"
   dependencies:
+    "@capacitor/app": "npm:8.1.0"
+    "@capacitor/core": "npm:8.3.1"
+    "@capacitor/local-notifications": "npm:8.1.0"
+    "@capacitor/preferences": "npm:8.0.1"
+    "@capacitor/push-notifications": "npm:8.1.1"
+    "@capacitor/screen-orientation": "npm:8.0.1"
     "@gfazioli/mantine-video": "npm:1.2.2"
     "@mantine/carousel": "npm:9.6.1"
     "@mantine/core": "npm:9.6.1"

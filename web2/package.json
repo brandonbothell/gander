@@ -9,6 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/app": "8.1.0",
+    "@capacitor/core": "8.3.1",
+    "@capacitor/local-notifications": "8.1.0",
+    "@capacitor/preferences": "8.0.1",
+    "@capacitor/push-notifications": "8.1.1",
+    "@capacitor/screen-orientation": "8.0.1",
     "@gfazioli/mantine-video": "1.2.2",
     "@mantine/carousel": "9.6.1",
     "@mantine/core": "9.6.1",

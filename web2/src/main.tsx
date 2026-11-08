@@ -11,17 +11,10 @@ export type CustomWindow = Window & {
   clearDebugLogs: () => void
 }
 
-export const API_BASE = ''
+export const API_BASE = import.meta.env.VITE_BASE_URL ?? ''
 
 if (isIOS()) {
   document.body.classList.add('ios')
-}
-
-// Register service worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').then((reg) => {
-    console.log('Service Worker registered:', reg)
-  })
 }
 
 function getTokenOrApiKey():

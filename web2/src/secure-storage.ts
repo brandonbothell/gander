@@ -1,3 +1,6 @@
+import { Preferences } from '@capacitor/preferences'
+import { Capacitor } from '@capacitor/core'
+
 class SecureStorageService {
   private isSecureContext(): boolean {
     return (
@@ -112,11 +115,20 @@ class SecureStorageService {
   }
 
   async setRefreshToken(token: string): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.set({ key: 'refreshToken', value: token })
+      return
+    }
     const encrypted = await this.encrypt(token)
     localStorage.setItem('_rt', encrypted)
   }
 
   async getRefreshToken(): Promise<string | null> {
+    if (Capacitor.isNativePlatform()) {
+      const { value } = await Preferences.get({ key: 'refreshToken' })
+      return value || null
+    }
+
     const encrypted = localStorage.getItem('_rt')
     if (!encrypted) return null
 
@@ -131,10 +143,18 @@ class SecureStorageService {
   }
 
   async removeRefreshToken(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.remove({ key: 'refreshToken' })
+      return
+    }
     localStorage.removeItem('_rt')
   }
 
   async clearAll(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.remove({ key: 'refreshToken' })
+      return
+    }
     localStorage.removeItem('_rt')
     localStorage.removeItem('_encKey')
   }

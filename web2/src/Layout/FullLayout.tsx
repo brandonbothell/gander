@@ -17,7 +17,8 @@ import {
   useMantineColorScheme,
   useMantineTheme,
 } from '@mantine/core'
-import { authFetch } from '../main'
+import { playNotificationSound } from '../util'
+import { API_BASE, authFetch } from '../main'
 import { ThemeToggle } from '../Component/ThemeToggle'
 import StreamsGrid from '../Component/Streams/StreamsGrid'
 import { SessionsLogoutButton } from '../Component/Sessions/SessionsLogoutButton'
@@ -60,6 +61,62 @@ export default function FullLayout(props: {
   const { colorScheme } = useMantineColorScheme()
 
   const hasMouse = window.matchMedia('(pointer:fine)').matches
+
+  const [motionStatus, setMotionStatus] = useState<{
+    [streamId: string]: {
+      detectingMotion: boolean
+      recording: boolean
+      secondsLeft: number
+      saving: boolean
+      startedRecordingAt: number
+      lowDiskSpace: boolean
+    }
+  }>({})
+
+  useEffect(() => {
+    async function checkMotionStatus() {
+      authFetch(`${API_BASE}/api/motion-status`)
+        .then((res) => res.json())
+        .then(
+          (status: {
+            [streamId: string]: {
+              recording: boolean
+              secondsLeft: number
+              saving: boolean
+              startedRecordingAt: number
+              lowDiskSpace: boolean
+              detectingMotion: boolean
+            }
+          }) => {
+            // Update motion status state
+            setMotionStatus(status)
+
+            // Check for any stream that just started recording (motion detection)
+            for (const [streamId, s] of Object.entries(status)) {
+              const recordingJustStarted =
+                s.recording && Date.now() - s.startedRecordingAt < 2000 // 2 second threshold
+
+              // Play sound when ANY stream starts recording
+              if (recordingJustStarted) {
+                console.log(
+                  `Motion detected on stream ${streamId}, playing sound`,
+                )
+                playNotificationSound()
+                break // Only play once even if multiple streams start recording simultaneously
+              }
+            }
+          },
+        )
+        .catch(() => setMotionStatus({}))
+    }
+
+    const motionStatusInterval = setInterval(checkMotionStatus, 2000)
+    checkMotionStatus() // Initial check immediately on mount
+
+    return () => {
+      clearInterval(motionStatusInterval)
+    }
+  }, [])
 
   useEffect(() => {
     if (loadingFailed < 3 && !loadingStreams && !streamsLoaded) {
@@ -238,6 +295,8 @@ export default function FullLayout(props: {
       <AppShell.Main style={{ display: 'grid' }}>
         <StreamsGrid
           streams={streams}
+          motionStatus={motionStatus}
+          setMotionStatus={setMotionStatus}
           setLayouts={setLayouts}
           layout={layouts.find((layout) => layout.id === activeLayout)!}
           setOnLayoutDeleted={setOnLayoutDeleted}

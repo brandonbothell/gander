@@ -13,6 +13,26 @@ import StreamEditMenu from './StreamEditMenu'
 export default function StreamVideo(props: {
   streams: Map<string, Stream>
   stream: Stream
+  motionStatus: {
+    detectingMotion: boolean
+    recording: boolean
+    secondsLeft: number
+    saving: boolean
+    startedRecordingAt: number
+    lowDiskSpace: boolean
+  }
+  setMotionStatus: React.Dispatch<
+    React.SetStateAction<{
+      [streamId: string]: {
+        detectingMotion: boolean
+        recording: boolean
+        secondsLeft: number
+        saving: boolean
+        startedRecordingAt: number
+        lowDiskSpace: boolean
+      }
+    }>
+  >
   setLayouts: (
     val:
       | {
@@ -208,6 +228,8 @@ export default function StreamVideo(props: {
               ref={popoverHoveredRef}
               streams={props.streams}
               stream={props.stream}
+              motionStatus={props.motionStatus}
+              setMotionStatus={props.setMotionStatus}
               setStream={props.setStream}
             >
               <ActionIcon

@@ -72,6 +72,7 @@ export default function initializeMotionRoutes(
   app.get('/api/motion-status', motionStatusLimiter, jwtAuth, (req, res) => {
     const states: {
       [streamId: string]: {
+        detectingMotion: boolean
         recording: boolean
         secondsLeft: number
         saving: boolean
@@ -83,6 +84,7 @@ export default function initializeMotionRoutes(
       const state = streamStates[streamId]
       if (!state) {
         states[streamId] = {
+          detectingMotion: false,
           recording: false,
           secondsLeft: 0,
           saving: false,
@@ -99,6 +101,7 @@ export default function initializeMotionRoutes(
         )
       }
       states[streamId] = {
+        detectingMotion: !state.motionPaused,
         recording: state.motionRecordingActive,
         secondsLeft,
         saving: state.savingInProgress ?? false,

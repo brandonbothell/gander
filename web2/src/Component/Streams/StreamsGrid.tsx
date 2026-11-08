@@ -18,6 +18,28 @@ type StoredSplitterLayout = {
 
 export default function StreamsGrid(props: {
   streams: Map<string, Stream>
+  motionStatus: {
+    [streamId: string]: {
+      detectingMotion: boolean
+      recording: boolean
+      secondsLeft: number
+      saving: boolean
+      startedRecordingAt: number
+      lowDiskSpace: boolean
+    }
+  }
+  setMotionStatus: React.Dispatch<
+    React.SetStateAction<{
+      [streamId: string]: {
+        detectingMotion: boolean
+        recording: boolean
+        secondsLeft: number
+        saving: boolean
+        startedRecordingAt: number
+        lowDiskSpace: boolean
+      }
+    }>
+  >
   layout: { id: number; splitterStreams: string[] }
   setLayouts: (
     val:
@@ -271,9 +293,11 @@ export default function StreamsGrid(props: {
                     splitterStreams[0] = streamId
                     props.setLayoutStreams(splitterStreams)
                   }}
+                  setMotionStatus={props.setMotionStatus}
                   setLayouts={props.setLayouts}
                   stream={props.streams.get(splitterStreams[0])!}
                   streams={props.streams}
+                  motionStatus={props.motionStatus[splitterStreams[0]!]}
                   getAspectRatio={getAspectRatio}
                   removeFromLayout={() => {
                     delete splitterStreams[0]
@@ -299,6 +323,8 @@ export default function StreamsGrid(props: {
                 <StreamVideo
                   streams={props.streams}
                   stream={props.streams.get(splitterStreams[1])!}
+                  motionStatus={props.motionStatus[splitterStreams[1]!]}
+                  setMotionStatus={props.setMotionStatus}
                   setLayouts={props.setLayouts}
                   getAspectRatio={getAspectRatio}
                   removeFromLayout={() => {
@@ -363,6 +389,8 @@ export default function StreamsGrid(props: {
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[2])!}
                   streams={props.streams}
+                  motionStatus={props.motionStatus[splitterStreams[2]!]}
+                  setMotionStatus={props.setMotionStatus}
                   getAspectRatio={getAspectRatio}
                   setLayouts={props.setLayouts}
                   removeFromLayout={() => {
@@ -393,6 +421,8 @@ export default function StreamsGrid(props: {
                 <StreamVideo
                   stream={props.streams.get(splitterStreams[3])!}
                   streams={props.streams}
+                  motionStatus={props.motionStatus[splitterStreams[3]!]}
+                  setMotionStatus={props.setMotionStatus}
                   getAspectRatio={getAspectRatio}
                   setLayouts={props.setLayouts}
                   removeFromLayout={() => {
