@@ -193,7 +193,7 @@ export default function App() {
 
       if (res.status === 200) {
         const data = await res.json()
-        if (data && data.token && data.refreshToken) {
+        if (data && data.token && data.refreshToken && data.statusToken) {
           debugLog('Token refresh successful, storing new tokens')
 
           localStorage.setItem('jwt', data.token)
@@ -203,6 +203,7 @@ export default function App() {
             localStorage.removeItem('tokenRefreshInProgress')
           } else {
             await SecureStorage.setRefreshToken(data.refreshToken)
+            await SecureStorage.setStatusToken(data.statusToken)
           }
 
           // Broadcast to all tabs (only on web)
@@ -658,7 +659,11 @@ export default function App() {
     }
   }
 
-  const handleLogin = async (token: string, refreshToken: string) => {
+  const handleLogin = async (
+    token: string,
+    refreshToken: string,
+    statusToken: string,
+  ) => {
     // Show user-friendly error message
     if (
       !window.isSecureContext &&
@@ -673,6 +678,7 @@ export default function App() {
     try {
       if (Capacitor.isNativePlatform()) {
         await SecureStorage.setRefreshToken(refreshToken)
+        await SecureStorage.setStatusToken(statusToken)
       }
       localStorage.setItem('jwt', token)
       setAuthenticated(true)
@@ -681,8 +687,6 @@ export default function App() {
 
       // Still try to authenticate even if secure storage fails
       localStorage.setItem('jwt', token)
-      // Store refresh token as base64 fallback
-      // localStorage.setItem('_rt', btoa(refreshToken))
       setAuthenticated(true)
     }
   }

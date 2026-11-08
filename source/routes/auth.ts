@@ -105,7 +105,7 @@ export default function initializeAuthRoutes(
       'warn',
     )
 
-    const refreshTokenExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
+    const refreshTokenExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 // 7 days
 
     const configUserIndex = config.users.findIndex(
       (user) => user.username === username && user.password === password,
@@ -114,10 +114,13 @@ export default function initializeAuthRoutes(
     if (configUserIndex >= 0) {
       const configUser = config.users[configUserIndex]
       const token = jwt.sign(
-        { username, isAdmin: configUser.isAdmin },
+        { username, isAdmin: configUser.isAdmin, type: 'access' },
         JWT_SECRET,
         { expiresIn: '5m' },
       )
+      const statusToken = jwt.sign({ username, type: 'status' }, JWT_SECRET, {
+        expiresIn: '21d',
+      })
       const refreshToken = jwt.sign(
         {
           username,
@@ -134,6 +137,7 @@ export default function initializeAuthRoutes(
           username: true,
           jwts: true,
           refreshTokens: true,
+          statusTokens: true,
           isAdmin: false,
         },
       })
@@ -153,6 +157,7 @@ export default function initializeAuthRoutes(
             username,
             jwts: JSON.stringify([token]),
             refreshTokens: JSON.stringify([refreshToken]),
+            statusTokens: JSON.stringify([statusToken]),
             trustedIps: JSON.stringify([newDevice]),
             isAdmin: configUser.isAdmin ?? false,
           },
@@ -234,6 +239,11 @@ export default function initializeAuthRoutes(
                 new Set([...JSON.parse(user.refreshTokens), refreshToken]),
               ),
             ),
+            statusTokens: JSON.stringify(
+              Array.from(
+                new Set([...JSON.parse(user.statusTokens), statusToken]),
+              ),
+            ),
             trustedIps: JSON.stringify(trustedDevices),
           },
         })
@@ -255,7 +265,7 @@ export default function initializeAuthRoutes(
         'warn',
       )
 
-      res.json({ success: true, token, refreshToken })
+      res.json({ success: true, token, refreshToken, statusToken })
     } else {
       setTimeout(
         () =>
@@ -341,15 +351,16 @@ export default function initializeAuthRoutes(
       `[Refresh Token] User ${user.username} refreshing token from IP: ${ip}`,
     )
 
-    let tokens: string[] = []
+    let refreshTokens: string[] = []
+    let jwts: string[] = []
+    let statusTokens: string[] = []
     try {
-      tokens = JSON.parse(user.refreshTokens ?? '[]')
+      refreshTokens = JSON.parse(user.refreshTokens ?? '[]')
+      jwts = JSON.parse(user.jwts ?? '[]')
+      statusTokens = JSON.parse(user.statusTokens ?? '[]')
     } catch (_) {
-      logAuth(
-        `Failed to parse refresh tokens for user: ${user.username}`,
-        'error',
-      )
-      res.status(500).json({ error: 'Failed to parse refresh tokens' })
+      logAuth(`Failed to parse tokens for user: ${user.username}`, 'error')
+      res.status(500).json({ error: 'Failed to parse tokens' })
       return
     }
 
@@ -374,8 +385,9 @@ export default function initializeAuthRoutes(
           },
           JWT_SECRET,
         )
-        tokens = tokens.filter((t: string) => t !== refreshToken)
-        tokens.push(newRefreshToken)
+        if (!refreshTokens.includes(newRefreshToken)) {
+          refreshTokens.push(newRefreshToken)
+        }
         return newRefreshToken
       } catch (_) {
         logAuth(
@@ -455,10 +467,59 @@ export default function initializeAuthRoutes(
       return
     }
 
+    const token = jwt.sign(
+      { username: user.username, isAdmin: user.isAdmin, type: 'access' },
+      JWT_SECRET,
+      {
+        expiresIn: '5m',
+      },
+    )
+    const currentStatusToken = statusTokens.find((t) => {
+      try {
+        // Check if the status token is valid for at least 10 more days
+        if (
+          jwt.decode(t, { json: true })?.exp! * 1000 >
+          Date.now() + 10 * 24 * 60 * 60 * 1000
+        ) {
+          return true
+        } else {
+          logAuth(
+            `[Refresh Token] Status token for user ${user.username} is expiring on ${new Date(jwt.decode(t, { json: true })?.exp! * 1000)}, generating a new one.`,
+          )
+          return false
+        }
+      } catch (err) {
+        logAuth(
+          `[Refresh Token] Failed to decode status token for user ${user.username}: ${err}`,
+          'error',
+        )
+      }
+
+      return false
+    })
+    const statusToken =
+      currentStatusToken ??
+      jwt.sign({ username: user.username, type: 'status' }, JWT_SECRET, {
+        expiresIn: '21d',
+      })
+
+    jwts.push(token)
+    if (!currentStatusToken) statusTokens.push(statusToken)
+    else {
+      logAuth(
+        `[Refresh Token] Reusing existing status token for user ${user.username}`,
+      )
+    }
+
     await prisma.user.update({
       where: { username: user.username },
       data: {
-        refreshTokens: JSON.stringify(tokens),
+        refreshTokens: JSON.stringify(
+          refreshTokens.filter((t) => t !== refreshToken),
+        ), // Remove old refresh token
+        statusTokens: JSON.stringify(statusTokens),
+        jwts: JSON.stringify(jwts),
+
         ...(trustedDevices
           ? { trustedIps: JSON.stringify(trustedDevices) }
           : {}),
@@ -471,14 +532,12 @@ export default function initializeAuthRoutes(
       expires: new Date(refreshTokenExp * 1000),
     })
 
-    const token = jwt.sign(
-      { username: user.username, isAdmin: user.isAdmin },
-      JWT_SECRET,
-      {
-        expiresIn: '5m',
-      },
-    )
-    res.json({ success: true, token, refreshToken: newRefreshToken })
+    res.json({
+      success: true,
+      refreshToken: newRefreshToken,
+      token,
+      statusToken,
+    })
   })
 
   app.get(

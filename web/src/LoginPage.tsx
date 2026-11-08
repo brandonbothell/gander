@@ -7,7 +7,7 @@ export default function LoginPage({
   onLogin,
   setAuthenticated,
 }: {
-  onLogin: (token: string, refreshToken: string) => void
+  onLogin: (token: string, refreshToken: string, statusToken: string) => void
   setAuthenticated: (authenticated: boolean) => void
 }) {
   const [username, setUsername] = useState('')
@@ -86,7 +86,7 @@ export default function LoginPage({
         if (!Capacitor.isNativePlatform()) {
           localStorage.removeItem('tokenRefreshInProgress')
         }
-        onLogin(data.token, data.refreshToken)
+        onLogin(data.token, data.refreshToken, data.statusToken)
       } else {
         setError(data.message ?? 'Login failed')
       }

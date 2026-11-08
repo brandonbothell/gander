@@ -686,6 +686,23 @@ async function cleanupExpiredTokensAndDevices() {
     })
     if (validRefreshTokens.length !== refreshTokens.length) changed = true
 
+    // --- Status Tokens ---
+    let statusTokens: string[] = []
+    try {
+      statusTokens = JSON.parse(user.statusTokens ?? '[]')
+    } catch {
+      statusTokens = []
+    }
+    const validStatusTokens = statusTokens.filter((token) => {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload
+        return decoded && decoded.exp && decoded.exp * 1000 > now
+      } catch {
+        return false
+      }
+    })
+    if (validStatusTokens.length !== statusTokens.length) changed = true
+
     // --- Trusted Devices ---
     let trustedDevices: TrustedDevice[] = []
     try {
@@ -695,7 +712,7 @@ async function cleanupExpiredTokensAndDevices() {
     }
     const filteredDevices = trustedDevices.filter((device) => {
       const lastSeen = new Date(device.lastSeen).getTime()
-      return !isNaN(lastSeen) && now - lastSeen < SEVEN_DAYS_MS
+      return !isNaN(lastSeen) && now - lastSeen < SEVEN_DAYS_MS // Untrust devices after 7 days of inactivity
     })
     if (filteredDevices.length !== trustedDevices.length) changed = true
 
@@ -707,6 +724,7 @@ async function cleanupExpiredTokensAndDevices() {
             jwts: JSON.stringify(validJwts),
             refreshTokens: JSON.stringify(validRefreshTokens),
             trustedIps: JSON.stringify(filteredDevices),
+            statusTokens: JSON.stringify(validStatusTokens),
           },
         })
         .catch(() => {

@@ -16,6 +16,7 @@ model User {
   username      String   @id
   jwts          String   @default("[]")
   refreshTokens String   @default("[]")
+  statusTokens  String   @default("[]")
   trustedIps    String   @default("[]")
   createdAt     DateTime @default(now())
   isAdmin       Boolean  @default(false)

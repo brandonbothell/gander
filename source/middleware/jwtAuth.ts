@@ -46,6 +46,11 @@ export async function jwtAuth(
     const payload = jwt.verify(auth.slice(7), JWT_SECRET) as {
       username: string
       isAdmin: boolean
+      type?: string
+    }
+    if (payload.type !== 'access') {
+      res.status(401).json({ error: 'Invalid token type.' })
+      return
     }
     req.user = payload
 

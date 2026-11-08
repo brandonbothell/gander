@@ -245,12 +245,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/android@npm:8.4.1":
-  version: 8.4.1
-  resolution: "@capacitor/android@npm:8.4.1"
+"@capacitor/android@npm:8.6.0":
+  version: 8.6.0
+  resolution: "@capacitor/android@npm:8.6.0"
   peerDependencies:
-    "@capacitor/core": ^8.4.0
-  checksum: 10c0/84df2b3e50e6735ad8a1f8899593df7e420d3e7894c02fd57416dba8da928d67fcee650ae365275548e261ff125e89418153d7baa0a73981116227420aa26444
+    "@capacitor/core": ^8.6.0
+  checksum: 10c0/46428782c38b1ef8b2fb5638b52f4252c31148ea96efd9bc404a4960a182764a71b739b563fbe4e131a4dd6947fc87f0adc8615db1236de2226b8416fe401422
   languageName: node
   linkType: hard
 
@@ -263,9 +263,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/cli@npm:8.3.1":
-  version: 8.3.1
-  resolution: "@capacitor/cli@npm:8.3.1"
+"@capacitor/app@npm:8.1.2":
+  version: 8.1.2
+  resolution: "@capacitor/app@npm:8.1.2"
+  peerDependencies:
+    "@capacitor/core": ">=8.0.0"
+  checksum: 10c0/4c92a23b0ce0b4c7272d6c3cd0443ff3102309c07e7e494a86ca00984d14f9bed333f7908ae0bc184a536435b487d8e36850382ff8e60b46e29a614de4e075da
+  languageName: node
+  linkType: hard
+
+"@capacitor/cli@npm:8.6.0":
+  version: 8.6.0
+  resolution: "@capacitor/cli@npm:8.6.0"
   dependencies:
     "@ionic/cli-framework-output": "npm:^2.2.8"
     "@ionic/utils-subprocess": "npm:^3.0.1"
@@ -283,11 +292,12 @@ __metadata:
     semver: "npm:^7.6.3"
     tar: "npm:^7.5.3"
     tslib: "npm:^2.8.1"
+    xcode: "npm:^4.0.0"
     xml2js: "npm:^0.6.2"
   bin:
     cap: bin/capacitor
     capacitor: bin/capacitor
-  checksum: 10c0/7e23fd4f1ea78ce23634ef7ca34fab6f937c1cf5410190520e8996256bfbfd690b94df60ea9058c425c9e2ac4d28de975f1bdc5df5cda9582b6a8ee27ac6a8e3
+  checksum: 10c0/5ccfa31710c56edb85e995425f3b09c0a50af39a1ca883acbc94d25413afc7ebea87df23fbfded778d7753fdc57ec3b269f6afd2b62b29021723d280ff07d012
   languageName: node
   linkType: hard
 
@@ -297,6 +307,15 @@ __metadata:
   dependencies:
     tslib: "npm:^2.1.0"
   checksum: 10c0/c35d65e94f3f2523e2ccd10d1f1e4b74596aeede5d2cabcb03f02464dfc78679bcdf0570ecaa7916f08bc25de404313d8628d2832c138cfccf8b7f8e5c7b3761
+  languageName: node
+  linkType: hard
+
+"@capacitor/core@npm:8.6.0":
+  version: 8.6.0
+  resolution: "@capacitor/core@npm:8.6.0"
+  dependencies:
+    tslib: "npm:^2.1.0"
+  checksum: 10c0/3ebe05bb0e7b32111ac549c97b583a253127794094fc10179940c6abb01a0e4ca03e6ab909e0f35eeedf9efa2e9f4f80d8179da4efce245845748716a638a21d
   languageName: node
   linkType: hard
 
@@ -327,12 +346,30 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@capacitor/push-notifications@npm:8.1.3":
+  version: 8.1.3
+  resolution: "@capacitor/push-notifications@npm:8.1.3"
+  peerDependencies:
+    "@capacitor/core": ">=8.0.0"
+  checksum: 10c0/b64d3dffd79d2a8aa5847c293b166489fc094f61956b3beefe53ac62984dda7d1bf7d2c193eba21f9e0267fadcc38778ff3cdab480a5ae1354a202be7a73d889
+  languageName: node
+  linkType: hard
+
 "@capacitor/screen-orientation@npm:8.0.1":
   version: 8.0.1
   resolution: "@capacitor/screen-orientation@npm:8.0.1"
   peerDependencies:
     "@capacitor/core": ">=8.0.0"
   checksum: 10c0/5c352cf09fecc3496babba7fde5226b281af57be1d6dd5e2f406003643017d6bf0f626a37e4de3dd6b736cefa4e57740759086cc1600814f07a8ad9c9e011686
+  languageName: node
+  linkType: hard
+
+"@capacitor/screen-orientation@npm:8.0.2":
+  version: 8.0.2
+  resolution: "@capacitor/screen-orientation@npm:8.0.2"
+  peerDependencies:
+    "@capacitor/core": ">=8.0.0"
+  checksum: 10c0/009a569a7d88e7623fbee4d851d0a83e01bf7c8cbae3850faf4a85b0e852be438a3f8697d0aac3575b2095289427f44c3c3a7c52adf322f7d814dafb5d800610
   languageName: node
   linkType: hard
 
@@ -3214,6 +3251,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@xmldom/xmldom@npm:^0.9.10":
+  version: 0.9.12
+  resolution: "@xmldom/xmldom@npm:0.9.12"
+  checksum: 10c0/0a9ef38e203213717dde8d16c62743c26c37eb4195aeb4f286550a0aec2145c063a6c3633f253c29f75202f922d7c961d1acaad4dd93e5db1ef05c813354d178
+  languageName: node
+  linkType: hard
+
 "@yarnpkg/core@npm:^4.4.2, @yarnpkg/core@npm:^4.4.4":
   version: 4.5.0
   resolution: "@yarnpkg/core@npm:4.5.0"
@@ -3867,7 +3911,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bplist-parser@npm:^0.3.2":
+"bplist-creator@npm:0.1.1":
+  version: 0.1.1
+  resolution: "bplist-creator@npm:0.1.1"
+  dependencies:
+    stream-buffers: "npm:2.2.x"
+  checksum: 10c0/427ec37263ce0e8c68a83f595fc9889a9cbf2e6fda2de18e1f8ef7f0c6ce68c0cdbb7c9c1f3bb3f2d217407af8cffbdf254bf0f71c99f2186175d07752f08a47
+  languageName: node
+  linkType: hard
+
+"bplist-parser@npm:0.3.2, bplist-parser@npm:^0.3.2":
   version: 0.3.2
   resolution: "bplist-parser@npm:0.3.2"
   dependencies:
@@ -6200,14 +6253,14 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "gander@workspace:."
   dependencies:
-    "@capacitor/android": "npm:8.4.1"
-    "@capacitor/app": "npm:8.1.0"
-    "@capacitor/cli": "npm:8.3.1"
-    "@capacitor/core": "npm:8.3.1"
+    "@capacitor/android": "npm:8.6.0"
+    "@capacitor/app": "npm:8.1.2"
+    "@capacitor/cli": "npm:8.6.0"
+    "@capacitor/core": "npm:8.6.0"
     "@capacitor/local-notifications": "npm:8.1.0"
     "@capacitor/preferences": "npm:8.0.1"
-    "@capacitor/push-notifications": "npm:8.1.1"
-    "@capacitor/screen-orientation": "npm:8.0.1"
+    "@capacitor/push-notifications": "npm:8.1.3"
+    "@capacitor/screen-orientation": "npm:8.0.2"
     "@dotenvx/dotenvx": "npm:1.66.0"
     "@eslint/compat": "npm:2.1.0"
     "@eslint/eslintrc": "npm:3.3.5"
@@ -9116,6 +9169,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"plist@npm:^3.0.5":
+  version: 3.1.1
+  resolution: "plist@npm:3.1.1"
+  dependencies:
+    "@xmldom/xmldom": "npm:^0.9.10"
+    base64-js: "npm:^1.5.1"
+    xmlbuilder: "npm:^15.1.1"
+  checksum: 10c0/af681277c2e541c6aab0ddee57f59459c43beeea1ee7aa2d4218aa39595fb41c068e2d2be3e4abb17e3252eaf2c1b806ecfb1d402fa5a3f4a6e1a7a32c880c9a
+  languageName: node
+  linkType: hard
+
 "plist@npm:^3.1.0":
   version: 3.1.0
   resolution: "plist@npm:3.1.0"
@@ -10507,6 +10571,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"simple-plist@npm:^1.3.1":
+  version: 1.4.0
+  resolution: "simple-plist@npm:1.4.0"
+  dependencies:
+    bplist-creator: "npm:0.1.1"
+    bplist-parser: "npm:0.3.2"
+    plist: "npm:^3.0.5"
+  checksum: 10c0/226c283492d8518d715e4133d94bdbd15c0619561bcde583b4807b36cde106c0078c615b9b4e25c0e8758a4ae4e79ed5dd76e57cd528d8b7001ecab5ad35e343
+  languageName: node
+  linkType: hard
+
 "simple-update-notifier@npm:^2.0.0":
   version: 2.0.0
   resolution: "simple-update-notifier@npm:2.0.0"
@@ -10714,6 +10789,13 @@ __metadata:
     es-errors: "npm:^1.3.0"
     internal-slot: "npm:^1.1.0"
   checksum: 10c0/de4e45706bb4c0354a4b1122a2b8cc45a639e86206807ce0baf390ee9218d3ef181923fa4d2b67443367c491aa255c5fbaa64bb74648e3c5b48299928af86c09
+  languageName: node
+  linkType: hard
+
+"stream-buffers@npm:2.2.x":
+  version: 2.2.0
+  resolution: "stream-buffers@npm:2.2.0"
+  checksum: 10c0/14a351f0a066eaa08c8c64a74f4aedd87dd7a8e59d4be224703da33dca3eb370828ee6c0ae3fff59a9c743e8098728fc95c5f052ae7741672a31e6b1430ba50a
   languageName: node
   linkType: hard
 
@@ -11970,6 +12052,15 @@ __metadata:
     is-wsl: "npm:^3.1.0"
     powershell-utils: "npm:^0.1.0"
   checksum: 10c0/b3ba99cc6b71f66457eef598d529beeb8cb57a72646877fe25993894b808c60b82f6d47df5463f0b6e54632272f62f5eaea105c12784fd09b06f500f3f53aa2e
+  languageName: node
+  linkType: hard
+
+"xcode@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "xcode@npm:4.0.0"
+  dependencies:
+    simple-plist: "npm:^1.3.1"
+  checksum: 10c0/cbb3510eda03636a1594476978f48eebea88a9d8c8ba506df0366c007581774551bb45ca8b511c6a41fc4b6b564958e765c89ad31d8aabec4e4f8f993c8a7fc6
   languageName: node
   linkType: hard
 
