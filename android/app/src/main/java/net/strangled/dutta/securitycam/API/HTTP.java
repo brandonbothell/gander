@@ -133,9 +133,11 @@ public class HTTP {
                         HTTP.lastRefreshed = System.currentTimeMillis();
                         HTTP.currentRefreshToken = body.refreshToken;
                         HTTP.currentToken = body.token;
+                        HTTP.currentStatusToken = body.statusToken;
                         if (sharedPreferences != null) {
                             SharedPreferences.Editor editor = sharedPreferences.edit();
                             editor.putString("refreshToken", body.refreshToken);
+                            editor.putString("statusToken", body.statusToken);
                             boolean success = editor.commit();
                             if (!success) {
                                 Log.e("Refresh Token", "Failed to save refresh token");

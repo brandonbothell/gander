@@ -493,9 +493,15 @@ export default function initializeAuthRoutes(
     const currentStatusToken = statusTokens.find((t) => {
       try {
         // Check if the status token is valid for at least 10 more days
+        const decoded = jwt.decode(t) as {
+          username: string
+          type: string
+          exp?: number
+        } | null
         if (
-          jwt.decode(t, { json: true })?.exp! * 1000 >
-          Date.now() + 10 * 24 * 60 * 60 * 1000
+          decoded &&
+          decoded.type === 'status' &&
+          decoded.exp! * 1000 > Date.now() + 10 * 24 * 60 * 60 * 1000
         ) {
           return true
         } else {

@@ -596,7 +596,11 @@ loadStreamsFromDb()
       try {
         const payload = jwt.verify(token, JWT_SECRET) as {
           username: string
+          type: string
         }
+
+        if (payload.type !== 'status') throw new Error()
+
         socket.data.username = payload.username
         console.info(`[Socket] User '${socket.data.username}' connecting...`)
         return next()
