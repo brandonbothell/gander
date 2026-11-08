@@ -8,6 +8,7 @@ import { Preferences } from '@capacitor/preferences'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { App } from '@capacitor/app'
 import { API_BASE, authFetch } from './main'
+import { MotionService } from './capacitor-plugins/motion-service'
 
 export async function setupPushNotifications() {
   try {
@@ -71,6 +72,7 @@ export async function setupPushNotifications() {
               body: JSON.stringify({ fcmToken: token.value, clientId }),
             })
             resolved = true
+            await MotionService.startService()
             resolve()
           } catch (err) {
             PushNotifications.removeAllListeners()

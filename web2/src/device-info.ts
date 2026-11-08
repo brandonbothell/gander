@@ -1,3 +1,6 @@
+import { Preferences } from '@capacitor/preferences'
+import { Capacitor } from '@capacitor/core'
+
 export interface TrustedDevice {
   ip: string
   deviceInfo: DeviceInfo
@@ -71,6 +74,13 @@ export async function getDeviceFingerprint(): Promise<DeviceInfo> {
           return v.toString(16)
         })
     localStorage.setItem('clientId', clientId)
+  }
+
+  if (
+    Capacitor.isNativePlatform() &&
+    !(await Preferences.get({ key: 'clientId' })).value
+  ) {
+    await Preferences.set({ key: 'clientId', value: clientId })
   }
 
   return {
