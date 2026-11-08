@@ -126,6 +126,15 @@ class SecureStorageService {
     }
   }
 
+  async setStatusToken(token: string): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.set({
+        key: 'statusToken',
+        value: token,
+      })
+    }
+  }
+
   async getRefreshToken(): Promise<string | null> {
     if (Capacitor.isNativePlatform()) {
       const result = await Preferences.get({ key: 'refreshToken' })

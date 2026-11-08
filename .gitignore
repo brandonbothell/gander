@@ -61,6 +61,7 @@ build/
 out/
 compiled/
 *.tgz
+*.buildinfo.*
 
 # Logs
 logs/

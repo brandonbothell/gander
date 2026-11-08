@@ -166,7 +166,10 @@ public class MotionForegroundService extends Service {
         tokenUpdateHandler.postDelayed(() -> {
             SharedPreferences sharedPref = getApplicationContext()
                     .getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
+
+            String statusToken = sharedPref.getString("statusToken", null);
             String refreshToken = sharedPref.getString("refreshToken", null);
+            if (statusToken != null) HTTP.setCurrentStatusToken(statusToken);
             if (refreshToken != null) HTTP.setCurrentRefreshToken(refreshToken);
             updateTokenLoop();
         }, 10 * 1000L /* 10 seconds */);
@@ -217,41 +220,37 @@ public class MotionForegroundService extends Service {
             String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
             SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
             String clientId = sharedPref.getString("clientId", null);
-            String refreshToken = sharedPref.getString("refreshToken", null);
+            String statusToken = sharedPref.getString("statusToken", null);
 
-            HTTP.authenticate(baseUrl, refreshToken, clientId, new HTTP.RefreshTokenCallback() {
-                @Override
-                public void onSuccess(String newRefreshToken, String token) {
-                    // Cleanup old socket instance completely
-                    if (mSocket != null) {
-                        mSocket.disconnect();
-                        mSocket.off();
-                    }
+            // TODO: Invoke a high-priority warning notification (possibly using fullscreen-intent permission) if the socket disconnects for too long
+            if (statusToken == null) {
+                Log.e("MotionForegroundService", "Auth failed: missing status token. Socket reconnection will be rescheduled.");
+                return;
+            }
 
-                    Map<String, String> auth = new HashMap<>();
-                    auth.put("clientId", clientId);
-                    auth.put("token", token);
+            // Cleanup old socket instance completely
+            if (mSocket != null) {
+                mSocket.disconnect();
+                mSocket.off();
+            }
 
-                    IO.Options socketOptions = IO.Options.builder()
-                            .setAuth(auth)
-                            .setTransports(new String[]{"polling", "websocket"})
-                            .setReconnection(true)
-                            .build();
+            Map<String, String> auth = new HashMap<>();
+            auth.put("clientId", clientId);
+            auth.put("token", statusToken);
 
-                    try {
-                        mSocket = IO.socket(baseUrl, socketOptions);
-                        setupSocketListeners();
-                        mSocket.connect();
-                    } catch (URISyntaxException e) {
-                        Log.e("MotionService", "URI Error: " + e.getMessage());
-                    }
-                }
+            IO.Options socketOptions = IO.Options.builder()
+                    .setAuth(auth)
+                    .setTransports(new String[]{"polling", "websocket"})
+                    .setReconnection(true)
+                    .build();
 
-                @Override
-                public void onFailure(String errorMessage) {
-                    Log.e("MotionForegroundService", "Auth failed: " + errorMessage + ". Socket reconnection will be rescheduled.");
-                }
-            });
+            try {
+                mSocket = IO.socket(baseUrl, socketOptions);
+                setupSocketListeners();
+                mSocket.connect();
+            } catch (URISyntaxException e) {
+                Log.e("MotionService", "URI Error: " + e.getMessage());
+            }
         }
     }
 

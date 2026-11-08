@@ -26,6 +26,7 @@ public class HTTP {
     private static int refreshFailuresInARow = 0;
 
     private static String dontTryThisTokenAgain = null;
+    private static String currentStatusToken = null;
     private static String currentRefreshToken = null;
     private static String currentToken = null;
     public static SharedPreferences sharedPreferences = null;
@@ -422,6 +423,9 @@ public class HTTP {
         }
     }
 
+    public static void setCurrentStatusToken(String statusToken) {
+        currentStatusToken = statusToken;
+    }
 
     public static void setCurrentRefreshToken(String refreshToken) {
         currentRefreshToken = refreshToken;
