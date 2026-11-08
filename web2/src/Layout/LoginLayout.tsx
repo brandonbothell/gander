@@ -23,7 +23,7 @@ type LoginValues = {
 }
 
 type LoginLayoutProps = {
-  onLogin: (token: string, refreshToken: string) => void
+  onLogin: (token: string, refreshToken: string, statusToken: string) => void
   setAuthenticated: (authenticated: boolean) => void
 }
 
@@ -103,7 +103,7 @@ export default function LoginLayout({
 
       if (data.success) {
         localStorage.removeItem('tokenRefreshInProgress')
-        onLogin(data.token, data.refreshToken)
+        onLogin(data.token, data.refreshToken, data.statusToken)
       } else {
         setError(data.message ?? 'Login failed')
       }

@@ -150,10 +150,11 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
         await globalLogout()
         throw new Error('Token refresh failed - logged out')
       }
-    } finally {
+    } catch (error) {
       // Clear the refresh promise when done
-      tokenRefreshPromise = null
     }
+
+    tokenRefreshPromise = null
   }
 
   return response

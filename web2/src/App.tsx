@@ -537,7 +537,11 @@ export default function App() {
     }
   }, [])
 
-  const handleLogin = async (token: string, refreshToken: string) => {
+  const handleLogin = async (
+    token: string,
+    refreshToken: string,
+    statusToken: string,
+  ) => {
     // Show user-friendly error message
     if (
       !window.isSecureContext &&
@@ -551,9 +555,18 @@ export default function App() {
     }
 
     try {
+      if (Capacitor.isNativePlatform()) {
+        await Preferences.set({
+          key: 'statusToken',
+          value: statusToken,
+        })
+        await SecureStorage.setRefreshToken(refreshToken)
+      }
+
       if (!window.isSecureContext) {
         await SecureStorage.setRefreshToken(refreshToken)
       }
+
       localStorage.setItem('jwt', token)
       setAuthenticated(true)
     } catch (error) {
