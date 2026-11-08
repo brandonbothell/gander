@@ -53,7 +53,7 @@ export default function StreamEditMenu(props: {
   const [togglingDetection, setTogglingDetection] = useState(false)
 
   const toggleDetection = useCallback(() => {
-    const motionPaused = props.motionStatus.detectingMotion
+    const motionPaused = props.motionStatus?.detectingMotion
     setTogglingDetection(true)
     authFetch(`${API_BASE}/api/motion-pause/${props.stream.id}`, {
       method: 'POST',
@@ -63,7 +63,10 @@ export default function StreamEditMenu(props: {
       .then((r) => r.json())
       .then((status: { paused: boolean }) =>
         props.setMotionStatus((prev) => {
-          prev[props.stream.id].detectingMotion = !status.paused
+          prev[props.stream.id] = {
+            ...prev[props.stream.id],
+            detectingMotion: !status.paused,
+          }
           return { ...prev }
         }),
       )
@@ -75,7 +78,7 @@ export default function StreamEditMenu(props: {
         })
       })
       .finally(() => setTogglingDetection(false))
-  }, [props.motionStatus.detectingMotion])
+  }, [props.motionStatus?.detectingMotion])
 
   return (
     <Group wrap="nowrap" gap={0}>

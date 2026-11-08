@@ -8,6 +8,7 @@ import { Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
+import { Capacitor } from '@capacitor/core'
 import { isLocalIPv4 } from './util'
 import theme from './theme'
 import SecureStorage from './secure-storage'
@@ -98,7 +99,10 @@ export default function App() {
       debugLog('Attempting to get refresh token from storage')
 
       const rtExists =
-        !!refreshToken || !!(await cookieStore?.get('_rtexists'))?.value
+        !!refreshToken ||
+        (!Capacitor.isNativePlatform()
+          ? !!(await cookieStore?.get('_rtexists'))?.value
+          : false)
       if (!rtExists) {
         debugLog(
           `No refresh token available for refresh attempt, _rtexists: '${rtExists}'`,
@@ -268,7 +272,9 @@ export default function App() {
         console.error,
       )
       const rtExists =
-        !!refreshToken || !!(await cookieStore?.get('_rtexists'))?.value
+        !!refreshToken || !Capacitor.isNativePlatform()
+          ? !!(await cookieStore?.get('_rtexists'))?.value
+          : false
       if (!rtExists) {
         debugLog(
           `No refresh token available for logout attempt, _rtexists: '${rtExists}'`,

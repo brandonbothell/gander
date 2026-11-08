@@ -111,9 +111,7 @@ public class MotionForegroundService extends Service {
         if (intent != null) {
             if ("MUTE_NOTIFS_1H".equals(intent.getAction())) {
                 muteUntilTimestamp = System.currentTimeMillis() + 60L*60L*1000L /* 1 hour */;
-                unmuteHandler.postDelayed(() -> {
-                    manager.cancel(5543245);
-                }, 60L*60L*1000L);
+                unmuteHandler.postDelayed(() -> manager.cancel(5543245), 60L*60L*1000L);
 
                 Log.d("MotionForegroundService", "User muted alerts for 1 hour.");
             } else if ("UNMUTE_NOTIFS".equals(intent.getAction())) {
@@ -288,9 +286,7 @@ public class MotionForegroundService extends Service {
             }
         });
 
-        mSocket.on(Socket.EVENT_CONNECT, args -> {
-            Log.d("MotionForegroundService", "Socket connected");
-        });
+        mSocket.on(Socket.EVENT_CONNECT, args -> Log.d("MotionForegroundService", "Socket connected"));
 
         mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
             // Check if the error is a 401/Unauthorized
@@ -306,9 +302,7 @@ public class MotionForegroundService extends Service {
             }
         });
 
-        mSocket.on(Socket.EVENT_DISCONNECT, args -> {
-            Log.d("MotionForegroundService", "Socket disconnected, will attempt to reconnect...");
-        });
+        mSocket.on(Socket.EVENT_DISCONNECT, args -> Log.d("MotionForegroundService", "Socket disconnected, will attempt to reconnect..."));
     }
 
     private void refreshToken() {

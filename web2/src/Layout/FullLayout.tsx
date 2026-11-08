@@ -18,6 +18,7 @@ import {
   useMantineTheme,
 } from '@mantine/core'
 import { playNotificationSound } from '../util'
+import { setupPushNotifications } from '../push-notifications'
 import { API_BASE, authFetch } from '../main'
 import { ThemeToggle } from '../Component/ThemeToggle'
 import StreamsGrid from '../Component/Streams/StreamsGrid'
@@ -72,6 +73,10 @@ export default function FullLayout(props: {
       lowDiskSpace: boolean
     }
   }>({})
+
+  useEffect(() => {
+    setupPushNotifications()
+  }, [])
 
   useEffect(() => {
     async function checkMotionStatus() {
