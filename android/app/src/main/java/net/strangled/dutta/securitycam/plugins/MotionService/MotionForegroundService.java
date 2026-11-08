@@ -217,7 +217,7 @@ public class MotionForegroundService extends Service {
         InputStreamReader reader = new InputStreamReader(is);
         JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
         if (config.has("server")) {
-            String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+            String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
             SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
             String clientId = sharedPref.getString("clientId", null);
             String statusToken = sharedPref.getString("statusToken", null);
@@ -321,7 +321,7 @@ public class MotionForegroundService extends Service {
         InputStreamReader reader = new InputStreamReader(is);
         JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
         if (config.has("server")) {
-            String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+            String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
             SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
             String clientId = sharedPref.getString("clientId", null);
             String refreshToken = sharedPref.getString("refreshToken", null);
@@ -398,7 +398,7 @@ public class MotionForegroundService extends Service {
             JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
 
             if (config.has("server")) {
-                String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+                String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
                 SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
                 String clientId = sharedPref.getString("clientId", null);
 
