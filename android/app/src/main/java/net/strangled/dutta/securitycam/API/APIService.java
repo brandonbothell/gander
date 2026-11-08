@@ -32,6 +32,7 @@ public interface APIService {
     class RefreshTokenResponse extends APIResponse {
         @Nullable public String refreshToken = null;
         @Nullable public String token = null;
+        @Nullable public String statusToken = null;
     }
 
     class MotionPauseResponse {

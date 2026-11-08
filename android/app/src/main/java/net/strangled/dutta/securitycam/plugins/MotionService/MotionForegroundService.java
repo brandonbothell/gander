@@ -299,6 +299,7 @@ public class MotionForegroundService extends Service {
 
                 if (errorMsg.contains("Invalid or expired token")) {
                     Log.d("MotionForegroundService", "Token likely expired, refreshing...");
+                    refreshToken();
                 } else {
                     Log.e("MotionForegroundService", "Socket connect Error: " + args[0]);
                 }
@@ -308,6 +309,35 @@ public class MotionForegroundService extends Service {
         mSocket.on(Socket.EVENT_DISCONNECT, args -> {
             Log.d("MotionForegroundService", "Socket disconnected, will attempt to reconnect...");
         });
+    }
+
+    private void refreshToken() {
+        InputStream is;
+        try {
+            is = getAssets().open("capacitor.config.json");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        InputStreamReader reader = new InputStreamReader(is);
+        JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
+        if (config.has("server")) {
+            String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+            SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
+            String clientId = sharedPref.getString("clientId", null);
+            String refreshToken = sharedPref.getString("refreshToken", null);
+
+            HTTP.authenticate(baseUrl, refreshToken, clientId, new HTTP.RefreshTokenCallback() {
+                @Override
+                public void onSuccess(String newRefreshToken, String token) {
+                    Log.i("MotionForegroundService", "Token refresh successful");
+                }
+
+                @Override
+                public void onFailure(String errorMessage) {
+                    Log.e("MotionForegroundService", "Auth failed: " + errorMessage + ". Socket reconnection will be rescheduled.");
+                }
+            });
+        }
     }
 
     private void showSecurityAlert(String streamUrl, String cameraId, String title, String body,
