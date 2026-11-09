@@ -665,8 +665,7 @@ async function cleanupExpiredTokensAndDevices() {
     }
     const validJwts = jwts.filter((token) => {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload
-        return decoded && decoded.exp && decoded.exp * 1000 > now
+        return jwt.verify(token, JWT_SECRET)
       } catch {
         return false
       }
@@ -743,9 +742,9 @@ async function cleanupExpiredTokensAndDevices() {
           (refreshTokens.length - validRefreshTokens.length)
         } expired tokens and ${trustedDevices.length - filteredDevices.length} old devices.`,
       )
+    } else {
+      console.debug(`[Cleanup] No changes for ${user.username}`)
     }
-
-    console.debug(`[Cleanup] No changes for ${user.username}`)
   }
 
   // Run every hour

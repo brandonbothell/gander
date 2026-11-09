@@ -294,7 +294,7 @@ export default function initializeAuthRoutes(
     }
     if (decoded.type !== 'refresh') {
       logAuth('[Refresh Token] Invalid token type', 'error')
-      res.status(401).json({ error: 'No refresh token provided' })
+      res.status(401).json({ error: 'Invalid token provided' })
       return
     }
 
@@ -302,7 +302,7 @@ export default function initializeAuthRoutes(
 
     if (!deviceInfo) {
       logAuth('[Refresh Token] No device info provided', 'error')
-      res.status(401).json({ error: 'No device info provided' })
+      res.status(401).json({ error: 'Invalid token provided' })
       return
     }
 
@@ -354,12 +354,6 @@ export default function initializeAuthRoutes(
       return
     }
 
-    if (decoded.username !== user.username) {
-      logAuth(`[Refresh Token] Invalid token user ${decoded.username}`, 'error')
-      res.status(401).json({ error: 'No refresh token provided' })
-      return
-    }
-
     const ip =
       'x-real-ip' in req.headers ? String(req.headers['x-real-ip']) : req.ip
 
@@ -380,39 +374,21 @@ export default function initializeAuthRoutes(
       return
     }
 
-    const refreshTokenExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-
     const newRefreshToken = (() => {
-      try {
-        const decoded = jwt.verify(refreshToken, JWT_SECRET) as {
-          exp?: number
-        }
-        if (!decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) {
-          logAuth(`Refresh token expired for user: ${user.username}`, 'error')
-          res.status(401).json({ error: 'Refresh token expired' })
-          return null
-        }
-
-        const newRefreshToken = jwt.sign(
+      let newRefreshToken
+      while (!newRefreshToken || refreshTokens.includes(newRefreshToken)) {
+        newRefreshToken = jwt.sign(
           {
             username: user.username,
             type: 'refresh',
-            exp: refreshTokenExp,
           },
           JWT_SECRET,
+          { expiresIn: '7d' },
         )
-        if (!refreshTokens.includes(newRefreshToken)) {
-          refreshTokens.push(newRefreshToken)
-        }
-        return newRefreshToken
-      } catch (_) {
-        logAuth(
-          `Failed to verify refresh token for user: ${user.username}`,
-          'error',
-        )
-        res.status(401).json({ error: 'Invalid refresh token' })
-        return null
       }
+
+      refreshTokens.push(newRefreshToken)
+      return newRefreshToken
     })()
 
     if (!newRefreshToken) {
@@ -551,7 +527,7 @@ export default function initializeAuthRoutes(
     res.cookie('_rt', newRefreshToken, {
       httpOnly: true,
       secure: process.env.API_ENV !== 'development',
-      expires: new Date(refreshTokenExp * 1000),
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     })
 
     res.json({
