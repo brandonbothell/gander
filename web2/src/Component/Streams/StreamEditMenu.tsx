@@ -1,4 +1,4 @@
-import { FiPause, FiPlay, FiSettings, FiTrash, FiX } from 'react-icons/fi'
+import { FiPause, FiPlay, FiSettings, FiX } from 'react-icons/fi'
 import { useCallback, useState } from 'react'
 import { notifications } from '@mantine/notifications'
 import { Group, Menu } from '@mantine/core'
@@ -97,30 +97,9 @@ export default function StreamEditMenu(props: {
       >
         <Menu.Target>{props.children}</Menu.Target>
         <Menu.Dropdown ref={props.ref}>
-          <Menu.Label>Layout</Menu.Label>
-          <Menu.Item
-            onClick={() => props.setStream('')}
-            leftSection={<FiX size={14} />}
-          >
-            Remove
-          </Menu.Item>
-
-          <Menu.Divider />
-
           <Menu.Label>Camera</Menu.Label>
-          <CreateEditStreamPopover
-            setLayouts={props.setLayouts}
-            setStream={props.setStream}
-            streams={props.streams}
-            currentStream={props.stream}
-            setOpen={setPopoverOpen}
-          >
-            <Menu.Item leftSection={<FiSettings size={14} />}>
-              Settings
-            </Menu.Item>
-          </CreateEditStreamPopover>
-
           <Menu.Item
+            color={props.motionStatus?.detectingMotion ? 'yellow' : 'green'}
             disabled={!props.motionStatus || togglingDetection}
             onClick={toggleDetection}
             leftSection={
@@ -133,9 +112,27 @@ export default function StreamEditMenu(props: {
           >
             {props.motionStatus?.detectingMotion ? 'Pause' : 'Start'} Detection
           </Menu.Item>
+          <CreateEditStreamPopover
+            setLayouts={props.setLayouts}
+            setStream={props.setStream}
+            streams={props.streams}
+            currentStream={props.stream}
+            setOpen={setPopoverOpen}
+          >
+            <Menu.Item leftSection={<FiSettings size={14} />}>
+              Settings
+            </Menu.Item>
+          </CreateEditStreamPopover>
 
-          <Menu.Item color="red" leftSection={<FiTrash size={14} />}>
-            Delete
+          <Menu.Divider />
+
+          <Menu.Label>Layout</Menu.Label>
+          <Menu.Item
+            color="red"
+            onClick={() => props.setStream('')}
+            leftSection={<FiX size={16} />}
+          >
+            Remove
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>

@@ -202,7 +202,9 @@ export default function CreateEditStreamPopover(props: {
                     if (!res.ok) {
                       const body = await res.json().catch(() => ({}))
                       notifications.show({
-                        message: body.error || 'Failed to delete stream.',
+                        message:
+                          body.error ||
+                          `Failed to delete ${props.currentStream!.nickname}.`,
                         color: 'red',
                       })
                       setLoading(false)
