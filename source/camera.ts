@@ -682,8 +682,7 @@ async function cleanupExpiredTokensAndDevices() {
     }
     const validRefreshTokens = refreshTokens.filter((token) => {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload
-        return decoded && decoded.exp && decoded.exp * 1000 > now
+        return jwt.verify(token, JWT_SECRET)
       } catch {
         return false
       }
@@ -699,8 +698,7 @@ async function cleanupExpiredTokensAndDevices() {
     }
     const validStatusTokens = statusTokens.filter((token) => {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload
-        return decoded && decoded.exp && decoded.exp * 1000 > now
+        return jwt.verify(token, JWT_SECRET)
       } catch {
         return false
       }
@@ -738,7 +736,7 @@ async function cleanupExpiredTokensAndDevices() {
           )
         })
 
-      console.log(
+      console.debug(
         `[Cleanup] Updated user ${user.username} - removed ${
           jwts.length -
           validJwts.length +
@@ -746,10 +744,12 @@ async function cleanupExpiredTokensAndDevices() {
         } expired tokens and ${trustedDevices.length - filteredDevices.length} old devices.`,
       )
     }
+
+    console.debug(`[Cleanup] No changes for ${user.username}`)
   }
 
   // Run every hour
-  setTimeout(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
+  setInterval(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
 }
 
 app.use(cookieParser(JWT_SECRET))
