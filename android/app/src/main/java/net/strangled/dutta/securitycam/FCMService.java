@@ -3,6 +3,7 @@ package net.strangled.dutta.securitycam;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -13,6 +14,8 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -32,6 +35,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+// This is managed by the web app (capacitor plugin PushNotifications)
+@SuppressLint("MissingFirebaseInstanceTokenRefresh")
 public class FCMService extends FirebaseMessagingService {
     private static final String EVENT_CHANNEL_ID = "motion_event_channel";
 
@@ -187,70 +192,6 @@ public class FCMService extends FirebaseMessagingService {
             Log.d("FCMService", "Notification shown");
         } catch (SecurityException e) {
             Log.e("FCMService", "Error showing notification", e);
-        }
-    }
-
-    /**
-     * There are two scenarios when onNewToken is called:
-     * 1) When a new token is generated on initial app startup
-     * 2) Whenever an existing token is changed
-     * Under #2, there are three scenarios when the existing token is changed:
-     * A) App is restored to a new device
-     * B) User uninstalls/reinstalls the app
-     * C) User clears app data
-     */
-    @Override
-    public void onNewToken(@NonNull String fcmToken) {
-        SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
-        String refreshToken = sharedPref.getString("refreshToken", null);
-
-        // If you want to send messages to this application instance or
-        // manage this apps subscriptions on the server side, send the
-        // FCM registration token to your app server.
-        if (refreshToken != null) {
-            try {
-                sendRegistrationToServer(sharedPref, fcmToken);
-            } catch (IOException e) {
-                Log.e("FCMService", "Error sending token to server", e);
-            }
-        }
-    }
-
-    private void sendRegistrationToServer(@NonNull SharedPreferences sharedPref,
-                                          @NonNull String fcmToken) throws IOException {
-        InputStream is = getAssets().open("capacitor.config.json");
-        InputStreamReader reader = new InputStreamReader(is);
-        JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
-
-        if (config.has("server")) {
-            String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
-            String clientId = sharedPref.getString("clientId", null);
-
-            assert baseUrl != null;
-            assert clientId != null;
-
-//            interface DeviceInfo {
-//                userAgent: string
-//                platform: string
-//                vendor: string
-//                language: string
-//                timezone: string
-//                screen: string
-//                clientId: string
-//            }
-            JsonObject dummyDeviceInfoInner = new JsonObject();
-            dummyDeviceInfoInner.addProperty("clientId", clientId);
-            dummyDeviceInfoInner.addProperty("userAgent", MainActivity.userAgent);
-
-            JsonObject dummyDeviceInfo = new JsonObject();
-            dummyDeviceInfo.add("deviceInfo", dummyDeviceInfoInner);
-
-            JsonObject fcmSubscribeBody = new JsonObject();
-            fcmSubscribeBody.addProperty("fcmToken", fcmToken);
-
-            HTTP.subscribeToFCM(baseUrl, clientId, fcmToken, null);
-        } else {
-            Log.e("FCMService", "No server URL found in capacitor.config.json");
         }
     }
 }

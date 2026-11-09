@@ -90,7 +90,6 @@ public class MotionForegroundService extends Service {
                         // 3. Initialize Socket.io
                         startSocketWithDelay();
                         socketConnectionLoopHandler.postDelayed(service::ensureSocketConnectionLoop, 20000);
-                        updateTokenLoop();
                         unregisterReceiver(this);
                     }
                 }
@@ -99,7 +98,6 @@ public class MotionForegroundService extends Service {
             // 3. Initialize Socket.io
             startSocketWithDelay();
             socketConnectionLoopHandler.postDelayed(this::ensureSocketConnectionLoop, 20000);
-            updateTokenLoop();
         }
     }
 
@@ -158,19 +156,6 @@ public class MotionForegroundService extends Service {
             wakeLock.acquire(10*60*1000L /* 10 minutes */);
         }
         wakeLockHandler.postDelayed(this::acquireWakeLock, 10*61*1000L /* 10 minutes 10 seconds */);
-    }
-
-    private void updateTokenLoop() {
-        tokenUpdateHandler.postDelayed(() -> {
-            SharedPreferences sharedPref = getApplicationContext()
-                    .getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
-
-            String statusToken = sharedPref.getString("statusToken", null);
-            String refreshToken = sharedPref.getString("refreshToken", null);
-            if (statusToken != null) HTTP.setCurrentStatusToken(statusToken);
-            if (refreshToken != null) HTTP.setCurrentRefreshToken(refreshToken);
-            updateTokenLoop();
-        }, 10 * 1000L /* 10 seconds */);
     }
 
     private void startSocketWithDelay() {
@@ -295,7 +280,8 @@ public class MotionForegroundService extends Service {
 
                 if (errorMsg.contains("Invalid or expired token")) {
                     Log.d("MotionForegroundService", "Token likely expired, refreshing...");
-                    refreshToken();
+                    // Delay the token refresh to give time for the app to do its thing
+                    new Handler(Looper.getMainLooper()).postDelayed(this::refreshToken, 5L * 1000);
                 } else {
                     Log.e("MotionForegroundService", "Socket connect Error: " + args[0]);
                 }
@@ -386,7 +372,7 @@ public class MotionForegroundService extends Service {
             // res/drawable/push_icon.png
             builder.setSmallIcon(R.drawable.push_icon);
 
-            Log.d("FCMService", "Actions enabled");
+            Log.d("MotionForegroundService", "Actions enabled");
             InputStream is = getAssets().open("capacitor.config.json");
             InputStreamReader reader = new InputStreamReader(is);
             JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();

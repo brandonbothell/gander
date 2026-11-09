@@ -118,9 +118,10 @@ class SecureStorageService {
     if (Capacitor.isNativePlatform()) {
       await Preferences.set({ key: 'refreshToken', value: token })
       return
+    } else if (!window.isSecureContext) {
+      const encrypted = await this.encrypt(token)
+      localStorage.setItem('_rt', encrypted)
     }
-    const encrypted = await this.encrypt(token)
-    localStorage.setItem('_rt', encrypted)
   }
 
   async getRefreshToken(): Promise<string | null> {

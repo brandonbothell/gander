@@ -49,7 +49,7 @@ export async function jwtAuth(
       type?: string
     }
     if (payload.type !== 'access') {
-      res.status(401).json({ error: 'Invalid token type.' })
+      res.status(401).json({ error: 'Invalid or expired token.' })
       return
     }
     req.user = payload

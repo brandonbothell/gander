@@ -226,6 +226,10 @@ export default function App() {
               key: 'statusToken',
               value: data.statusToken,
             })
+            await Preferences.set({
+              key: 'token',
+              value: data.token,
+            })
           }
 
           // Broadcast to all tabs
@@ -259,6 +263,8 @@ export default function App() {
     // Cleanup on failure
     debugLog('Token refresh failed, cleaning up', 'error')
     await SecureStorage.removeRefreshToken()
+    await Preferences.remove({ key: 'statusToken' })
+    await Preferences.remove({ key: 'token' })
     localStorage.removeItem('jwt')
     localStorage.removeItem('tokenRefreshInProgress')
 
@@ -309,6 +315,8 @@ export default function App() {
     } finally {
       // Clear all tokens and authentication state
       await SecureStorage.clearAll()
+      await Preferences.remove({ key: 'statusToken' })
+      await Preferences.remove({ key: 'token' })
       localStorage.removeItem('jwt')
       setAuthenticated(false)
 
@@ -555,16 +563,16 @@ export default function App() {
     }
 
     try {
+      await SecureStorage.setRefreshToken(refreshToken)
       if (Capacitor.isNativePlatform()) {
         await Preferences.set({
           key: 'statusToken',
           value: statusToken,
         })
-        await SecureStorage.setRefreshToken(refreshToken)
-      }
-
-      if (!window.isSecureContext) {
-        await SecureStorage.setRefreshToken(refreshToken)
+        await Preferences.set({
+          key: 'token',
+          value: token,
+        })
       }
 
       localStorage.setItem('jwt', token)

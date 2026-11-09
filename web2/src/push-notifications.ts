@@ -6,11 +6,14 @@ import {
 } from '@capacitor/push-notifications'
 import { Preferences } from '@capacitor/preferences'
 import { LocalNotifications } from '@capacitor/local-notifications'
+import { Capacitor } from '@capacitor/core'
 import { App } from '@capacitor/app'
 import { API_BASE, authFetch } from './main'
 import { MotionService } from './capacitor-plugins/motion-service'
 
 export async function setupPushNotifications() {
+  if (!Capacitor.isNativePlatform()) return
+
   try {
     const pushPermissions = await PushNotifications.requestPermissions()
 

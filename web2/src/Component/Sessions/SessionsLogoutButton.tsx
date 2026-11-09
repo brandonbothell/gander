@@ -11,7 +11,11 @@ export function SessionsLogoutButton(
 
   return (
     <Group wrap="nowrap" gap={0} style={props?.style}>
-      <Button leftSection={<FiUsers size={16} />} className={classes.button}>
+      <Button
+        onClick={() => console.log('TODO: Implement')}
+        leftSection={<FiUsers size={16} />}
+        className={classes.button}
+      >
         Sessions
       </Button>
       <Menu
