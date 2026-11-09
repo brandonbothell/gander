@@ -156,11 +156,11 @@ export default function FullLayout(props: {
       navbar={{
         width: 300,
         breakpoint: 1200,
-        collapsed: { mobile: !openedMenu },
+        collapsed: { mobile: !openedMenu, desktop: !openedMenu },
       }}
       aside={{
         width: 300,
-        breakpoint: 1500,
+        breakpoint: 1800,
         collapsed: { desktop: false, mobile: true },
       }}
       padding="md"
@@ -173,7 +173,6 @@ export default function FullLayout(props: {
             size="sm"
             style={{
               pointerEvents: 'auto',
-              display: width < 1200 ? 'initial' : 'none',
             }}
           />
           Gander
