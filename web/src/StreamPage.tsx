@@ -146,7 +146,7 @@ export default function StreamPage({
   const [mobileSearchSticky, setMobileSearchSticky] = useState(false)
   const lastStickyRef = useRef(false)
   const lastMobileStickyRef = useRef(false)
-  const PAGE_SIZE = 50
+  const PAGE_SIZE = 20
   const [currentPage, setCurrentPage] = useState(1)
   const [lastSeenRecording, setLastSeenRecording] = useLocalStorageState<{
     [streamId: string]: string | null

@@ -148,7 +148,7 @@ public class FCMService extends FirebaseMessagingService {
             JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
 
             if (config.has("server")) {
-                String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+                String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
                 SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
                 String clientId = sharedPref.getString("clientId", null);
 
@@ -223,7 +223,7 @@ public class FCMService extends FirebaseMessagingService {
         JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
 
         if (config.has("server")) {
-            String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+            String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
             String clientId = sharedPref.getString("clientId", null);
 
             assert baseUrl != null;

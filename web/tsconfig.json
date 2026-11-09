@@ -1,5 +1,10 @@
 {
-  "files": [],
+  "files": [
+    "../eslint.config.mts",
+    "../prisma.config.ts",
+    "../capacitor.config.ts"
+  ],
+  "include": ["../web2/src", "../source"],
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }

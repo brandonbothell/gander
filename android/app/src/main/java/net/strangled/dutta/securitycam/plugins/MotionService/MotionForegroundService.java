@@ -111,9 +111,7 @@ public class MotionForegroundService extends Service {
         if (intent != null) {
             if ("MUTE_NOTIFS_1H".equals(intent.getAction())) {
                 muteUntilTimestamp = System.currentTimeMillis() + 60L*60L*1000L /* 1 hour */;
-                unmuteHandler.postDelayed(() -> {
-                    manager.cancel(5543245);
-                }, 60L*60L*1000L);
+                unmuteHandler.postDelayed(() -> manager.cancel(5543245), 60L*60L*1000L);
 
                 Log.d("MotionForegroundService", "User muted alerts for 1 hour.");
             } else if ("UNMUTE_NOTIFS".equals(intent.getAction())) {
@@ -217,7 +215,7 @@ public class MotionForegroundService extends Service {
         InputStreamReader reader = new InputStreamReader(is);
         JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
         if (config.has("server")) {
-            String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+            String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
             SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
             String clientId = sharedPref.getString("clientId", null);
             String statusToken = sharedPref.getString("statusToken", null);
@@ -288,9 +286,7 @@ public class MotionForegroundService extends Service {
             }
         });
 
-        mSocket.on(Socket.EVENT_CONNECT, args -> {
-            Log.d("MotionForegroundService", "Socket connected");
-        });
+        mSocket.on(Socket.EVENT_CONNECT, args -> Log.d("MotionForegroundService", "Socket connected"));
 
         mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
             // Check if the error is a 401/Unauthorized
@@ -306,9 +302,36 @@ public class MotionForegroundService extends Service {
             }
         });
 
-        mSocket.on(Socket.EVENT_DISCONNECT, args -> {
-            Log.d("MotionForegroundService", "Socket disconnected, will attempt to reconnect...");
-        });
+        mSocket.on(Socket.EVENT_DISCONNECT, args -> Log.d("MotionForegroundService", "Socket disconnected, will attempt to reconnect..."));
+    }
+
+    private void refreshToken() {
+        InputStream is;
+        try {
+            is = getAssets().open("capacitor.config.json");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        InputStreamReader reader = new InputStreamReader(is);
+        JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
+        if (config.has("server")) {
+            String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
+            SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
+            String clientId = sharedPref.getString("clientId", null);
+            String refreshToken = sharedPref.getString("refreshToken", null);
+
+            HTTP.authenticate(baseUrl, refreshToken, clientId, new HTTP.RefreshTokenCallback() {
+                @Override
+                public void onSuccess(String newRefreshToken, String token) {
+                    Log.i("MotionForegroundService", "Token refresh successful");
+                }
+
+                @Override
+                public void onFailure(String errorMessage) {
+                    Log.e("MotionForegroundService", "Auth failed: " + errorMessage + ". Socket reconnection will be rescheduled.");
+                }
+            });
+        }
     }
 
     private void refreshToken() {
@@ -398,7 +421,7 @@ public class MotionForegroundService extends Service {
             JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
 
             if (config.has("server")) {
-                String baseUrl = config.getAsJsonObject("server").get("url").getAsString();
+                String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
                 SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
                 String clientId = sharedPref.getString("clientId", null);
 

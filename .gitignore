@@ -139,7 +139,6 @@ test_*.png
 *.debug.png
 
 # Recordings and media files
-recordings/
 hls_*/
 
 # Thumbnails
@@ -172,3 +171,5 @@ Thumbs.db
 *.bak
 *.backup
 android/app/debug/output-metadata.json
+
+tsconfig.tsbuildinfo

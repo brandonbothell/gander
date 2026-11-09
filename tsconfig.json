@@ -18,6 +18,8 @@
     "source/**/*.cjs",
     "source/**/*.mjsx",
     "source/**/*.cjsx",
+    "web2/**/*.ts",
+    "web2/**/*.tsx",
     "types/**/*.d.ts",
     "scripts/**/*.ts",
     "eslint.config.mts"

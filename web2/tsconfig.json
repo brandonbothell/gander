@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "noCheck": true
+  },
+  "files": [
+    "../eslint.config.mts",
+    "../prisma.config.ts",
+    "../capacitor.config.ts"
+  ],
+  "include": ["../source/**/*.ts"],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
