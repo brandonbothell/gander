@@ -207,31 +207,31 @@ export default function StreamVideo(props: {
           videoHoveredRef(ref)
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            color: 'white',
-            height: 20,
-            marginTop: 4,
-            textShadow: '0 1px 2px black',
-            pointerEvents: 'none',
-            display: 'flex',
-            alignItems: 'end',
-          }}
+        <StreamEditMenu
+          setLayouts={props.setLayouts}
+          ref={popoverHoveredRef}
+          streams={props.streams}
+          stream={props.stream}
+          motionStatus={props.motionStatus}
+          setMotionStatus={props.setMotionStatus}
+          setStream={props.setStream}
         >
-          {props.stream.nickname}
-          {!document.fullscreenElement && (
-            <StreamEditMenu
-              setLayouts={props.setLayouts}
-              ref={popoverHoveredRef}
-              streams={props.streams}
-              stream={props.stream}
-              motionStatus={props.motionStatus}
-              setMotionStatus={props.setMotionStatus}
-              setStream={props.setStream}
-            >
+          <div
+            style={{
+              pointerEvents: 'auto',
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              color: 'white',
+              height: 20,
+              marginTop: 4,
+              textShadow: '0 1px 2px black',
+              display: 'flex',
+              alignItems: 'end',
+            }}
+          >
+            {props.stream.nickname}
+            {!document.fullscreenElement && (
               <ActionIcon
                 variant="light"
                 ml={'sm'}
@@ -239,30 +239,87 @@ export default function StreamVideo(props: {
                 radius="md"
                 aria-label="Stream options"
                 style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
                   pointerEvents: 'auto',
                 }}
               >
                 <FiChevronDown size={16} />
               </ActionIcon>
-            </StreamEditMenu>
-          )}
-          {/* <ActionIcon
-              onClick={(event) => {
-                event.preventDefault()
-                props.removeFromLayout()
-              }}
-              variant="light"
-              ml={'sm'}
-              color="white"
-              radius="md"
-              aria-label="Remove stream from layout"
+            )}
+          </div>
+        </StreamEditMenu>
+        {/* Recording dot/saving spinner in top right if motionActive */}
+        {props.motionStatus?.saving ? (
+          <div>
+            <div
               style={{
-                pointerEvents: 'auto',
+                position: 'absolute',
+                top: 12,
+                right: 18,
+                zIndex: 3,
+                width: 16,
+                height: 16,
+                border: '2px solid rgba(255, 193, 7, 0.3)',
+                borderTop: '2px solid #ffc107',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                verticalAlign: 'middle',
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 36,
+                paddingRight: '8px',
+                zIndex: 3,
+                fontSize: '.8em',
+                color: 'white',
+                verticalAlign: 'middle',
+                textShadow: '0 1px 2px black',
               }}
             >
-              <FiTrash size={16} />
-            </ActionIcon> */}
-        </div>
+              Saving
+            </span>
+          </div>
+        ) : props.motionStatus?.recording ? (
+          <>
+            <span
+              style={{
+                paddingRight: '8px',
+                position: 'absolute',
+                top: 8,
+                right: 36,
+                zIndex: 3,
+                color: 'white',
+                textShadow: '0 1px 2px black',
+              }}
+            >
+              {props.motionStatus?.secondsLeft
+                ? `${props.motionStatus.secondsLeft}s`
+                : ''}
+            </span>
+            <div
+              className="stream-tile-recording-dot"
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 20,
+                zIndex: 3,
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                background: 'red',
+                boxShadow: '0 0 8px 2px #f00',
+                animation: 'record-blink 1s steps(1) infinite',
+                border: '2px solid #fff',
+              }}
+              title="Stream is recording to disk"
+            />
+          </>
+        ) : (
+          <></>
+        )}
         <Video.Controls />
       </Video>
     </>
