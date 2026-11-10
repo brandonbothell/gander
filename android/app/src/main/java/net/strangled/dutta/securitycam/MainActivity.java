@@ -4,7 +4,6 @@ import android.os.Bundle;
 
 import com.getcapacitor.BridgeActivity;
 
-import net.strangled.dutta.securitycam.API.HTTP;
 import net.strangled.dutta.securitycam.plugins.BatteryOptimization.BatteryOptimizationPlugin;
 import net.strangled.dutta.securitycam.plugins.MotionService.MotionServicePlugin;
 import net.strangled.dutta.securitycam.plugins.SecurePreferences.SecurePreferencesPlugin;
