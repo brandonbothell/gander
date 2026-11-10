@@ -7,16 +7,16 @@ import com.getcapacitor.BridgeActivity;
 import net.strangled.dutta.securitycam.API.HTTP;
 import net.strangled.dutta.securitycam.plugins.BatteryOptimization.BatteryOptimizationPlugin;
 import net.strangled.dutta.securitycam.plugins.MotionService.MotionServicePlugin;
+import net.strangled.dutta.securitycam.plugins.SecurePreferences.SecurePreferencesPlugin;
 
 public class MainActivity extends BridgeActivity {
     public static String userAgent = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        HTTP.sharedPreferences = getSharedPreferences("CapacitorStorage", MODE_PRIVATE);
-
         registerPlugin(BatteryOptimizationPlugin.class);
         registerPlugin(MotionServicePlugin.class);
+        registerPlugin(SecurePreferencesPlugin.class);
 
         super.onCreate(savedInstanceState);
     }

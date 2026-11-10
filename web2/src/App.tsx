@@ -8,7 +8,6 @@ import { Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
-import { Preferences } from '@capacitor/preferences'
 import { Capacitor } from '@capacitor/core'
 import { isLocalIPv4 } from './util'
 import theme from './theme'
@@ -20,6 +19,7 @@ import {
   Session,
   TrustedDevice,
 } from './device-info'
+import { SecurePreferences } from './capacitor-plugins/secure-preferences'
 import LoginLayout from './Layout/LoginLayout'
 import FullLayout from './Layout/FullLayout'
 
@@ -76,7 +76,7 @@ export default function App() {
   const [lastFailedJwt, setFailedJwt] = useState<string>()
   // Helper: Try to refresh token
   const tryRefreshToken = async (): Promise<boolean> => {
-    debugLog('=== STARTING TOKEN REFRESH ===')
+    console.log('=== STARTING TOKEN REFRESH ===')
 
     try {
       debugLog('Checking for API key in localStorage')
@@ -92,8 +92,8 @@ export default function App() {
       )
     }
 
-    const refreshToken = await SecureStorage.getRefreshToken().catch(
-      console.error,
+    const refreshToken = await SecureStorage.getRefreshToken().catch((err) =>
+      console.error('Error accessing refresh token: ', err),
     )
 
     try {
@@ -105,9 +105,8 @@ export default function App() {
           ? !!(await cookieStore?.get('_rtexists'))?.value
           : false)
       if (!rtExists) {
-        debugLog(
+        console.warn(
           `No refresh token available for refresh attempt, _rtexists: '${rtExists}'`,
-          'warn',
         )
         setAuthenticated(false)
         return false
@@ -205,14 +204,18 @@ export default function App() {
             15000,
           ),
         ),
-      ])
+      ]).catch((err) => {
+        console.error('Error refreshing token from API: ', err)
+      })
 
       const requestDuration = Date.now() - refreshStartTime
-      debugLog(
-        `Refresh token response received after ${requestDuration}ms, status: ${res.status}`,
-      )
+      if (res) {
+        debugLog(
+          `Refresh token response received after ${requestDuration}ms, status: ${res.status}`,
+        )
+      }
 
-      if (res.status === 200) {
+      if (res && res.status === 200) {
         const data = await res.json()
         if (data && data.token && data.refreshToken) {
           debugLog('Token refresh successful, storing new tokens')
@@ -222,11 +225,11 @@ export default function App() {
 
           await SecureStorage.setRefreshToken(data.refreshToken)
           if (Capacitor.isNativePlatform()) {
-            await Preferences.set({
+            await SecurePreferences.setString({
               key: 'statusToken',
               value: data.statusToken,
             })
-            await Preferences.set({
+            await SecurePreferences.setString({
               key: 'token',
               value: data.token,
             })
@@ -248,9 +251,9 @@ export default function App() {
           debugLog('Token refresh response missing required fields', 'error')
         }
       } else {
-        debugLog(`Token refresh failed with status: ${res.status}`, 'error')
+        debugLog(`Token refresh failed with status: ${res?.status}`, 'error')
         try {
-          const errorText = await res.text()
+          const errorText = await res?.text()
           debugLog(`Error response body: ${errorText}`, 'error')
         } catch (_) {
           debugLog('Could not read error response body', 'warn')
@@ -262,10 +265,7 @@ export default function App() {
 
     // Cleanup on failure
     debugLog('Token refresh failed, cleaning up', 'error')
-    await SecureStorage.removeRefreshToken()
-    await Preferences.remove({ key: 'statusToken' })
-    await Preferences.remove({ key: 'token' })
-    localStorage.removeItem('jwt')
+    await SecureStorage.clearAll()
     localStorage.removeItem('tokenRefreshInProgress')
 
     setAuthenticated(false)
@@ -280,20 +280,20 @@ export default function App() {
     } catch {
       /* ignore */
     }
+
     try {
-      const refreshToken = await SecureStorage.getRefreshToken().catch(
-        console.error,
+      const refreshToken = await SecureStorage.getRefreshToken().catch((err) =>
+        console.error('Error loading refresh token during logout', err),
       )
-      const rtExists =
-        !!refreshToken || !Capacitor.isNativePlatform()
+      const rtExists = Capacitor.isNativePlatform()
+        ? !!refreshToken
+        : !refreshToken
           ? !!(await cookieStore?.get('_rtexists'))?.value
           : false
       if (!rtExists) {
-        debugLog(
+        console.warn(
           `No refresh token available for logout attempt, _rtexists: '${rtExists}'`,
-          'warn',
         )
-        setAuthenticated(false)
         return
       }
 
@@ -309,15 +309,12 @@ export default function App() {
           clientId: fingerprint.clientId,
           ...(refreshToken ? { Cookie: `_rt=${refreshToken}` } : {}),
         }),
-      }).catch(console.error)
+      }).catch((err) => console.error('Error logging out from API: ', err))
     } catch (error) {
       console.error('Error during logout:', error)
     } finally {
       // Clear all tokens and authentication state
       await SecureStorage.clearAll()
-      await Preferences.remove({ key: 'statusToken' })
-      await Preferences.remove({ key: 'token' })
-      localStorage.removeItem('jwt')
       setAuthenticated(false)
 
       // Only broadcast if not called from a broadcast event (prevent infinite loop)
@@ -565,11 +562,11 @@ export default function App() {
     try {
       await SecureStorage.setRefreshToken(refreshToken)
       if (Capacitor.isNativePlatform()) {
-        await Preferences.set({
+        await SecurePreferences.setString({
           key: 'statusToken',
           value: statusToken,
         })
-        await Preferences.set({
+        await SecurePreferences.setString({
           key: 'token',
           value: token,
         })

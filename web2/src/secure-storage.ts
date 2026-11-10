@@ -1,5 +1,6 @@
-import { Preferences } from '@capacitor/preferences'
 import { Capacitor } from '@capacitor/core'
+import { SecurePreferences } from './capacitor-plugins/secure-preferences'
+import { MotionService } from './capacitor-plugins/motion-service'
 
 class SecureStorageService {
   private isSecureContext(): boolean {
@@ -116,7 +117,7 @@ class SecureStorageService {
 
   async setRefreshToken(token: string): Promise<void> {
     if (Capacitor.isNativePlatform()) {
-      await Preferences.set({ key: 'refreshToken', value: token })
+      await SecurePreferences.setString({ key: 'refreshToken', value: token })
       return
     } else if (!window.isSecureContext) {
       const encrypted = await this.encrypt(token)
@@ -126,8 +127,11 @@ class SecureStorageService {
 
   async getRefreshToken(): Promise<string | null> {
     if (Capacitor.isNativePlatform()) {
-      const { value } = await Preferences.get({ key: 'refreshToken' })
-      return value || null
+      console.log('Getting refresh token from SecurePreferences')
+      const { value: token } = await SecurePreferences.getStringOrNull({
+        key: 'refreshToken',
+      })
+      return token
     }
 
     const encrypted = localStorage.getItem('_rt')
@@ -145,7 +149,7 @@ class SecureStorageService {
 
   async removeRefreshToken(): Promise<void> {
     if (Capacitor.isNativePlatform()) {
-      await Preferences.remove({ key: 'refreshToken' })
+      await SecurePreferences.unset({ key: 'refreshToken' })
       return
     }
     localStorage.removeItem('_rt')
@@ -153,9 +157,14 @@ class SecureStorageService {
 
   async clearAll(): Promise<void> {
     if (Capacitor.isNativePlatform()) {
-      await Preferences.remove({ key: 'refreshToken' })
-      return
+      await SecurePreferences.unset({ key: 'refreshToken' })
+      await SecurePreferences.unset({ key: 'statusToken' })
+      await SecurePreferences.unset({ key: 'token' })
+
+      MotionService.stopService()
     }
+
+    localStorage.removeItem('jwt')
     localStorage.removeItem('_rt')
     localStorage.removeItem('_encKey')
   }

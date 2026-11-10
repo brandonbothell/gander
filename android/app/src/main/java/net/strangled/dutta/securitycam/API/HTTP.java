@@ -1,5 +1,7 @@
 package net.strangled.dutta.securitycam.API;
 
+import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Handler;
@@ -11,6 +13,7 @@ import androidx.annotation.Nullable;
 import com.google.gson.JsonObject;
 
 import net.strangled.dutta.securitycam.MainActivity;
+import net.strangled.dutta.securitycam.plugins.SecurePreferences.SecureSharedPreferencesManager;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +39,12 @@ public class HTTP {
     private static String currentToken = null;
     public static SharedPreferences sharedPreferences = null;
     private static boolean refreshingToken = false;
+    private static SecureSharedPreferencesManager encryptedSharedPreferences;
+
+    public static void setEncryptedSharedPreferences(SecureSharedPreferencesManager encryptedSharedPreferences) {
+        HTTP.encryptedSharedPreferences = encryptedSharedPreferences;
+    }
+
 
     public interface APICallback {
         void onSuccess();
@@ -45,7 +54,7 @@ public class HTTP {
     public static void setMotionPaused(String baseUrl, String clientId, String streamId,
                                        boolean paused, @Nullable APICallback callback) {
         assert baseUrl != null;
-        String currentToken = sharedPreferences.getString("token", null);
+        String currentToken = encryptedSharedPreferences.getStringOrNull("token");
 
         if (currentToken == null || !isTokenValidAndNotExpiring(currentToken, 10)) {
             Log.i("SetMotionPaused", "Need new token, checking if refreshing already...");
@@ -116,7 +125,7 @@ public class HTTP {
             return;
         }
 
-        currentRefreshToken = sharedPreferences.getString("refreshToken", null);
+        currentRefreshToken = encryptedSharedPreferences.getStringOrNull("refreshToken");
         if (refreshToken == null) refreshToken = currentRefreshToken;
 
         assert baseUrl != null;
@@ -180,7 +189,7 @@ public class HTTP {
 
                         // Wait 5 seconds before the next attempt
                         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            currentRefreshToken = sharedPreferences.getString("refreshToken", null);
+                            currentRefreshToken = encryptedSharedPreferences.getStringOrNull("refreshToken");
                             HTTP.authenticate(baseUrl, HTTP.currentRefreshToken, clientId, callback, attempt + 1);
                         }, 5000);
                     } else {
@@ -199,7 +208,7 @@ public class HTTP {
                     HTTP.currentToken = body.token;
                     HTTP.currentStatusToken = body.statusToken;
                     if (sharedPreferences != null) {
-                        SharedPreferences.Editor editor = sharedPreferences.edit();
+                        SharedPreferences.Editor editor = encryptedSharedPreferences.getEditor();
                         editor.putString("refreshToken", body.refreshToken);
                         editor.putString("statusToken", body.statusToken);
                         editor.putString("token", body.token);

@@ -36,6 +36,7 @@ import com.google.gson.JsonParser;
 import net.strangled.dutta.securitycam.API.HTTP;
 import net.strangled.dutta.securitycam.PauseDetectionNotificationActionReceiver;
 import net.strangled.dutta.securitycam.R;
+import net.strangled.dutta.securitycam.plugins.SecurePreferences.SecureSharedPreferencesManager;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -64,6 +65,8 @@ public class MotionForegroundService extends Service {
     private static final String LOW_EVENT_CHANNEL_ID = "motion_event_low_channel";
 
     private static long muteUntilTimestamp = 0;
+    private static String refreshToken = null;
+    private SecureSharedPreferencesManager encryptedSharedPref;
 
     public static long getMuteUntilTimestamp() {
         return muteUntilTimestamp;
@@ -72,6 +75,7 @@ public class MotionForegroundService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        encryptedSharedPref = SecureSharedPreferencesManager.getInstance(getApplicationContext());
 
         // 1. Start Foreground service
         MotionForegroundService.createNotificationChannels(getApplicationContext());
@@ -203,7 +207,7 @@ public class MotionForegroundService extends Service {
             String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
             SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
             String clientId = sharedPref.getString("clientId", null);
-            String statusToken = sharedPref.getString("statusToken", null);
+            String statusToken = encryptedSharedPref.getStringOrNull("statusToken");
 
             // TODO: Invoke a high-priority warning notification (possibly using fullscreen-intent permission) if the socket disconnects for too long
             if (statusToken == null) {
@@ -304,7 +308,7 @@ public class MotionForegroundService extends Service {
             String baseUrl = config.getAsJsonObject("server").get("baseUrl").getAsString();
             SharedPreferences sharedPref = getSharedPreferences("CapacitorStorage", Activity.MODE_PRIVATE);
             String clientId = sharedPref.getString("clientId", null);
-            String refreshToken = sharedPref.getString("refreshToken", null);
+            String refreshToken = encryptedSharedPref.getStringOrNull("refreshToken");
 
             HTTP.authenticate(baseUrl, refreshToken, clientId, new HTTP.RefreshTokenCallback() {
                 @Override
@@ -507,5 +511,9 @@ public class MotionForegroundService extends Service {
 
     public static boolean getIsSocketConnected() {
         return mSocket != null && mSocket.connected();
+    }
+
+    public static void setCurrentRefreshToken(String token) {
+        refreshToken = token;
     }
 }

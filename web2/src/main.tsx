@@ -100,8 +100,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   }
   // If we get a 401 and we have refresh handlers, try to refresh the token
   if (resp.status === 401 && globalTryRefreshToken && globalLogout) {
-    console.log('Received 401, attempting token refresh...')
-
+    console.warn('Received 401, waiting on current token refresh...')
     // If there's already a refresh in progress, wait for it
     if (tokenRefreshPromise) {
       const refreshSuccess = await tokenRefreshPromise
@@ -115,6 +114,8 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
         throw new Error('Authentication failed - logged out')
       }
     }
+
+    console.log('Received 401, attempting token refresh...')
 
     // Start a new refresh attempt
     tokenRefreshPromise = globalTryRefreshToken()
