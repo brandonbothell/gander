@@ -581,10 +581,14 @@ export const io = new SocketIOServer(httpServer, {
 })
 
 loadStreamsFromDb()
-  .then(cleanupExpiredTokensAndDevices)
+  .then(() => {
+    cleanupExpiredTokensAndDevices()
+    setInterval(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
+  })
   .then(() => setupStreamMotionMonitoring())
   .then(() => {
     // --- Start server ---
+    syncDeletedRecordings()
     setInterval(syncDeletedRecordings, 1000 * 60 * 60) // Sync deleted recordings every hour
 
     // Use HTTP with an nginx reverse proxy in production or plain HTTP for development
@@ -742,13 +746,8 @@ async function cleanupExpiredTokensAndDevices() {
           (refreshTokens.length - validRefreshTokens.length)
         } expired tokens and ${trustedDevices.length - filteredDevices.length} old devices.`,
       )
-    } else {
-      console.debug(`[Cleanup] No changes for ${user.username}`)
     }
   }
-
-  // Run every hour
-  setInterval(cleanupExpiredTokensAndDevices, 60 * 60 * 1000)
 }
 
 app.use(cookieParser(JWT_SECRET))
