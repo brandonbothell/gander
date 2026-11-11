@@ -65,10 +65,6 @@ export async function setupPushNotifications() {
             'Push notification action recieved:' +
               JSON.stringify(action, null, 2),
           )
-          const url = action.notification.data?.streamUrl
-          if (url) {
-            window.location.href = url
-          }
         },
       )
 
@@ -78,10 +74,6 @@ export async function setupPushNotifications() {
           console.log(
             'Local notification tapped: ' + JSON.stringify(event, null, 2),
           )
-          const url = event.notification.extra?.streamUrl
-          if (url) {
-            window.location.href = url
-          }
         },
       )
 

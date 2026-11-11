@@ -255,7 +255,6 @@ public class MotionForegroundService extends Service {
 
             try {
                 if (args.length > 0 && args[0] instanceof JSONObject data) {
-                    String streamUrl = data.getString("streamUrl");
                     String cameraId = data.getString("cameraId");
                     String title = data.getString("title");
                     String body = data.getString("body");
@@ -265,7 +264,7 @@ public class MotionForegroundService extends Service {
                     String group = data.optString("group", null);
 
                     try {
-                        showSecurityAlert(streamUrl, cameraId, title, body, icon, sound, channelId, group);
+                        showSecurityAlert(cameraId, title, body, icon, sound, channelId, group);
                     } catch (IOException e) {
                         Log.e("MotionForegroundService", "Error showing security alert: " + e.getMessage());
                     }
@@ -324,7 +323,7 @@ public class MotionForegroundService extends Service {
         }
     }
 
-    private void showSecurityAlert(String streamUrl, String cameraId, String title, String body,
+    private void showSecurityAlert(String cameraId, String title, String body,
                                    String icon, String sound, String channelId, String group) throws IOException {
         Log.d("MotionForegroundService", "Showing security alert from socket");
 
@@ -334,16 +333,12 @@ public class MotionForegroundService extends Service {
                 .getLaunchIntentForPackage(getPackageName()))
                 .setPackage(null)
                 .setAction(Intent.ACTION_VIEW)
-                .setData(Uri.parse(streamUrl))
                 .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 
-        intent.putExtra(getPackageName() + ".streamUrl", streamUrl);
         intent.putExtra(getPackageName() + ".cameraId", cameraId);
         intent.putExtra(getPackageName() + ".notificationId", alertId);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Bundle extras = new Bundle();
-        extras.putString("streamUrl", streamUrl);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
                 .setContentTitle(title)
@@ -354,7 +349,6 @@ public class MotionForegroundService extends Service {
                 .setChannelId(channelId)
                 .setLights(Color.parseColor("#2196F3"), 500, 500)
                 .setVibrate(new long[]{0L, 500L, 500L, 500L})
-                .addExtras(extras)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setAutoCancel(true)

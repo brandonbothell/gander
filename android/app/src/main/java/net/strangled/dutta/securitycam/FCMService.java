@@ -65,7 +65,7 @@ public class FCMService extends FirebaseMessagingService {
                 if (vibrateTimingsMillis == null) vibrateTimingsMillis = "0,500,500,0";
                 showNotificationWithActions(
                         data.get("channelId"), data.get("title"), data.get("body"), data.get("icon"),
-                        data.get("color"), data.get("sound"), vibrateTimingsMillis, data.get("streamUrl"),
+                        data.get("color"), data.get("sound"), vibrateTimingsMillis,
                         data.get("cameraId"), data.get("group"), data.get("actions")
                 );
             } catch (IOException e) {
@@ -76,13 +76,12 @@ public class FCMService extends FirebaseMessagingService {
 
     private void showNotificationWithActions(String channelId, String title, String body, String icon,
                                              String color,  String sound, String vibrateTimingsMillis,
-                                             String streamUrl, String cameraId, String group, String actions)
+                                             String cameraId, String group, String actions)
             throws IOException {
         int notificationId = (int) System.currentTimeMillis();
         // 1. Intent for the "Open" button (launches your app)
         Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
         assert intent != null;
-        intent.putExtra(getPackageName() + ".streamUrl", streamUrl);
         intent.putExtra(getPackageName() + ".cameraId", cameraId);
         intent.putExtra(getPackageName() + ".notificationId", notificationId);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -90,7 +89,6 @@ public class FCMService extends FirebaseMessagingService {
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Bundle extras = new Bundle();
-        extras.putString("streamUrl", streamUrl);
 
         String[] stringArray = vibrateTimingsMillis.split(",");
         long[] vibrateTimingsMillisArray = new long[stringArray.length];
