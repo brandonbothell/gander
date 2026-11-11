@@ -13,10 +13,10 @@ export type CustomWindow = Window & {
 }
 
 export const API_BASE = Capacitor.isNativePlatform()
-  ? import.meta.env.VITE_ANDROID_ENV === 'development'
+  ? import.meta.env.CLIENT_ANDROID_ENV === 'development'
     ? '' // Force local URL for Android in development
-    : (import.meta.env.VITE_ANDROID_API_BASE_URL ?? // Use production URL for native apps
-      import.meta.env.VITE_API_BASE_URL ??
+    : (import.meta.env.CLIENT_ANDROID_API_BASE_URL ?? // Use production URL for native apps
+      import.meta.env.CLIENT_API_BASE_URL ??
       '')
   : ''
 

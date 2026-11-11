@@ -5,12 +5,13 @@ import { isLocalIPv4 } from './web2/src/util'
 import localConfig from './config.json'
 
 const apiBaseUrl =
-  process.env.VITE_ANDROID_ENV === 'development'
+  process.env.CLIENT_ANDROID_ENV === 'development'
     ? `http://${getLocalIp() || 'localhost'}:${process.env.PORT ?? 3000}`
-    : (process.env.VITE_ANDROID_API_BASE_URL ?? process.env.VITE_API_BASE_URL)
+    : (process.env.CLIENT_ANDROID_API_BASE_URL ??
+      process.env.CLIENT_API_BASE_URL)
 
 const appBaseUrl =
-  process.env.VITE_ANDROID_ENV === 'development'
+  process.env.CLIENT_ANDROID_ENV === 'development'
     ? `http://${getLocalIp() || 'localhost'}:${process.env.PORT ?? 3000}`
     : process.env.ANDROID_APP_BASE_URL
 
@@ -22,7 +23,7 @@ const config: CapacitorConfig = {
     // @ts-ignore
     baseUrl: apiBaseUrl,
     url: appBaseUrl,
-    cleartext: process.env.VITE_ANDROID_ENV === 'development', // Allow cleartext traffic in development
+    cleartext: process.env.CLIENT_ANDROID_ENV === 'development', // Allow cleartext traffic in development
   },
 }
 

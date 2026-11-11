@@ -458,7 +458,7 @@ export default function App() {
 
   function checkLocalStorageStateConsistency() {
     try {
-      const currentVersion = import.meta.env.VITE_REACT_APP_VERSION ?? '1.0.0'
+      const currentVersion = import.meta.env.CLIENT_REACT_APP_VERSION ?? '1.0.0'
       let lastUpdate = localStorage.getItem('lastUsedAppVersion')
 
       // If new version, reset cached data

@@ -10,4 +10,5 @@ export default defineConfig({
     cssMinify: false,
     target: 'chrome84',
   },
+  envPrefix: 'CLIENT_',
 })

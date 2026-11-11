@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => ({
   ...(mode === 'development'
     ? {
         build: { manifest: true, sourcemap: true },
+        envPrefix: 'CLIENT_',
       }
     : {}),
 }))
