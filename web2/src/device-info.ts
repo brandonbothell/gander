@@ -1,5 +1,6 @@
 import { Preferences } from '@capacitor/preferences'
 import { Capacitor } from '@capacitor/core'
+import { AppIntegrity } from './capacitor-plugins/app-integrity-check'
 
 export interface TrustedDevice {
   ip: string
@@ -18,6 +19,7 @@ export interface DeviceInfo {
   timezone: string
   screen: string
   clientId: string
+  appCheckToken: string | undefined
 }
 
 export interface Session {
@@ -76,11 +78,18 @@ export async function getDeviceFingerprint(): Promise<DeviceInfo> {
     localStorage.setItem('clientId', clientId)
   }
 
-  if (
-    Capacitor.isNativePlatform() &&
-    !(await Preferences.get({ key: 'clientId' })).value
-  ) {
-    await Preferences.set({ key: 'clientId', value: clientId })
+  let appCheckToken: string | undefined = undefined
+
+  if (Capacitor.isNativePlatform()) {
+    if (!(await Preferences.get({ key: 'clientId' })).value) {
+      await Preferences.set({ key: 'clientId', value: clientId })
+    }
+
+    const appCheckResponse = await AppIntegrity.getAppCheckToken()
+    if ('token' in appCheckResponse) appCheckToken = appCheckResponse.token
+    else {
+      console.error('Error getting app check token: ' + appCheckResponse.error)
+    }
   }
 
   return {
@@ -91,6 +100,7 @@ export async function getDeviceFingerprint(): Promise<DeviceInfo> {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     screen: `${screen.width}x${screen.height}`,
     clientId,
+    appCheckToken,
   }
 }
 

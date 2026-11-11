@@ -16,6 +16,7 @@ export interface DeviceInfo {
   timezone: string
   screen: string
   clientId: string
+  appCheckToken: string | undefined
 }
 
 export interface Session {

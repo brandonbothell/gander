@@ -217,7 +217,7 @@ export default function App() {
 
       if (res && res.status === 200) {
         const data = await res.json()
-        if (data && data.token && data.refreshToken) {
+        if (data && data.token) {
           debugLog('Token refresh successful, storing new tokens')
 
           localStorage.setItem('jwt', data.token)
@@ -544,7 +544,7 @@ export default function App() {
 
   const handleLogin = async (
     token: string,
-    refreshToken: string,
+    refreshToken: string | undefined,
     statusToken: string,
   ) => {
     // Show user-friendly error message
@@ -560,7 +560,7 @@ export default function App() {
     }
 
     try {
-      await SecureStorage.setRefreshToken(refreshToken)
+      if (refreshToken) await SecureStorage.setRefreshToken(refreshToken)
       if (Capacitor.isNativePlatform()) {
         await SecurePreferences.setString({
           key: 'statusToken',

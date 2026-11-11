@@ -23,7 +23,11 @@ type LoginValues = {
 }
 
 type LoginLayoutProps = {
-  onLogin: (token: string, refreshToken: string, statusToken: string) => void
+  onLogin: (
+    token: string,
+    refreshToken: string | undefined,
+    statusToken: string,
+  ) => void
   setAuthenticated: (authenticated: boolean) => void
 }
 
@@ -107,7 +111,8 @@ export default function LoginLayout({
       } else {
         setError(data.message ?? 'Login failed')
       }
-    } catch {
+    } catch (err) {
+      console.error('Error logging in: ', err)
       setError('Login failed. Please try again.')
     } finally {
       setLoading(false)

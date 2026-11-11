@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken'
+import { getAppCheck } from 'firebase-admin/app-check'
 import express from 'express'
 import {
   DeviceInfo,
@@ -57,8 +58,6 @@ export default function initializeAuthRoutes(
       deviceInfo,
     }: { username: string; password: string; deviceInfo: DeviceInfo } = req.body
 
-    logAuth(`[Login] Device info: ${JSON.stringify(deviceInfo, null, 2)}`)
-
     const ip =
       'x-real-ip' in req.headers ? String(req.headers['x-real-ip']) : req.ip
 
@@ -68,7 +67,7 @@ export default function initializeAuthRoutes(
     )
 
     if (!username || !password || !deviceInfo) {
-      res.status(400).json({ error: 'Missing required fields' })
+      res.status(401).json({ success: false, message: 'Invalid credentials' })
       return
     }
 
@@ -98,7 +97,14 @@ export default function initializeAuthRoutes(
         typeof deviceInfo?.clientId === 'string'
           ? deviceInfo.clientId
           : 'Unknown',
+      appCheckToken: ['string', 'undefined'].includes(
+        typeof deviceInfo?.appCheckToken,
+      )
+        ? deviceInfo.appCheckToken
+        : 'Unknown',
     }
+
+    logAuth(`[Login] Device info: ${JSON.stringify(safeDeviceInfo, null, 2)}`)
 
     logAuth(
       `[Login] User agent: '${safeDeviceInfo.userAgent}'\nClient ID: '${safeDeviceInfo.clientId}'`,
@@ -113,6 +119,29 @@ export default function initializeAuthRoutes(
 
     if (configUserIndex >= 0) {
       const configUser = config.users[configUserIndex]
+      logAuth(
+        `[Login] User '${configUser.username}' credentials verified succesfully from ${req.ip}`,
+      )
+
+      let isVerifiedMobile = false
+
+      if (safeDeviceInfo.appCheckToken) {
+        try {
+          // Verifies the token and confirms MEETS_DEVICE_INTEGRITY
+          await getAppCheck().verifyToken(safeDeviceInfo.appCheckToken)
+          logAuth('[Login] Client succeeded mobile attestation')
+          isVerifiedMobile = true
+        } catch (err) {
+          logAuth(
+            '[Login] Client failed mobile attestation, returning 401',
+            'warn',
+          )
+          return res
+            .status(401)
+            .json({ success: false, message: 'Invalid credentials' })
+        }
+      }
+
       const token = jwt.sign(
         { username, isAdmin: configUser.isAdmin, type: 'access' },
         JWT_SECRET,
@@ -265,7 +294,12 @@ export default function initializeAuthRoutes(
         'warn',
       )
 
-      res.json({ success: true, token, refreshToken, statusToken })
+      res.json({
+        success: true,
+        token,
+        ...(isVerifiedMobile ? { refreshToken } : {}),
+        statusToken,
+      })
     } else {
       setTimeout(
         () =>
@@ -347,6 +381,11 @@ export default function initializeAuthRoutes(
         typeof deviceInfo?.clientId === 'string'
           ? deviceInfo.clientId
           : 'Unknown',
+      appCheckToken: ['string', 'undefined'].includes(
+        typeof deviceInfo?.appCheckToken,
+      )
+        ? deviceInfo.appCheckToken
+        : 'Unknown',
     }
 
     // Find the user whose refreshTokens array contains the given refreshToken
@@ -365,7 +404,7 @@ export default function initializeAuthRoutes(
       logAuth(
         `[Refresh Token] Bad Refresh Request Headers: ${JSON.stringify(req.headers, null, 2)}`,
       )
-      res.status(401).json({ error: 'Invalid refresh token' })
+      res.status(401).json({ error: 'Invalid token provided' })
       return
     }
 
@@ -375,6 +414,23 @@ export default function initializeAuthRoutes(
     logAuth(
       `[Refresh Token] User ${user.username} refreshing token from IP: ${ip}`,
     )
+
+    let isVerifiedMobile = false
+
+    if (safeDeviceInfo.appCheckToken) {
+      try {
+        // Cryptographically verifies the token and confirms MEETS_DEVICE_INTEGRITY
+        await getAppCheck().verifyToken(safeDeviceInfo.appCheckToken)
+        logAuth('[Refresh Token] Client succeeded mobile attestation')
+        isVerifiedMobile = true
+      } catch (err) {
+        logAuth(
+          '[Refresh Token] Client failed mobile attestation, returning 401',
+          'warn',
+        )
+        return res.status(401).json({ error: 'Invalid token provided' })
+      }
+    }
 
     let refreshTokens: string[] = []
     let jwts: string[] = []
@@ -411,7 +467,7 @@ export default function initializeAuthRoutes(
         `Failed to generate new refresh token for user: ${user.username}`,
         'error',
       )
-      res.status(401).json({ error: 'Failed to generate new refresh token' })
+      res.status(500).json({ error: 'Failed to generate new refresh token' })
       return
     }
 
@@ -466,7 +522,7 @@ export default function initializeAuthRoutes(
       res.status(403).json({ error: 'Unauthorized activity detected' })
       logAuth(
         `[${user.username}] Unauthorized activity detected from IP: ${ip}`,
-        'warn',
+        'error',
       )
       logAuth(
         `[Refresh Token] Unauthorized Refresh Request Headers for ${user.username}: ${JSON.stringify(req.headers, null, 2)}`,
@@ -545,7 +601,7 @@ export default function initializeAuthRoutes(
 
     res.json({
       success: true,
-      refreshToken: newRefreshToken,
+      ...(isVerifiedMobile ? { refreshToken: newRefreshToken } : {}),
       token,
       statusToken,
     })

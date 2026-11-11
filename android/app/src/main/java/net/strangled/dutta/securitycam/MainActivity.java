@@ -1,9 +1,15 @@
 package net.strangled.dutta.securitycam;
 
 import android.os.Bundle;
+import android.util.Log;
 
 import com.getcapacitor.BridgeActivity;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.appcheck.FirebaseAppCheck;
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory;
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
 
+import net.strangled.dutta.securitycam.plugins.AppIntegrityCheck.AppIntegrityCheckPlugin;
 import net.strangled.dutta.securitycam.plugins.BatteryOptimization.BatteryOptimizationPlugin;
 import net.strangled.dutta.securitycam.plugins.MotionService.MotionServicePlugin;
 import net.strangled.dutta.securitycam.plugins.SecurePreferences.SecurePreferencesPlugin;
@@ -13,9 +19,17 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        FirebaseApp.initializeApp(getApplicationContext());
+        FirebaseAppCheck firebaseAppCheck = FirebaseAppCheck.getInstance();
+
+        Log.d("OnCreate", "Build in debug mode: " + BuildConfig.DEBUG);
+        if (BuildConfig.DEBUG) firebaseAppCheck.installAppCheckProviderFactory(DebugAppCheckProviderFactory.getInstance());
+        else firebaseAppCheck.installAppCheckProviderFactory(PlayIntegrityAppCheckProviderFactory.getInstance());
+
         registerPlugin(BatteryOptimizationPlugin.class);
         registerPlugin(MotionServicePlugin.class);
         registerPlugin(SecurePreferencesPlugin.class);
+        registerPlugin(AppIntegrityCheckPlugin.class);
 
         super.onCreate(savedInstanceState);
     }
