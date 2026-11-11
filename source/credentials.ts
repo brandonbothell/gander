@@ -1,5 +1,4 @@
-import path from 'path'
-import admin from 'firebase-admin'
+import * as admin from 'firebase-admin'
 
 export const JWT_SECRET = process.env.JWT_SECRET as string
 
@@ -9,15 +8,9 @@ export function initializeCredentials() {
     process.exit(1)
   }
 
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(
-    __dirname,
-    '..',
-    'security-cam-credentials.json',
-  )
-
-  if (!admin.apps.length) {
+  if (!admin.getApps().length) {
     admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
+      credential: admin.cert('security-cam-credentials.json'),
     })
   }
 }

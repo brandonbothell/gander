@@ -1,5 +1,5 @@
 import webpush from 'web-push'
-import admin from 'firebase-admin'
+import * as fcm from 'firebase-admin/messaging'
 import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
@@ -217,7 +217,6 @@ export async function notify(
             title,
             body,
             data: {
-              streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
               cameraId: streamId,
               // ...other custom data
             },
@@ -267,7 +266,6 @@ export async function notify(
           // Emit notification data to the clientId group
           try {
             io.to(sub.clientId).emit('notification', {
-              streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
               cameraId: streamId,
               title,
               body,
@@ -314,7 +312,7 @@ export async function notify(
         )
         // FCM push
         try {
-          await admin.messaging().send({
+          await fcm.getMessaging().send({
             android: {
               data: {
                 title,
@@ -328,7 +326,6 @@ export async function notify(
                 vibrateTimingsMillis: '0,500,500,500',
                 ...withOptional,
 
-                streamUrl: `${process.env.VITE_BASE_URL || 'http://localhost:3000'}/stream/${streamId}`,
                 cameraId: streamId,
                 ...(group ? { group } : {}),
                 actions: title === 'Motion Detected!' ? 'true' : 'false',
