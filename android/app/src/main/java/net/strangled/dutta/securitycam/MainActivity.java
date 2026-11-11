@@ -5,8 +5,8 @@ import android.util.Log;
 
 import com.getcapacitor.BridgeActivity;
 import com.google.firebase.FirebaseApp;
+import com.google.firebase.appcheck.AppCheckProviderFactory;
 import com.google.firebase.appcheck.FirebaseAppCheck;
-import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory;
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
 
 import net.strangled.dutta.securitycam.plugins.AppIntegrityCheck.AppIntegrityCheckPlugin;
@@ -23,7 +23,16 @@ public class MainActivity extends BridgeActivity {
         FirebaseAppCheck firebaseAppCheck = FirebaseAppCheck.getInstance();
 
         Log.d("OnCreate", "Build in debug mode: " + BuildConfig.DEBUG);
-        if (BuildConfig.DEBUG) firebaseAppCheck.installAppCheckProviderFactory(DebugAppCheckProviderFactory.getInstance());
+        if (BuildConfig.DEBUG) {
+            try {
+                Class<?> debugFactoryClass = Class.forName("com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory");
+                AppCheckProviderFactory factory = (AppCheckProviderFactory) debugFactoryClass.getMethod("getInstance").invoke(null);
+                assert factory != null;
+                firebaseAppCheck.installAppCheckProviderFactory(factory);
+            } catch (Exception e) {
+                Log.e("OnCreate", "Error initializing debug app check provider: ", e);
+            }
+        }
         else firebaseAppCheck.installAppCheckProviderFactory(PlayIntegrityAppCheckProviderFactory.getInstance());
 
         registerPlugin(BatteryOptimizationPlugin.class);
