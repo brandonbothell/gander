@@ -1,5 +1,6 @@
 import ReactDOM from 'react-dom/client'
 import { StrictMode } from 'react'
+import { Capacitor } from '@capacitor/core'
 import App from './App'
 
 function isIOS() {
@@ -11,7 +12,13 @@ export type CustomWindow = Window & {
   clearDebugLogs: () => void
 }
 
-export const API_BASE = import.meta.env.VITE_BASE_URL ?? ''
+export const API_BASE = Capacitor.isNativePlatform()
+  ? import.meta.env.VITE_ANDROID_ENV === 'development'
+    ? '' // Force local URL for Android in development
+    : (import.meta.env.VITE_ANDROID_API_BASE_URL ?? // Use production URL for native apps
+      import.meta.env.VITE_API_BASE_URL ??
+      '')
+  : ''
 
 if (isIOS()) {
   document.body.classList.add('ios')

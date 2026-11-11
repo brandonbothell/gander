@@ -5,7 +5,8 @@
   "maintainerEmail":      "example@email.com",
   "recordingsLowSpaceThresholdMb":  1024,
   "domains": [
-    "https://example.tld"
+    "https://example.tld",
+    "https://m.example.tld"
   ],
   "vapid": {
     "email":              "mailto:example@email.com",

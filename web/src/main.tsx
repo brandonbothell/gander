@@ -16,7 +16,7 @@ export type CustomWindow = Window & {
 }
 
 export const API_BASE = Capacitor.isNativePlatform()
-  ? import.meta.env.VITE_BASE_URL // Use production URL for native apps
+  ? import.meta.env.VITE_CAPACITOR_SERVER_URL // Use production URL for native apps
   : ''
 
 if (isIOS()) {

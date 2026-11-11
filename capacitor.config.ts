@@ -4,11 +4,15 @@ import type { CapacitorConfig } from '@capacitor/cli'
 import { isLocalIPv4 } from './web2/src/util'
 import localConfig from './config.json'
 
-const baseUrl =
-  process.env.VITE_BASE_URL ??
-  (process.env.CAPACITOR_ENV === 'development'
+const apiBaseUrl =
+  process.env.VITE_ANDROID_ENV === 'development'
     ? `http://${getLocalIp() || 'localhost'}:${process.env.PORT ?? 3000}`
-    : undefined)
+    : (process.env.VITE_ANDROID_API_BASE_URL ?? process.env.VITE_API_BASE_URL)
+
+const appBaseUrl =
+  process.env.VITE_ANDROID_ENV === 'development'
+    ? `http://${getLocalIp() || 'localhost'}:${process.env.PORT ?? 3000}`
+    : process.env.ANDROID_APP_BASE_URL
 
 const config: CapacitorConfig = {
   appId: localConfig.appId,
@@ -16,9 +20,9 @@ const config: CapacitorConfig = {
   webDir: './web2/dist',
   server: {
     // @ts-ignore
-    baseUrl: baseUrl,
-    url: process.env.CAPACITOR_SERVER_URL ?? baseUrl,
-    cleartext: process.env.CAPACITOR_ENV === 'development', // Allow cleartext traffic in development
+    baseUrl: apiBaseUrl,
+    url: appBaseUrl,
+    cleartext: process.env.VITE_ANDROID_ENV === 'development', // Allow cleartext traffic in development
   },
 }
 
@@ -28,9 +32,9 @@ function getLocalIp() {
   try {
     const interfaces = os.networkInterfaces()
 
-    for (const [name, interfacee] of Object.entries(interfaces)) {
-      if (interfacee?.length) {
-        for (const iface of interfacee) {
+    for (const [_name, interface_] of Object.entries(interfaces)) {
+      if (interface_?.length) {
+        for (const iface of interface_) {
           if (iface.family === 'IPv4' && isLocalIPv4(iface.address)) {
             ip = iface.address
             break
