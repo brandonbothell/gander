@@ -26,6 +26,7 @@ import FullLayout from './Layout/FullLayout'
 export type RecordingType = {
   streamId: string
   filename: string
+  nickname: string
   duration: number
   motionTimestamps: number[]
 }

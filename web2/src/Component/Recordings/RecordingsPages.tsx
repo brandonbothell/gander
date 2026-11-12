@@ -137,7 +137,14 @@ export default function RecordingsPages(props: {
         if (currentRecordings && currentRecordings.length >= activePage) {
           const currentPage = currentRecordings[activePage - 1]
           // The page is already cached
-          if (currentPage.length !== 0) return
+          if (
+            activePage ===
+            Math.ceil((totalRecordings.get(activeStream.id) ?? 0) / 20)
+              ? currentPage.length !== 0
+              : currentPage.length === 20
+          ) {
+            return
+          }
         }
 
         console.log(
@@ -219,6 +226,88 @@ export default function RecordingsPages(props: {
       }
     })()
   }, [props.streams, activeStream, recordings, activePage, totalRecordings])
+
+  useEffect(() => {
+    const fetchLatestRecordingsInterval = setInterval(async () => {
+      if (activeStream) {
+        const currentRecordings = recordings.get(activeStream.id)
+        if (!currentRecordings) {
+          return
+        }
+
+        const res = await authFetch(
+          `${API_BASE}/api/latest-recordings/${activeStream.id}`,
+        )
+        if (!res.ok) return
+        const data = (await res.json()) as {
+          recordings: (Omit<Recording, 'motionTimestamps'> & {
+            motionTimestamps: string
+          })[]
+          deletedRecordings: string[]
+        }
+        const newRecs = (data.recordings || []).map((rec, index) => ({
+          ...rec,
+          motionTimestamps: JSON.parse(rec.motionTimestamps) as number[],
+          page: Math.ceil((index || 1) / 20), // Max page length of 20, for index 0 we have a special case of needing it to be page 1
+          index,
+        }))
+
+        // TODO: Handle deleted recordings
+        if (
+          data.deletedRecordings &&
+          Array.isArray(data.deletedRecordings) &&
+          data.deletedRecordings.length > 0
+        ) {
+          console.info(
+            'Deleted recordings sent from the server: ' +
+              data.deletedRecordings.join(', '),
+          )
+        }
+
+        if (newRecs.length > 0) {
+          console.log(`${newRecs.length} new recordings polled from the server`)
+
+          if (!currentRecordings.length) {
+            console.warn('No recordings were found, creating the first page...')
+            recordings.set(activeStream.id, [newRecs])
+            return
+          }
+
+          currentRecordings[0] = newRecs.concat(currentRecordings[0])
+
+          const totalPageRecordings = currentRecordings[0].length
+
+          if (totalPageRecordings <= 20) {
+            recordings.set(activeStream.id, currentRecordings)
+            return
+          }
+
+          let elementsToMove = currentRecordings[0].splice(20)
+          currentRecordings[1] = elementsToMove.concat(
+            currentRecordings[1] ?? [],
+          )
+          let index = 0
+
+          while (elementsToMove.length) {
+            index += 1
+            const totalPageRecordings = currentRecordings[index].length
+
+            if (totalPageRecordings <= 20) {
+              recordings.set(activeStream.id, currentRecordings)
+              return
+            }
+
+            elementsToMove = currentRecordings[index].splice(20)
+            currentRecordings[index] = elementsToMove.concat(
+              currentRecordings[index] ?? [],
+            )
+          }
+        }
+      }
+    }, 5 * 1000)
+
+    return () => clearInterval(fetchLatestRecordingsInterval)
+  }, [activeStream, recordings, activePage, totalRecordings])
 
   return (
     activeStream && (
