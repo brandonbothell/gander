@@ -104,6 +104,26 @@ export default function RecordingsPages(props: {
     )
   }, [activePage, activeStream, recordings, loading])
 
+  const moveOverflowRecordings = useCallback(
+    (
+      pages: (Recording & { page: number; index: number })[][],
+      pageIndex = 0,
+    ) => {
+      const currentPage = pages[pageIndex] ?? []
+
+      if (currentPage.length <= 20) {
+        return pages
+      }
+
+      const nextPage = pages[pageIndex + 1] ?? []
+      const overflow = currentPage.splice(20)
+
+      pages[pageIndex + 1] = overflow.concat(nextPage)
+      return moveOverflowRecordings(pages, pageIndex + 1)
+    },
+    [],
+  )
+
   useEffect(() => {
     // Check if there are no recordings
     const streamRecordings = activeStream
@@ -274,34 +294,7 @@ export default function RecordingsPages(props: {
           }
 
           currentRecordings[0] = newRecs.concat(currentRecordings[0])
-
-          const totalPageRecordings = currentRecordings[0].length
-
-          if (totalPageRecordings <= 20) {
-            recordings.set(activeStream.id, currentRecordings)
-            return
-          }
-
-          let elementsToMove = currentRecordings[0].splice(20)
-          currentRecordings[1] = elementsToMove.concat(
-            currentRecordings[1] ?? [],
-          )
-          let index = 0
-
-          while (elementsToMove.length) {
-            index += 1
-            const totalPageRecordings = currentRecordings[index].length
-
-            if (totalPageRecordings <= 20) {
-              recordings.set(activeStream.id, currentRecordings)
-              return
-            }
-
-            elementsToMove = currentRecordings[index].splice(20)
-            currentRecordings[index] = elementsToMove.concat(
-              currentRecordings[index] ?? [],
-            )
-          }
+          moveOverflowRecordings(currentRecordings)
         }
       }
     }, 5 * 1000)
