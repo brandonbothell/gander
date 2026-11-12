@@ -8,6 +8,7 @@ import { Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
+import { SplashScreen } from '@capacitor/splash-screen'
 import { Capacitor } from '@capacitor/core'
 import { isLocalIPv4 } from './util'
 import theme from './theme'
@@ -401,6 +402,7 @@ export default function App() {
       }
 
       debugLog('=== INITIAL AUTH CHECK COMPLETE ===')
+      await SplashScreen.hide()
     }
 
     initAuth().catch((error) => {

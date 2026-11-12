@@ -15,6 +15,7 @@
     "@capacitor/preferences": "8.0.1",
     "@capacitor/push-notifications": "8.1.1",
     "@capacitor/screen-orientation": "8.0.1",
+    "@capacitor/splash-screen": "8.0.2",
     "@gfazioli/mantine-video": "1.2.2",
     "@mantine/carousel": "9.6.1",
     "@mantine/core": "9.6.1",

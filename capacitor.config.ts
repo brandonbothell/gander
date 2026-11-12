@@ -25,6 +25,15 @@ const config: CapacitorConfig = {
     url: appBaseUrl,
     cleartext: process.env.CLIENT_ANDROID_ENV === 'development', // Allow cleartext traffic in development
   },
+  plugins: {
+    SplashScreen: {
+      launchAutoHide: false,
+      backgroundColor: '#292929',
+      showSpinner: true,
+      androidSpinnerStyle: 'large',
+      spinnerColor: '#999999',
+    },
+  },
 }
 
 function getLocalIp() {
