@@ -771,6 +771,7 @@ app.use(
     secret: JWT_SECRET,
     rolling: true,
     cookie: {
+      secure: process.env.API_ENV !== 'development',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   }),
