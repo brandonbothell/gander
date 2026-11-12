@@ -12,7 +12,7 @@ import retrofit2.http.Body;
 import retrofit2.http.Path;
 
 public interface APIService {
-    @POST("/api/refresh-token")
+    @POST("/api/mobile/refresh-token")
     Call<RefreshTokenResponse> refreshToken(@Header("Cookie") String cookie, @Body JsonObject deviceInfo);
 
     @POST("/api/subscribe")

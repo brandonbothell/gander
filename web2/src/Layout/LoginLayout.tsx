@@ -27,6 +27,7 @@ type LoginLayoutProps = {
     token: string,
     refreshToken: string | undefined,
     statusToken: string,
+    csrfToken: string | undefined,
   ) => void
   setAuthenticated: (authenticated: boolean) => void
 }
@@ -107,7 +108,7 @@ export default function LoginLayout({
 
       if (data.success) {
         localStorage.removeItem('tokenRefreshInProgress')
-        onLogin(data.token, data.refreshToken, data.statusToken)
+        onLogin(data.token, data.refreshToken, data.statusToken, data.csrfToken)
       } else {
         setError(data.message ?? 'Login failed')
       }

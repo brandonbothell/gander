@@ -77,6 +77,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
 
   // Use the latest JWT
   const finalToken = getTokenOrApiKey()
+  const csrfToken = localStorage.getItem('csrf')
 
   const makeRequest = (authToken?: { token: string; type: 'jwt' | 'api' }) => {
     return fetch(input, {
@@ -89,6 +90,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
             ? `${finalToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${finalToken.token}`
             : '',
         ...(init.headers ?? {}),
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
       },
     })
   }

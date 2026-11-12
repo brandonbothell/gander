@@ -183,11 +183,13 @@ export default function App() {
       // Mark refresh as in progress
       localStorage.setItem('tokenRefreshInProgress', Date.now().toString())
 
+      const csrfToken = localStorage.getItem('csrf')
       const deviceInfo = await getDeviceFingerprint()
       const data = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
         },
         body: JSON.stringify({
           deviceInfo,
@@ -198,7 +200,7 @@ export default function App() {
       const refreshStartTime = Date.now()
       // The current refresh token will be sent in the http only cookie
       const res = await Promise.race([
-        fetch(`${API_BASE}/api/refresh-token`, data),
+        fetch(`${API_BASE}/api/refresh-token`, data as any),
         new Promise<Response>((_, reject) =>
           setTimeout(
             () => reject(new Error('Token refresh request timeout')),
@@ -218,10 +220,12 @@ export default function App() {
 
       if (res && res.status === 200) {
         const data = await res.json()
-        if (data && data.token) {
+        if (data && data.token && data.csrfToken) {
           debugLog('Token refresh successful, storing new tokens')
 
           localStorage.setItem('jwt', data.token)
+          localStorage.setItem('csrf', data.csrfToken)
+
           localStorage.removeItem('tokenRefreshInProgress')
 
           await SecureStorage.setRefreshToken(data.refreshToken)
@@ -547,6 +551,7 @@ export default function App() {
     token: string,
     refreshToken: string | undefined,
     statusToken: string,
+    csrfToken: string | undefined,
   ) => {
     // Show user-friendly error message
     if (
@@ -573,10 +578,16 @@ export default function App() {
         })
       }
 
+      if (csrfToken) {
+        localStorage.setItem('csrf', csrfToken)
+      } else {
+        console.warn('No CSRF token from login!')
+      }
+
       localStorage.setItem('jwt', token)
       setAuthenticated(true)
     } catch (error) {
-      console.error('Error storing tokens:', error)
+      console.error('Error storing tokens: ' + error)
 
       // Still try to authenticate even if secure storage fails
       localStorage.setItem('jwt', token)
