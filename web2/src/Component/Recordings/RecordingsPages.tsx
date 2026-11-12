@@ -272,7 +272,7 @@ export default function RecordingsPages(props: {
           index,
         }))
 
-        // TODO: Handle deleted recordings
+        // TODO: Handle deleted recordings including totalRecordings
         if (
           data.deletedRecordings &&
           Array.isArray(data.deletedRecordings) &&
@@ -286,6 +286,10 @@ export default function RecordingsPages(props: {
 
         if (newRecs.length > 0) {
           console.log(`${newRecs.length} new recordings polled from the server`)
+          totalRecordings.set(
+            activeStream.id,
+            (totalRecordings.get(activeStream.id) ?? 0) + newRecs.length,
+          )
 
           if (!currentRecordings.length) {
             console.warn('No recordings were found, creating the first page...')
