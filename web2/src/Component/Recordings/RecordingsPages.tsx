@@ -25,10 +25,10 @@ export default function RecordingsPages(props: {
   const { colors } = useMantineTheme()
 
   const totalRecordings = useMap<string, number>()
+  const totalCachedRecordings = useMap<string, number>()
   const signedUrlsCache = useMap<
     string,
-    // eslint-disable-next-line func-call-spacing
-    Map<number, (SignedThumbnailUrl | null)[]>
+    Map<string, SignedThumbnailUrl | null>
   >()
   const signedUrlRequests = useMap<string, Promise<void>>()
 
@@ -94,6 +94,7 @@ export default function RecordingsPages(props: {
     return (
       <RecordingsGrid
         recordings={recordings}
+        cachedRecordingsCount={totalCachedRecordings}
         recordingsCount={totalRecordings}
         currentPage={recordingsToRender}
         pageLoading={loading}
@@ -193,6 +194,10 @@ export default function RecordingsPages(props: {
           console.error(`Error loading recordings: ${JSON.stringify(page)}`)
           setLastFailedPage(activePage)
           totalRecordings.set(activeStream.id, page.total || 0)
+          totalCachedRecordings.set(
+            activeStream.id,
+            page.recordings?.length || 0,
+          )
           setLoading(false)
           return
         }
@@ -205,6 +210,11 @@ export default function RecordingsPages(props: {
         }))
 
         totalRecordings.set(activeStream.id, page.total)
+        totalCachedRecordings.set(
+          activeStream.id,
+          (totalCachedRecordings.get(activeStream.id) ?? 0) +
+            page.recordings.length,
+        )
 
         // Set first page and initialize the rest as empty if we just started
         if (!currentRecordings) {
@@ -289,6 +299,10 @@ export default function RecordingsPages(props: {
           totalRecordings.set(
             activeStream.id,
             (totalRecordings.get(activeStream.id) ?? 0) + newRecs.length,
+          )
+          totalCachedRecordings.set(
+            activeStream.id,
+            (totalCachedRecordings.get(activeStream.id) ?? 0) + newRecs.length,
           )
 
           if (!currentRecordings.length) {
