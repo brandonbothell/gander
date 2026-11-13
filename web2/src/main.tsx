@@ -119,7 +119,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
     console.warn(
       `A request was rate limited. Waiting for ${rateLimitResetSeconds}s to request again.`,
     )
-    return new Promise((resolve) =>
+    return new Promise<Response>((resolve) =>
       setTimeout(
         async () => resolve(await authFetch(input, init)),
         rateLimitResetSeconds ? rateLimitResetSeconds * 1000 : 5000,
