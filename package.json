@@ -2,7 +2,7 @@
   "name": "gander",
   "author": "Brandon Bothell",
   "version": "0.1.0",
-  "main": "./compiled/camera.js",
+  "main": "./compiled/server.js",
   "packageManager": "yarn@4.18.1",
   "workspaces": [
     ".",
@@ -10,7 +10,7 @@
     "web2"
   ],
   "scripts": {
-    "start": "node ./compiled/camera.js",
+    "start": "node ./compiled/server.js",
     "build": "yarn build:server & yarn build:client",
     "android:sync": "yarn cap sync android",
     "android:open": "yarn cap open android",
@@ -20,7 +20,7 @@
     "build:server:force": "copyfiles -u 1 \"source/generated/**/*\" \"compiled\" && tsc --project tsconfig.build.json",
     "build:client": "dotenvx run -- yarn workspace web2 build",
     "dev:client": "cross-env NODE_ENV=development dotenvx run -- yarn workspace web2 vite build --watch --mode development --minify false",
-    "dev:server": "nodemon --watch source --ext ts --exec \"tsx --tsconfig tsconfig.build.json ./source/camera.ts\"",
+    "dev:server": "nodemon --watch source --ext ts --exec \"tsx --tsconfig tsconfig.build.json ./source/server.ts\"",
     "db:generate": "yarn prisma generate",
     "db:push": "yarn prisma db push",
     "db:migrate:dev:reset": "yarn prisma migrate reset",

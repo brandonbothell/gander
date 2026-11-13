@@ -10,7 +10,7 @@ import { Jimp, diff as getDiff } from 'jimp'
 import { StreamMotionState } from './types/stream'
 import { StreamManager } from './streamManager'
 import { logMotion } from './logMotion'
-import { initializeStreamState, prisma } from './camera'
+import { initializeStreamState, prisma } from './server'
 
 const STANDARD_WIDTH = 160 // Much smaller for performance
 const STANDARD_HEIGHT = 90

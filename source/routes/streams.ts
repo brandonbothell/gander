@@ -8,7 +8,7 @@ import {
   RequestWithUser,
   setupStreamMotionMonitoring,
   stopStreamMotionMonitoring,
-} from '../camera'
+} from '../server'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeStreamRoutes(
@@ -265,11 +265,9 @@ export default function initializeStreamRoutes(
               `[StreamManager] Failed to destroy stream ${id}:`,
               err,
             )
-            res
-              .status(500)
-              .json({
-                error: 'Failed to shut down the camera monitor process.',
-              })
+            res.status(500).json({
+              error: 'Failed to shut down the camera monitor process.',
+            })
             return
           }
           stopStreamMotionMonitoring(id)

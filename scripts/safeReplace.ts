@@ -13,7 +13,7 @@ async function safeReplace() {
     const { exec } = require('child_process')
     const isRunning = await new Promise((resolve) => {
       exec(
-        'lsof compiled/camera.js 2>/dev/null || pgrep -f "compiled/camera.js"',
+        'lsof compiled/server.js 2>/dev/null || pgrep -f "compiled/server.js"',
         (error: any) => {
           resolve(!error) // If no error, process is running
         },

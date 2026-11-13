@@ -1,5 +1,5 @@
 import fs from 'fs'
-import { motionLogPath, authLogPath, notifyLogPath } from './camera'
+import { motionLogPath, authLogPath, notifyLogPath } from './server'
 
 // Motion logging function
 

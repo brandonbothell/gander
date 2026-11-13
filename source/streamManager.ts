@@ -8,7 +8,7 @@ import {
   saveMotionSegments,
   setupStreamMotionMonitoring,
   stopStreamMotionMonitoring,
-} from './camera'
+} from './server'
 
 export interface StreamConfig {
   id: string
