@@ -447,8 +447,8 @@ export default function initializeSignedRoutes(
 
   const signedVideoLimiter = rateLimit({
     validate: { ip: false },
-    windowMs: 1000, // 1 second
-    max: 3,
+    windowMs: 60 * 1000, // 1 minute
+    max: 3000,
     standardHeaders: true,
     legacyHeaders: false,
   })
