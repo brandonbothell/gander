@@ -52,6 +52,14 @@ export default function initializeAuthRoutes(
     legacyHeaders: false,
   })
 
+  const authCheckLimiter = rateLimit({
+    validate: { ip: false },
+    windowMs: 5000, // 30 seconds
+    max: 1,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+
   const {
     invalidCsrfTokenError, // This is just for convenience if you plan on making your own middleware.
     generateCsrfToken, // Use this in your routes to provide a CSRF token.
@@ -757,7 +765,7 @@ export default function initializeAuthRoutes(
     }
   })
 
-  app.get('/api/authcheck', jwtAuth, async (req, res) =>
+  app.get('/api/authcheck', authCheckLimiter, jwtAuth, async (req, res) =>
     res.json({ success: true }),
   )
 }
