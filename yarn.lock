@@ -4091,6 +4091,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"chalk@npm:6.0.1":
+  version: 6.0.1
+  resolution: "chalk@npm:6.0.1"
+  checksum: 10c0/4c58238fa874f531b5201bf99ebd374742be31f8e306c7783d930856aec305f2dea3e07531a8805b2a7ba92807296e39ced52e9f673703e0264d96e83998a429
+  languageName: node
+  linkType: hard
+
 "chalk@npm:^4.1.2":
   version: 4.1.2
   resolution: "chalk@npm:4.1.2"
@@ -6158,7 +6165,7 @@ __metadata:
     "@yarnpkg/pnpify": "npm:4.1.6"
     better-sqlite3: "npm:13.1.1"
     better-sqlite3-session-store: "npm:0.1.0"
-    chalk: "npm:5.6.2"
+    chalk: "npm:6.0.1"
     chokidar: "npm:5.0.0"
     concurrently: "npm:10.0.3"
     console-stamp: "npm:3.1.2"
