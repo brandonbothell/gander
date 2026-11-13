@@ -1920,6 +1920,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@prisma/client-runtime-utils@npm:7.10.1":
+  version: 7.10.1
+  resolution: "@prisma/client-runtime-utils@npm:7.10.1"
+  checksum: 10c0/516f7d049381108d0f5d6014e206c5224878350ce08bc85ef63ff3a809321f559f03264b880fde88cd1fd04bd06779016428b7a032b1fa521aa57b54adebc93e
+  languageName: node
+  linkType: hard
+
 "@prisma/client-runtime-utils@npm:7.8.0":
   version: 7.8.0
   resolution: "@prisma/client-runtime-utils@npm:7.8.0"
@@ -6137,7 +6144,7 @@ __metadata:
     "@eslint/js": "npm:10.0.1"
     "@prisma/adapter-better-sqlite3": "npm:7.8.0"
     "@prisma/client": "npm:7.8.0"
-    "@prisma/client-runtime-utils": "npm:7.8.0"
+    "@prisma/client-runtime-utils": "npm:7.10.1"
     "@root/encoding": "npm:1.0.1"
     "@root/keypairs": "npm:0.10.3"
     "@stylistic/eslint-plugin": "npm:5.10.0"
