@@ -2,29 +2,48 @@
 
 A security camera application.
 
+## Table of Contents
+
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Detailed Setup](#detailed-setup)
+- [Starting the Server](#starting-the-server)
+- [Nginx Configuration](#nginx-configuration)
+- [Working With Android](#working-with-android)
+
+## Requirements
+
+- Node.js v22+ (install via `nvm`, [install yarn with `corepack`](https://yarnpkg.com/getting-started/install)) (Latest tested: **v26.13.1**)
+- ffmpeg v7+ (Latest tested: **v8.1**)
+- _Production_:
+  - A reverse proxy like nginx to handle HTTPS (see [configuration](#nginx-configuration))
+
 ## Quick Start
 
-1. Configure files: Copy `config.example.json`, `web/config.example.json`, `greenlock.d/config.example.json`, and `.env.example` to their respective `.json` and `.env` files, replacing placeholders.
+1. Configure files: Rename [`config.example.json`](./config.example.json), [`greenlock.d/config.example.json`](./greenlock.d/config.example.json), and [`.env.example`](./.env.example) by removing "`.example`" from the filenames.
+   - Fill in `config.json`, `greenlock.d/config.json`, and `.env` by reading comments and property names in the config/this README to know how to fill the values.
+
 2. Run `yarn db:generate` and `yarn db:migrate:deploy` to set up the database.
+   - At this point your should be able to run `yarn dev` to test in a development environment.
+
 3. Generate SSL certificates: `yarn generate:ssl`.
+
 4. Build and start: `yarn build && yarn start`.
+
 5. Access via your reverse-proxy (see [nginx config](#nginx-configuration))
    - Serve the SSL certificates from `greenlock.d/live/YourWebsite.com/`
-
-## Prerequisites
-
-- Node.js v22+ (install via `nvm`, enable yarn with `corepack`). Latest tested: v25.6.1
-- ffmpeg v7+ (tested with v7.1.2)
-- A reverse proxy like nginx to handle HTTPS (see [configuration](#nginx-configuration))
 
 ## Detailed Setup
 
 1. **Configuration Files**: Rename the following example configuration files, replacing placeholders with your real values:
 
-- `.env`
-- `config.json`
-- `web/config.json`
-- `greenlock.d/config.json` (if you don't have SSL certificates already)
+   | Original file                                                          | New file                    |
+   | ---------------------------------------------------------------------- | --------------------------- |
+   | [`.env.example`](./.env.example)                                       | `.env`                      |
+   | [`config.example.json`](./config.example.json)                         | `config.json`               |
+   | [`greenlock.d/config.example.json`](./greenlock.d/config.example.json) | `greenlock.d/config.json`\* |
+
+   <sup>_\*If you don't already have SSL certificates, plan to use `greenlock.d/config.json`. Otherwise, you can leave it as is if you don't plan to use `yarn generate:ssl`._</sup>
 
 2. **Database**: Run `yarn db:generate` to initialize the database manager and `yarn db:migrate:deploy` to set up the database tables.
 
@@ -38,7 +57,13 @@ A security camera application.
 
 ## Starting the Server
 
-Run `yarn build` and then `yarn start`. Ensure ports 80 and 443 are available for the reverse proxy. Access your site through the proxy.
+- Production
+  - Ensure `API_ENV` and `ANDROID_ENV` are set to `production` in [`.env`](./.env.example).
+  - Run `yarn build` and then `yarn start`. Ensure ports 80 and 443 are available for the reverse proxy. Access your site through the proxy.
+
+- Development/Testing:
+  - Ensure `API_ENV` and `ANDROID_ENV` are set to `development` in [`.env`](./.env.example).
+  - Run `yarn build` and then `yarn start`. Ensure port `3000` (default dev port, change by adding `PORT` to [`.env`](./.env.example)) is available for the server. The site should open by itself. If not, open [localhost:3000](http://localhost:3000) in a browser.
 
 ## Nginx Configuration
 
@@ -93,8 +118,21 @@ server {
 
 ## Working With Android
 
-To provide the most secure application possible, the Android app is integrated with the Firebase App Check Play Integrity API.
+To provide the most secure application possible, the Android app is integrated with the Firebase App Check Play Integrity API. A [Google Play Console](https://play.google.com/console/developers) developer account ($25 one-time fee) is required for this to function, but you can remove the functionality from the app if you so please, _noting that it increases the impact of XSS attacks_.
 
-- [Click here](https://firebase.google.com/docs/android/setup#create-firebase-project) to learn how to setup a Firebase project
-  - When prompted for a package name, enter `net.strangled.dutta.securitycam`
-- Place a copy of the downloaded `google-services.json` in both the project root (`./`) and [`./android/app/`](./android/app)
+1. [**Click here**](https://firebase.google.com/docs/android/setup#create-firebase-project) to learn how to setup a Firebase project
+   - When prompted for a package name, enter `net.strangled.dutta.securitycam`
+   - **_Important Note:_** Stop at **step 3.1** - you should have just downloaded a `google-services.json` file.
+
+2. Place a copy of the downloaded `google-services.json` in both the project root (`./`) and [`./android/app/`](./android/app)
+
+3. Then, follow [**these steps**](https://firebase.google.com/docs/app-check/android/play-integrity-provider#project-setup) to enable the Play Integrity API.
+
+4. Set up the advanced [**AppCheck settings**](https://console.firebase.google.com/project/_/appcheck/apps) of the app you made while following step 3.
+   - If you aren't distributing on Play Store (likely), then you'll want to ignore `PLAY_RECOGNIZED` and `LICENSED` while requiring `MEETS_DEVICE_INTEGRITY`.
+
+5. Navigate to your project's [**Firebase service accounts**](https://console.firebase.google.com/u/0/project/_/settings/serviceaccounts) and click **"Generate a new private key"**. Download the JSON file, rename it to `security-cam-credentials.json`, and place it in the project root.
+
+6. Build the Android app in `production` environment when generating a release APK, but when coding locally, use `development` env to make the app work properly in the Android Studio emulator.
+   - Always run `yarn cap sync` after any changes to [`.env`](./.env.example).
+   - Run `yarn cap open android` to open the project in [Android Studio](https://developer.android.com/studio) automatically.
