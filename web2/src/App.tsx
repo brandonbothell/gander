@@ -4,7 +4,7 @@ import '@mantine/lightbox/styles.css'
 import '@mantine/notifications/styles.css'
 import '@gfazioli/mantine-video/styles.css'
 import { useState, useEffect } from 'react'
-import { Notifications } from '@mantine/notifications'
+import { notifications, Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
@@ -111,6 +111,10 @@ export default function App() {
           `No refresh token available for refresh attempt, _rtexists: '${rtExists}'`,
         )
         setAuthenticated(false)
+        notifications.show({
+          message: 'Sorry you got logged out, there was an error on our end.',
+          color: 'red',
+        })
         return false
       }
 
@@ -165,6 +169,11 @@ export default function App() {
                   'error',
                 )
                 setAuthenticated(false)
+                notifications.show({
+                  message:
+                    'Sorry you got logged out, there was an error in other tab.',
+                  color: 'red',
+                })
                 tokenChannel.close()
                 resolve(false)
               } else {
@@ -213,6 +222,11 @@ export default function App() {
         ),
       ]).catch((err) => {
         console.error('Error refreshing token from API: ', err)
+        notifications.show({
+          message:
+            'There was an unknown error checking your login status. Please sign in again.',
+          color: 'red',
+        })
       })
 
       const requestDuration = Date.now() - refreshStartTime
@@ -261,6 +275,19 @@ export default function App() {
         }
       } else {
         debugLog(`Token refresh failed with status: ${res?.status}`, 'error')
+        if (res?.status === 401) {
+          notifications.show({
+            message:
+              'There was an error verifying your account details. Please sign in again.',
+            color: 'red',
+          })
+        } else {
+          notifications.show({
+            message:
+              'There was an unknown error verifying your login status. Please sign in again.',
+            color: 'red',
+          })
+        }
         try {
           const errorText = await res?.text()
           debugLog(`Error response body: ${errorText}`, 'error')
@@ -613,7 +640,7 @@ export default function App() {
             setAuthenticated={setAuthenticated}
           />
         </ModalsProvider>
-        <Notifications />
+        <Notifications zIndex={10001} />
       </MantineProvider>
     )
   }
