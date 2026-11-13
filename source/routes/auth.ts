@@ -473,6 +473,7 @@ export default function initializeAuthRoutes(
             // Cryptographically verifies the token and confirms MEETS_DEVICE_INTEGRITY
             const appCheck = await getAppCheck().verifyToken(
               safeDeviceInfo.appCheckToken,
+              { consume: true },
             )
             if (appCheck.alreadyConsumed) {
               throw new Error()
