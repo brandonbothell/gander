@@ -3,7 +3,7 @@ import '@mantine/core/styles.css'
 import '@mantine/lightbox/styles.css'
 import '@mantine/notifications/styles.css'
 import '@gfazioli/mantine-video/styles.css'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { notifications, Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
@@ -497,7 +497,7 @@ export default function App() {
     }
   }
 
-  function checkLocalStorageStateConsistency() {
+  const checkLocalStorageStateConsistency = useCallback(() => {
     try {
       const currentVersion = import.meta.env.CLIENT_REACT_APP_VERSION ?? '1.0.0'
       let lastUpdate = localStorage.getItem('lastUsedAppVersion')
@@ -511,7 +511,6 @@ export default function App() {
         setTotalRecordings({})
         setSignedUrlCache({})
         setSignedLiveThumbUrls({})
-        localStorage.setItem('lastUsedAppVersion', currentVersion)
         notifications.show({
           message:
             "There's been an update to the website. Things may take a little longer to load.",
@@ -519,10 +518,12 @@ export default function App() {
           autoClose: 10000,
         })
       }
+
+      localStorage.setItem('lastUsedAppVersion', currentVersion)
     } catch (err) {
       console.error('LocalStorage consistency check failed:', err)
     }
-  }
+  }, [])
 
   useEffect(() => {
     checkLocalStorageStateConsistency()
