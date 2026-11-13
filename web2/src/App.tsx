@@ -201,7 +201,10 @@ export default function App() {
       const refreshStartTime = Date.now()
       // The current refresh token will be sent in the http only cookie
       const res = await Promise.race([
-        fetch(`${API_BASE}/api/refresh-token`, data as any),
+        fetch(
+          `${API_BASE}/api${deviceInfo.appCheckToken ? '/mobile' : ''}/refresh-token`,
+          data as any,
+        ),
         new Promise<Response>((_, reject) =>
           setTimeout(
             () => reject(new Error('Token refresh request timeout')),
