@@ -1,7 +1,7 @@
 import { createLogger, defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-console.log(__dirname)
+console.log(import.meta.dirname)
 
 const customLogger = createLogger()
 const loggerWarnOnce = customLogger.warnOnce
