@@ -3,10 +3,10 @@ import '@mantine/core/styles.css'
 import '@mantine/lightbox/styles.css'
 import '@mantine/notifications/styles.css'
 import '@gfazioli/mantine-video/styles.css'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { notifications, Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
-import { useLocalStorage } from '@mantine/hooks'
+import { readLocalStorageValue, useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { Capacitor } from '@capacitor/core'
@@ -68,6 +68,11 @@ export default function App() {
   const [_cachedPages, setCachedPages] = useLocalStorage<{
     [streamId: string]: number[]
   }>({ key: 'cachedPages', defaultValue: {} })
+  const [lastUsedUpdate, setLastUsedUpdate] = useLocalStorage({
+    key: 'lastUsedAppVersion',
+    defaultValue: 'unknown',
+  })
+  const [notifiedUpdate, setNotifiedUpdate] = useState(false)
   const [knownSessions, setKnownSessions] = useLocalStorage<string[]>({
     key: 'knownSessionIds',
     defaultValue: [],
@@ -500,10 +505,19 @@ export default function App() {
   const checkLocalStorageStateConsistency = useCallback(() => {
     try {
       const currentVersion = import.meta.env.CLIENT_REACT_APP_VERSION ?? '1.0.0'
-      let lastUpdate = localStorage.getItem('lastUsedAppVersion')
+      const lastUsedVersion = readLocalStorageValue({
+        key: 'lastUsedAppVersion',
+      })
 
+      console.info(
+        `Server version: ${import.meta.env.CLIENT_REACT_APP_VERSION}\nClient version: ${lastUsedVersion}`,
+      )
+
+      if (lastUsedVersion === 'unknown') {
+        setLastUsedUpdate(currentVersion)
+      }
       // If new version, reset cached data
-      if (lastUpdate && lastUpdate !== currentVersion) {
+      else if (!notifiedUpdate && lastUsedVersion !== currentVersion) {
         // Reset all cached states if the website was updated
         setCachedRecordings({})
         setCachedRecordingRanges({})
@@ -511,23 +525,23 @@ export default function App() {
         setTotalRecordings({})
         setSignedUrlCache({})
         setSignedLiveThumbUrls({})
+        setLastUsedUpdate(currentVersion)
         notifications.show({
           message:
             "There's been an update to the website. Things may take a little longer to load.",
           color: 'yellow',
           autoClose: 10000,
         })
+        setNotifiedUpdate(true)
       }
-
-      localStorage.setItem('lastUsedAppVersion', currentVersion)
     } catch (err) {
       console.error('LocalStorage consistency check failed:', err)
     }
-  }, [])
+  }, [lastUsedUpdate, notifiedUpdate])
 
   useEffect(() => {
     checkLocalStorageStateConsistency()
-  }, [])
+  }, [lastUsedUpdate])
 
   // Check for new sessions when authenticated
   useEffect(() => {
