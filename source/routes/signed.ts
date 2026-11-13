@@ -220,6 +220,7 @@ export default function initializeSignedRoutes(
     async (req, res) => {
       const { streamId } = req.params
       const stream = dynamicStreams[streamId]
+      if (!stream) return res.status(404).send('Not found')
 
       fs.readdir(stream.config.hlsDir, async (err, files) => {
         if (err) {
@@ -467,6 +468,8 @@ export default function initializeSignedRoutes(
         res.status(403).send('Forbidden')
         return
       }
+      if (!dynamicStreams[streamId]) return res.status(404).send('Not found')
+
       const filePath = path.join(
         dynamicStreams[streamId].config.recordDir,
         filename,
@@ -512,6 +515,8 @@ export default function initializeSignedRoutes(
         res.status(403).send('Forbidden')
         return
       }
+      if (!dynamicStreams[streamId]) return res.status(404).send('Not found')
+
       const thumbPath = path.join(
         dynamicStreams[streamId].config.thumbDir,
         filename,
@@ -558,17 +563,17 @@ export default function initializeSignedRoutes(
         typeof streamId !== 'string' ||
         typeof expires !== 'string' ||
         typeof sig !== 'string' ||
-        !dynamicStreams[streamId] ||
         !verifySignedStreamUrl(streamId, expires, sig)
       ) {
         res.status(403).send('Forbidden')
         return
       }
+      if (!dynamicStreams[streamId]) return res.status(404).send('Not found')
+
       const playlistPath = dynamicStreams[streamId].getPlaylistPath()
       fs.readFile(playlistPath, 'utf8', (err, data) => {
         if (err) {
-          res.status(404).send('Not found')
-          return
+          return res.status(404).send('Not found')
         }
         let lines = data.split('\n')
         if (!lines.some((line) => line.startsWith('#EXT-X-PLAYLIST-TYPE'))) {
@@ -630,12 +635,13 @@ export default function initializeSignedRoutes(
         typeof expires !== 'string' ||
         typeof sig !== 'string' ||
         !/^segment_\d+\.ts$/.test(segment) ||
-        !dynamicStreams[streamId] ||
         !verifySignedStreamUrl(streamId, expires, sig)
       ) {
         res.status(403).send('Forbidden')
         return
       }
+      if (!dynamicStreams[streamId]) return res.status(404).send('Not found')
+
       const segmentPath = dynamicStreams[streamId].getSegmentPath(segment)
       res.setHeader(
         'Cache-Control',
@@ -648,15 +654,12 @@ export default function initializeSignedRoutes(
       try {
         fs.createReadStream(segmentPath)
           .on('error', () => {
-            res.type('text/html').status(404).send('Segment not found')
+            res.type('text/html').status(404).send('Not found')
           })
           .pipe(res.type('video/MP2T'))
       } catch (err) {
         if (res.headersSent) return
-        res
-          .type('application/json')
-          .status(404)
-          .json({ error: 'File not found' })
+        res.type('application/json').status(404).json({ error: 'Not found' })
         console.error(
           `[${streamId}] Failed to serve segment file ${segment}:`,
           JSON.stringify(err, null, 2),
@@ -764,6 +767,9 @@ function verifySignedStreamUrl(streamId: string, expires: string, sig: string) {
     .update(data)
     .digest('hex')
   if (sig !== expectedSig) return false
-  if (parseInt(expires) < Math.floor(Date.now() / 1000)) return false
+  const expiresInt = parseInt(expires)
+  if (isNaN(expiresInt) || expiresInt < Math.floor(Date.now() / 1000)) {
+    return false
+  }
   return true
 }
