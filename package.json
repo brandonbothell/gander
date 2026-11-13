@@ -104,7 +104,7 @@
     "jsonwebtoken": "9.0.3",
     "open": "11.0.4",
     "socket.io": "4.8.4",
-    "web-push": "3.6.7"
+    "web-push": "4.0.0"
   },
   "resolutions": {
     "@yarnpkg/core/got": "npm:^11.8.2"
