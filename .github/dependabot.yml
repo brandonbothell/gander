@@ -5,9 +5,9 @@
 
 version: 2
 updates:
-  - package-ecosystem: "npm" # See documentation for possible values
-    directories: 
-      - "/" # Location of package manifests
-      - "/web"
+  - package-ecosystem: 'npm' # See documentation for possible values
+    directories:
+      - '/' # Location of package manifests
+      - '/web2'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
