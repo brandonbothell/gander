@@ -222,11 +222,6 @@ export default function App() {
         ),
       ]).catch((err) => {
         console.error('Error refreshing token from API: ', err)
-        notifications.show({
-          message:
-            'There was an unknown error checking your login status. Please sign in again.',
-          color: 'red',
-        })
       })
 
       const requestDuration = Date.now() - refreshStartTime

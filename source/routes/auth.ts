@@ -152,7 +152,13 @@ export default function initializeAuthRoutes(
         if (safeDeviceInfo.appCheckToken) {
           try {
             // Verifies the token and confirms MEETS_DEVICE_INTEGRITY
-            await getAppCheck().verifyToken(safeDeviceInfo.appCheckToken)
+            const appCheck = await getAppCheck().verifyToken(
+              safeDeviceInfo.appCheckToken,
+              { consume: true },
+            )
+            if (appCheck.alreadyConsumed) {
+              throw new Error()
+            }
             logAuth('[Login] Client succeeded mobile attestation')
             isVerifiedMobile = true
           } catch (err) {
@@ -465,7 +471,12 @@ export default function initializeAuthRoutes(
         if (safeDeviceInfo.appCheckToken) {
           try {
             // Cryptographically verifies the token and confirms MEETS_DEVICE_INTEGRITY
-            await getAppCheck().verifyToken(safeDeviceInfo.appCheckToken)
+            const appCheck = await getAppCheck().verifyToken(
+              safeDeviceInfo.appCheckToken,
+            )
+            if (appCheck.alreadyConsumed) {
+              throw new Error()
+            }
             logAuth('[Refresh Token] Client succeeded mobile attestation')
             isVerifiedMobile = true
           } catch (err) {

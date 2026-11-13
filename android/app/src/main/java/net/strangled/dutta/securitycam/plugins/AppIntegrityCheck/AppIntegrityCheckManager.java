@@ -19,7 +19,7 @@ public class AppIntegrityCheckManager {
     }
 
     public void getAppCheckToken (Consumer<String> onSuccess, Consumer<Exception> onFailure) {
-        appCheck.getAppCheckToken(false)
+        appCheck.getLimitedUseAppCheckToken()
                 .addOnSuccessListener(appCheckTokenResponse -> {
                     onSuccess.accept(appCheckTokenResponse.getToken());
                 })
