@@ -54,8 +54,8 @@ export default function initializeAuthRoutes(
 
   const authCheckLimiter = rateLimit({
     validate: { ip: false },
-    windowMs: 5000, // 30 seconds
-    max: 1,
+    windowMs: 5000, // 5 seconds
+    max: 2,
     standardHeaders: true,
     legacyHeaders: false,
   })
