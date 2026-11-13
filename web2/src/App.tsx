@@ -85,6 +85,7 @@ export default function App() {
       if (localStorage.getItem('ak')) {
         debugLog('API key found in localStorage, skipping token refresh')
         setAuthenticated(true)
+        await SplashScreen.hide()
         return true
       }
     } catch {
@@ -111,6 +112,7 @@ export default function App() {
           `No refresh token available for refresh attempt, _rtexists: '${rtExists}'`,
         )
         setAuthenticated(false)
+        await SplashScreen.hide()
         notifications.show({
           message: 'Sorry you got logged out, there was an error on our end.',
           color: 'red',
@@ -136,12 +138,13 @@ export default function App() {
             const maxAttempts = 50 // 5 seconds max wait
             const tokenChannel = new BroadcastChannel('tokenUpdates')
 
-            const handleTokenUpdate = (event: MessageEvent) => {
+            const handleTokenUpdate = async (event: MessageEvent) => {
               if (event.data.type === 'TOKEN_UPDATED') {
                 debugLog(
                   'Another tab successfully refreshed token via broadcast',
                 )
                 setAuthenticated(true)
+                await SplashScreen.hide()
                 tokenChannel.close()
                 resolve(true)
               }
@@ -149,7 +152,7 @@ export default function App() {
 
             tokenChannel.addEventListener('message', handleTokenUpdate)
 
-            const checkComplete = () => {
+            const checkComplete = async () => {
               attempts++
               const stillInProgress = localStorage.getItem(
                 'tokenRefreshInProgress',
@@ -161,6 +164,7 @@ export default function App() {
                   'Another tab successfully refreshed token via localStorage check',
                 )
                 setAuthenticated(true)
+                await SplashScreen.hide()
                 tokenChannel.close()
                 resolve(true)
               } else if (!stillInProgress || attempts >= maxAttempts) {
@@ -169,6 +173,7 @@ export default function App() {
                   'error',
                 )
                 setAuthenticated(false)
+                await SplashScreen.hide()
                 notifications.show({
                   message:
                     'Sorry you got logged out, there was an error in other tab.',
@@ -263,6 +268,7 @@ export default function App() {
           tokenChannel.close()
 
           setAuthenticated(true)
+          await SplashScreen.hide()
           debugLog('=== TOKEN REFRESH SUCCESSFUL ===')
           return true
         } else {
@@ -300,6 +306,7 @@ export default function App() {
     localStorage.removeItem('tokenRefreshInProgress')
 
     setAuthenticated(false)
+    await SplashScreen.hide()
     debugLog('=== TOKEN REFRESH FAILED ===')
     return false
   }
@@ -421,13 +428,15 @@ export default function App() {
       if (token) {
         debugLog('Found existing JWT, assuming authenticated')
         setAuthenticated(true)
+        await authFetch(`${API_BASE}/api/authcheck`).then(() =>
+          SplashScreen.hide(),
+        )
       } else {
         debugLog('No JWT found, attempting token refresh')
         await tryRefreshToken()
       }
 
       debugLog('=== INITIAL AUTH CHECK COMPLETE ===')
-      await SplashScreen.hide()
     }
 
     initAuth().catch((error) => {

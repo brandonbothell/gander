@@ -756,4 +756,8 @@ export default function initializeAuthRoutes(
       res.status(500).json({ error: 'Failed to logout' })
     }
   })
+
+  app.get('/api/authcheck', jwtAuth, async (req, res) =>
+    res.json({ success: true }),
+  )
 }
