@@ -485,7 +485,9 @@ export default function initializeSignedRoutes(
         if (err && err.code !== 'ECONNABORTED') {
           res.status(404).json({ error: 'File not found' })
           console.error(
-            `[${streamId}] Failed to serve recording file ${filename}:`,
+            '[%s] Failed to serve recording file %s:',
+            streamId,
+            filename,
             JSON.stringify(err, null, 2),
           )
         }
@@ -536,7 +538,9 @@ export default function initializeSignedRoutes(
         if (err && err.code !== 'ECONNABORTED') {
           res.status(404).json({ error: 'File not found' })
           console.error(
-            `[${streamId}] Failed to serve thumbnail file ${filename}:`,
+            '[%s] Failed to serve thumbnail file %s:',
+            streamId,
+            filename,
             JSON.stringify(err, null, 2),
           )
         }
@@ -594,12 +598,15 @@ export default function initializeSignedRoutes(
         }
         lines = lines.filter((line) => !line.startsWith('#EXT-X-ENDLIST'))
         // Rewrite segment URLs to signed segment URLs for this stream
+        const encodedStreamId = encodeURIComponent(streamId)
+        const encodedExpires = encodeURIComponent(expires)
+        const encodedSig = encodeURIComponent(sig)
         const rewritten = lines
           .join('\n')
           .replace(
             /(segment_\d+\.ts)/g,
             (segment) =>
-              `/signed/stream/${streamId}/${segment}?expires=${expires}&sig=${sig}`,
+              `/signed/stream/${encodedStreamId}/${segment}?expires=${encodedExpires}&sig=${encodedSig}`,
           )
         res.setHeader(
           'Cache-Control',
@@ -661,7 +668,9 @@ export default function initializeSignedRoutes(
         if (res.headersSent) return
         res.type('application/json').status(404).json({ error: 'Not found' })
         console.error(
-          `[${streamId}] Failed to serve segment file ${segment}:`,
+          '[%s] Failed to serve segment file %s:',
+          streamId,
+          segment,
           JSON.stringify(err, null, 2),
         )
       }
