@@ -1920,6 +1920,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@prisma/client-runtime-utils@npm:7.10.1":
+  version: 7.10.1
+  resolution: "@prisma/client-runtime-utils@npm:7.10.1"
+  checksum: 10c0/516f7d049381108d0f5d6014e206c5224878350ce08bc85ef63ff3a809321f559f03264b880fde88cd1fd04bd06779016428b7a032b1fa521aa57b54adebc93e
+  languageName: node
+  linkType: hard
+
 "@prisma/client-runtime-utils@npm:7.8.0":
   version: 7.8.0
   resolution: "@prisma/client-runtime-utils@npm:7.8.0"
@@ -1927,11 +1934,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@prisma/client@npm:7.8.0":
-  version: 7.8.0
-  resolution: "@prisma/client@npm:7.8.0"
+"@prisma/client@npm:7.10.1":
+  version: 7.10.1
+  resolution: "@prisma/client@npm:7.10.1"
   dependencies:
-    "@prisma/client-runtime-utils": "npm:7.8.0"
+    "@prisma/client-runtime-utils": "npm:7.10.1"
   peerDependencies:
     prisma: "*"
     typescript: ">=5.4.0"
@@ -1940,7 +1947,7 @@ __metadata:
       optional: true
     typescript:
       optional: true
-  checksum: 10c0/bebf35fe26b3e4356a0a89f57828456093c0f87cac4c7af8d05634552562db08eca28f3da7fd356ede09a48f08fce605506b3625435423ff62f29b98a1fdb54f
+  checksum: 10c0/742cf5c6c8a1160a8ef7c7e14e3dc1072d6430e4f258a47b41b4f1d96d39b2f0616691d597862cb78613efd72a99376e413c01dc6cebde3b89f7020b1d1fc74a
   languageName: node
   linkType: hard
 
@@ -6136,7 +6143,7 @@ __metadata:
     "@eslint/eslintrc": "npm:3.3.5"
     "@eslint/js": "npm:10.0.1"
     "@prisma/adapter-better-sqlite3": "npm:7.8.0"
-    "@prisma/client": "npm:7.8.0"
+    "@prisma/client": "npm:7.10.1"
     "@prisma/client-runtime-utils": "npm:7.8.0"
     "@root/encoding": "npm:1.0.1"
     "@root/keypairs": "npm:0.10.3"

@@ -84,7 +84,7 @@
     "@capacitor/splash-screen": "8.0.2",
     "@dotenvx/dotenvx": "1.66.0",
     "@prisma/adapter-better-sqlite3": "7.8.0",
-    "@prisma/client": "7.8.0",
+    "@prisma/client": "7.10.1",
     "@prisma/client-runtime-utils": "7.8.0",
     "@root/encoding": "1.0.1",
     "@root/keypairs": "0.10.3",
