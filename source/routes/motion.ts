@@ -14,7 +14,7 @@ import {
   RECENT_SEGMENT_BUFFER,
   safeUnlinkWithRetry,
   saveMotionSegments as saveMotionSegmentsCamera,
-} from '../camera'
+} from '../server'
 import { recordingsLowSpaceThresholdMb } from '../../config.json'
 import { notify } from './notifications'
 import { rateLimit } from 'express-rate-limit'

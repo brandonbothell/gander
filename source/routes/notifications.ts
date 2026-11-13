@@ -4,7 +4,7 @@ import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
 import { logNotify } from '../logMotion'
-import { io, prisma, RequestWithUser, socketDisconnectMap } from '../camera'
+import { io, prisma, RequestWithUser, socketDisconnectMap } from '../server'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeNotificationRoutes(app: express.Application) {

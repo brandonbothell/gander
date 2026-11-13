@@ -4,8 +4,8 @@ import fs from 'fs'
 // Read from environment or a config file
 const BASE_URL = process.env.CLIENT_BASE_URL || 'http://localhost:3000' // fallback
 
-const swPath = path.resolve(__dirname, '../web/public/sw.js')
-const outPath = path.resolve(__dirname, '../web/dist/sw.js')
+const swPath = path.resolve(__dirname, '../web2/public/sw.js')
+const outPath = path.resolve(__dirname, '../web2/dist/sw.js')
 
 // Read the source SW
 let swSrc = fs.readFileSync(swPath, 'utf8')

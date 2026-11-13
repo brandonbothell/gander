@@ -16,3 +16,6 @@ project(':capacitor-push-notifications').projectDir = new File('../.yarn/unplugg
 
 include ':capacitor-screen-orientation'
 project(':capacitor-screen-orientation').projectDir = new File('../.yarn/unplugged/@capacitor-screen-orientation-virtual-a72f724b47/node_modules/@capacitor/screen-orientation/android')
+
+include ':capacitor-splash-screen'
+project(':capacitor-splash-screen').projectDir = new File('../.yarn/unplugged/@capacitor-splash-screen-virtual-dde86a9b91/node_modules/@capacitor/splash-screen/android')

@@ -4,10 +4,11 @@ import '@mantine/lightbox/styles.css'
 import '@mantine/notifications/styles.css'
 import '@gfazioli/mantine-video/styles.css'
 import { useState, useEffect } from 'react'
-import { Notifications } from '@mantine/notifications'
+import { notifications, Notifications } from '@mantine/notifications'
 import { ModalsProvider } from '@mantine/modals'
 import { useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
+import { SplashScreen } from '@capacitor/splash-screen'
 import { Capacitor } from '@capacitor/core'
 import { isLocalIPv4 } from './util'
 import theme from './theme'
@@ -26,6 +27,7 @@ import FullLayout from './Layout/FullLayout'
 export type RecordingType = {
   streamId: string
   filename: string
+  nickname: string
   duration: number
   motionTimestamps: number[]
 }
@@ -83,6 +85,7 @@ export default function App() {
       if (localStorage.getItem('ak')) {
         debugLog('API key found in localStorage, skipping token refresh')
         setAuthenticated(true)
+        await SplashScreen.hide()
         return true
       }
     } catch {
@@ -109,6 +112,11 @@ export default function App() {
           `No refresh token available for refresh attempt, _rtexists: '${rtExists}'`,
         )
         setAuthenticated(false)
+        await SplashScreen.hide()
+        notifications.show({
+          message: 'Sorry you got logged out, there was an error on our end.',
+          color: 'red',
+        })
         return false
       }
 
@@ -130,12 +138,13 @@ export default function App() {
             const maxAttempts = 50 // 5 seconds max wait
             const tokenChannel = new BroadcastChannel('tokenUpdates')
 
-            const handleTokenUpdate = (event: MessageEvent) => {
+            const handleTokenUpdate = async (event: MessageEvent) => {
               if (event.data.type === 'TOKEN_UPDATED') {
                 debugLog(
                   'Another tab successfully refreshed token via broadcast',
                 )
                 setAuthenticated(true)
+                await SplashScreen.hide()
                 tokenChannel.close()
                 resolve(true)
               }
@@ -143,7 +152,7 @@ export default function App() {
 
             tokenChannel.addEventListener('message', handleTokenUpdate)
 
-            const checkComplete = () => {
+            const checkComplete = async () => {
               attempts++
               const stillInProgress = localStorage.getItem(
                 'tokenRefreshInProgress',
@@ -155,6 +164,7 @@ export default function App() {
                   'Another tab successfully refreshed token via localStorage check',
                 )
                 setAuthenticated(true)
+                await SplashScreen.hide()
                 tokenChannel.close()
                 resolve(true)
               } else if (!stillInProgress || attempts >= maxAttempts) {
@@ -163,6 +173,12 @@ export default function App() {
                   'error',
                 )
                 setAuthenticated(false)
+                await SplashScreen.hide()
+                notifications.show({
+                  message:
+                    'Sorry you got logged out, there was an error in other tab.',
+                  color: 'red',
+                })
                 tokenChannel.close()
                 resolve(false)
               } else {
@@ -182,11 +198,13 @@ export default function App() {
       // Mark refresh as in progress
       localStorage.setItem('tokenRefreshInProgress', Date.now().toString())
 
+      const csrfToken = localStorage.getItem('csrf')
       const deviceInfo = await getDeviceFingerprint()
       const data = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
         },
         body: JSON.stringify({
           deviceInfo,
@@ -197,7 +215,10 @@ export default function App() {
       const refreshStartTime = Date.now()
       // The current refresh token will be sent in the http only cookie
       const res = await Promise.race([
-        fetch(`${API_BASE}/api/refresh-token`, data),
+        fetch(
+          `${API_BASE}/api${deviceInfo.appCheckToken ? '/mobile' : ''}/refresh-token`,
+          data as any,
+        ),
         new Promise<Response>((_, reject) =>
           setTimeout(
             () => reject(new Error('Token refresh request timeout')),
@@ -217,10 +238,12 @@ export default function App() {
 
       if (res && res.status === 200) {
         const data = await res.json()
-        if (data && data.token && data.refreshToken) {
+        if (data && data.token && data.csrfToken) {
           debugLog('Token refresh successful, storing new tokens')
 
           localStorage.setItem('jwt', data.token)
+          localStorage.setItem('csrf', data.csrfToken)
+
           localStorage.removeItem('tokenRefreshInProgress')
 
           await SecureStorage.setRefreshToken(data.refreshToken)
@@ -245,6 +268,7 @@ export default function App() {
           tokenChannel.close()
 
           setAuthenticated(true)
+          await SplashScreen.hide()
           debugLog('=== TOKEN REFRESH SUCCESSFUL ===')
           return true
         } else {
@@ -252,6 +276,19 @@ export default function App() {
         }
       } else {
         debugLog(`Token refresh failed with status: ${res?.status}`, 'error')
+        if (res?.status === 401) {
+          notifications.show({
+            message:
+              'There was an error verifying your account details. Please sign in again.',
+            color: 'red',
+          })
+        } else {
+          notifications.show({
+            message:
+              'There was an unknown error verifying your login status. Please sign in again.',
+            color: 'red',
+          })
+        }
         try {
           const errorText = await res?.text()
           debugLog(`Error response body: ${errorText}`, 'error')
@@ -269,6 +306,7 @@ export default function App() {
     localStorage.removeItem('tokenRefreshInProgress')
 
     setAuthenticated(false)
+    await SplashScreen.hide()
     debugLog('=== TOKEN REFRESH FAILED ===')
     return false
   }
@@ -390,6 +428,9 @@ export default function App() {
       if (token) {
         debugLog('Found existing JWT, assuming authenticated')
         setAuthenticated(true)
+        await authFetch(`${API_BASE}/api/authcheck`).then(() =>
+          SplashScreen.hide(),
+        )
       } else {
         debugLog('No JWT found, attempting token refresh')
         await tryRefreshToken()
@@ -544,8 +585,9 @@ export default function App() {
 
   const handleLogin = async (
     token: string,
-    refreshToken: string,
+    refreshToken: string | undefined,
     statusToken: string,
+    csrfToken: string | undefined,
   ) => {
     // Show user-friendly error message
     if (
@@ -560,7 +602,7 @@ export default function App() {
     }
 
     try {
-      await SecureStorage.setRefreshToken(refreshToken)
+      if (refreshToken) await SecureStorage.setRefreshToken(refreshToken)
       if (Capacitor.isNativePlatform()) {
         await SecurePreferences.setString({
           key: 'statusToken',
@@ -572,10 +614,16 @@ export default function App() {
         })
       }
 
+      if (csrfToken) {
+        localStorage.setItem('csrf', csrfToken)
+      } else {
+        console.warn('No CSRF token from login!')
+      }
+
       localStorage.setItem('jwt', token)
       setAuthenticated(true)
     } catch (error) {
-      console.error('Error storing tokens:', error)
+      console.error('Error storing tokens: ' + error)
 
       // Still try to authenticate even if secure storage fails
       localStorage.setItem('jwt', token)
@@ -596,7 +644,7 @@ export default function App() {
             setAuthenticated={setAuthenticated}
           />
         </ModalsProvider>
-        <Notifications />
+        <Notifications zIndex={10001} />
       </MantineProvider>
     )
   }

@@ -27,13 +27,14 @@ export type SignedThumbnailUrl = {
 
 export type SignedUrlsCache = Map<
   string,
-  Map<number, (SignedThumbnailUrl | null)[]>
+  Map<string, SignedThumbnailUrl | null>
 >
 
 export default function RecordingsGrid(props: {
   currentPage: (Recording & { page: number; index: number })[]
   recordings: Map<string, (Recording & { page: number; index: number })[][]>
   recordingsCount: Map<string, number>
+  cachedRecordingsCount: Map<string, number>
   pageLoading: boolean
   activeStream?: Stream
   signedUrlsCache: SignedUrlsCache
@@ -206,10 +207,9 @@ export default function RecordingsGrid(props: {
             style={{ borderRadius: 4 }}
           >
             {signedUrlsMap.has(recording.streamId) &&
-            signedUrlsMap.get(recording.streamId)!.has(recording.page) &&
-            recording.index <
-              signedUrlsMap.get(recording.streamId)!.get(recording.page)!
-                .length ? (
+            signedUrlsMap
+              .get(recording.streamId)!
+              .has(recording.filename.replace('.mp4', '.jpg')) ? (
               <>
                 <span
                   className={classes.recordingDurationBadge}
@@ -227,9 +227,9 @@ export default function RecordingsGrid(props: {
                   radius="md"
                   h="100%"
                   src={
-                    signedUrlsMap.get(recording.streamId)!.get(recording.page)![
-                      recording.index
-                    ]!.url
+                    signedUrlsMap
+                      .get(recording.streamId)!
+                      .get(recording.filename.replace('.mp4', '.jpg'))!.url
                   }
                 />
               </>
@@ -270,15 +270,19 @@ export default function RecordingsGrid(props: {
         streamSignedUrls = new Map()
         signedUrlsMap.set(props.activeStream.id, streamSignedUrls)
       }
-      const cachedUrls = streamSignedUrls.get(page)
-      const cacheIsFresh =
-        cachedUrls?.length === filenames.length &&
-        cachedUrls.every(
-          (signedUrl, index) =>
-            signedUrl?.filename === filenames[index] &&
-            signedUrl.expiresAt - 10 >= Date.now() / 1000,
-        )
 
+      let cacheIsFresh =
+        streamSignedUrls.size ===
+          props.cachedRecordingsCount.get(props.activeStream.id) &&
+        (() => {
+          for (const signedUrl of streamSignedUrls.values()) {
+            if (!signedUrl || signedUrl.expiresAt - 10 < Date.now() / 1000) {
+              return false
+            }
+          }
+
+          return true
+        })()
       if (cacheIsFresh) return
 
       const requestKey = `${props.activeStream.id}:${page}:${filenames.join('\0')}`
@@ -304,21 +308,18 @@ export default function RecordingsGrid(props: {
           expiresAt: number
         }[]
 
-        streamSignedUrls.set(
-          page,
-          signedUrls.map((signedUrl) => {
-            if (!signedUrl.url || !signedUrl.expiresAt || !signedUrl.filename) {
-              console.error(`Invalid URL signing output: ${signedUrl}`)
-              return null
-            }
+        signedUrls.forEach((signedUrl) => {
+          if (!signedUrl.url || !signedUrl.expiresAt || !signedUrl.filename) {
+            console.error(`Invalid URL signing output: ${signedUrl}`)
+            return null
+          }
 
-            return {
-              filename: signedUrl.filename,
-              url: signedUrl.url,
-              expiresAt: signedUrl.expiresAt,
-            }
-          }),
-        )
+          streamSignedUrls.set(signedUrl.filename, {
+            filename: signedUrl.filename,
+            url: signedUrl.url,
+            expiresAt: signedUrl.expiresAt,
+          })
+        })
       })()
 
       props.signedUrlRequests.set(requestKey, request)
@@ -446,17 +447,16 @@ export default function RecordingsGrid(props: {
         >
           <div className={classes.thumbnailFrame}>
             {signedUrlsMap.has(recording.streamId) &&
-              signedUrlsMap.get(recording.streamId)!.has(recording.page) &&
-              recording.index <
-                signedUrlsMap.get(recording.streamId)!.get(recording.page)!
-                  .length && (
+              signedUrlsMap
+                .get(recording.streamId)!
+                .has(recording.filename.replace('.mp4', '.jpg')) && (
                 <Image
                   radius="md"
                   h="100%"
                   src={
-                    signedUrlsMap.get(recording.streamId)!.get(recording.page)![
-                      recording.index
-                    ]!.url
+                    signedUrlsMap
+                      .get(recording.streamId)!
+                      .get(recording.filename.replace('.mp4', '.jpg'))!.url
                   }
                   onLoad={() => {
                     loadedThumbnailMap.set(

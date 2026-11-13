@@ -5,10 +5,13 @@ import fs from 'fs'
 import webpush from 'web-push'
 import { Server as SocketIOServer } from 'socket.io'
 import jwt from 'jsonwebtoken'
+import session from 'express-session'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import * as chokidar from 'chokidar'
+// @ts-ignore
+import SessionStore from 'better-sqlite3-session-store'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import config from '../config.json'
 import { StreamMotionState } from './types/stream'
@@ -27,6 +30,7 @@ import initializeMotionRoutes, {
   saveMotionSegmentsWithRetry,
 } from './routes/motion'
 import initializeMaskRoutes from './routes/masks'
+import initializeHlsRoutes from './routes/hls'
 import initializeAuthRoutes from './routes/auth'
 import { detectMotion, cleanFrameCache, debugLog } from './motionDetector'
 import { jwtAuth } from './middleware/jwtAuth'
@@ -36,11 +40,15 @@ import { initializeCredentials, JWT_SECRET } from './credentials'
 import { initializeConsole } from './console'
 import open from 'open'
 import { rateLimit } from 'express-rate-limit'
+import sqlite from 'better-sqlite3'
+
+const SQLiteStore = SessionStore(session)
+const db = new sqlite('sessions.sqlite')
 
 initializeConsole()
 initializeCredentials()
 
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL })
+const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL! })
 export const prisma = new PrismaClient({ adapter })
 
 // Motion logging setup
@@ -750,6 +758,25 @@ async function cleanupExpiredTokensAndDevices() {
   }
 }
 
+app.use(
+  session({
+    store: new SQLiteStore({
+      client: db,
+      expired: {
+        clear: true,
+        intervalMs: 7 * 24 * 60 * 60 * 1000, // 7 days
+      },
+    }),
+    resave: false,
+    saveUninitialized: true,
+    secret: JWT_SECRET,
+    rolling: true,
+    cookie: {
+      secure: process.env.API_ENV !== 'development',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    },
+  }),
+)
 app.use(cookieParser(JWT_SECRET))
 
 // --- CORS ---
@@ -776,63 +803,7 @@ app.use(express.json())
 
 app.set('trust proxy', () => true)
 
-const hlsStreamLimiter = rateLimit({
-  validate: { ip: false },
-  windowMs: 10 * 1000, // 10 seconds
-  max: 4,
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-app.get('/hls/:streamId/stream.m3u8', hlsStreamLimiter, jwtAuth, (req, res) => {
-  const { streamId } = req.params
-  const stream = dynamicStreams[streamId]
-  if (!stream) {
-    res.status(404).send('Stream not found')
-    return
-  }
-  fs.readFile(stream.getPlaylistPath(), 'utf8', (err, data) => {
-    if (err) {
-      res.status(404).send('Not found')
-      return
-    }
-    res.type('application/vnd.apple.mpegurl').send(data)
-  })
-})
-
-const hlsSegmentLimiter = rateLimit({
-  validate: { ip: false },
-  windowMs: 1000, // 1 second
-  max: 2,
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-app.get(
-  '/hls/:streamId/:segment',
-  hlsSegmentLimiter,
-  jwtAuth,
-  async (req, res) => {
-    const { streamId, segment } = req.params
-    const stream = dynamicStreams[streamId]
-    if (!stream || !/^segment_\d+\.ts$/.test(segment)) {
-      res.status(404).send('Not found')
-      return
-    }
-
-    try {
-      const segmentPath = stream.getSegmentPath(segment)
-      fs.createReadStream(segmentPath)
-        .on('error', () => {
-          res.type('text/html').status(404).send('Segment not found')
-        })
-        .pipe(res.type('video/MP2T'))
-    } catch {
-      res.type('text/html').status(404).send('Segment not found')
-      return
-    }
-  },
-)
+initializeHlsRoutes(app, dynamicStreams)
 
 process.on('SIGINT', () => cleanExit())
 process.on('SIGTERM', () => cleanExit())

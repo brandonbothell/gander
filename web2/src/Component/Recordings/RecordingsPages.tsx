@@ -25,10 +25,10 @@ export default function RecordingsPages(props: {
   const { colors } = useMantineTheme()
 
   const totalRecordings = useMap<string, number>()
+  const totalCachedRecordings = useMap<string, number>()
   const signedUrlsCache = useMap<
     string,
-    // eslint-disable-next-line func-call-spacing
-    Map<number, (SignedThumbnailUrl | null)[]>
+    Map<string, SignedThumbnailUrl | null>
   >()
   const signedUrlRequests = useMap<string, Promise<void>>()
 
@@ -94,6 +94,7 @@ export default function RecordingsPages(props: {
     return (
       <RecordingsGrid
         recordings={recordings}
+        cachedRecordingsCount={totalCachedRecordings}
         recordingsCount={totalRecordings}
         currentPage={recordingsToRender}
         pageLoading={loading}
@@ -103,6 +104,26 @@ export default function RecordingsPages(props: {
       />
     )
   }, [activePage, activeStream, recordings, loading])
+
+  const moveOverflowRecordings = useCallback(
+    (
+      pages: (Recording & { page: number; index: number })[][],
+      pageIndex = 0,
+    ) => {
+      const currentPage = pages[pageIndex] ?? []
+
+      if (currentPage.length <= 20) {
+        return pages
+      }
+
+      const nextPage = pages[pageIndex + 1] ?? []
+      const overflow = currentPage.splice(20)
+
+      pages[pageIndex + 1] = overflow.concat(nextPage)
+      return moveOverflowRecordings(pages, pageIndex + 1)
+    },
+    [],
+  )
 
   useEffect(() => {
     // Check if there are no recordings
@@ -137,7 +158,14 @@ export default function RecordingsPages(props: {
         if (currentRecordings && currentRecordings.length >= activePage) {
           const currentPage = currentRecordings[activePage - 1]
           // The page is already cached
-          if (currentPage.length !== 0) return
+          if (
+            activePage ===
+            Math.ceil((totalRecordings.get(activeStream.id) ?? 0) / 20)
+              ? currentPage.length !== 0
+              : currentPage.length === 20
+          ) {
+            return
+          }
         }
 
         console.log(
@@ -166,6 +194,10 @@ export default function RecordingsPages(props: {
           console.error(`Error loading recordings: ${JSON.stringify(page)}`)
           setLastFailedPage(activePage)
           totalRecordings.set(activeStream.id, page.total || 0)
+          totalCachedRecordings.set(
+            activeStream.id,
+            page.recordings?.length || 0,
+          )
           setLoading(false)
           return
         }
@@ -178,6 +210,11 @@ export default function RecordingsPages(props: {
         }))
 
         totalRecordings.set(activeStream.id, page.total)
+        totalCachedRecordings.set(
+          activeStream.id,
+          (totalCachedRecordings.get(activeStream.id) ?? 0) +
+            page.recordings.length,
+        )
 
         // Set first page and initialize the rest as empty if we just started
         if (!currentRecordings) {
@@ -219,6 +256,69 @@ export default function RecordingsPages(props: {
       }
     })()
   }, [props.streams, activeStream, recordings, activePage, totalRecordings])
+
+  useEffect(() => {
+    const fetchLatestRecordingsInterval = setInterval(async () => {
+      if (activeStream) {
+        const currentRecordings = recordings.get(activeStream.id)
+        if (!currentRecordings) {
+          return
+        }
+
+        const res = await authFetch(
+          `${API_BASE}/api/latest-recordings/${activeStream.id}`,
+        )
+        if (!res.ok) return
+        const data = (await res.json()) as {
+          recordings: (Omit<Recording, 'motionTimestamps'> & {
+            motionTimestamps: string
+          })[]
+          deletedRecordings: string[]
+        }
+        const newRecs = (data.recordings || []).map((rec, index) => ({
+          ...rec,
+          motionTimestamps: JSON.parse(rec.motionTimestamps) as number[],
+          page: Math.ceil((index || 1) / 20), // Max page length of 20, for index 0 we have a special case of needing it to be page 1
+          index,
+        }))
+
+        // TODO: Handle deleted recordings including totalRecordings
+        if (
+          data.deletedRecordings &&
+          Array.isArray(data.deletedRecordings) &&
+          data.deletedRecordings.length > 0
+        ) {
+          console.info(
+            'Deleted recordings sent from the server: ' +
+              data.deletedRecordings.join(', '),
+          )
+        }
+
+        if (newRecs.length > 0) {
+          console.log(`${newRecs.length} new recordings polled from the server`)
+          totalRecordings.set(
+            activeStream.id,
+            (totalRecordings.get(activeStream.id) ?? 0) + newRecs.length,
+          )
+          totalCachedRecordings.set(
+            activeStream.id,
+            (totalCachedRecordings.get(activeStream.id) ?? 0) + newRecs.length,
+          )
+
+          if (!currentRecordings.length) {
+            console.warn('No recordings were found, creating the first page...')
+            recordings.set(activeStream.id, [newRecs])
+            return
+          }
+
+          currentRecordings[0] = newRecs.concat(currentRecordings[0])
+          moveOverflowRecordings(currentRecordings)
+        }
+      }
+    }, 5 * 1000)
+
+    return () => clearInterval(fetchLatestRecordingsInterval)
+  }, [activeStream, recordings, activePage, totalRecordings])
 
   return (
     activeStream && (

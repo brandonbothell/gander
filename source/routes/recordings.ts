@@ -4,7 +4,7 @@ import express from 'express'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
 import { MotionRecording, Prisma } from '../generated/prisma/client'
-import { prisma, RequestWithUser } from '../camera'
+import { prisma, RequestWithUser } from '../server'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeRecordingRoutes(
@@ -262,16 +262,11 @@ export default function initializeRecordingRoutes(
         select: {
           streamId: true,
           filename: true,
+          nickname: true,
           motionTimestamps: true,
           duration: true,
         },
       })
-
-      const newRecordings = recordings.map((r) => ({
-        filename: r.filename,
-        motionTimestamps: r.motionTimestamps,
-        duration: r.duration,
-      }))
 
       // Get deleted recordings since lastSeen
       let deletedRecordings: string[] = []
@@ -288,16 +283,16 @@ export default function initializeRecordingRoutes(
       }
 
       res.json({
-        recordings: newRecordings,
+        recordings,
         deletedRecordings, // Include new deletions
       })
 
       // Update lastSeen to the newest file
-      if (newRecordings.length > 0) {
+      if (recordings.length > 0) {
         await prisma.userLastSeenRecording.upsert({
           where: { username_streamId: { username, streamId } },
-          update: { lastSeen: newRecordings[0].filename },
-          create: { username, streamId, lastSeen: newRecordings[0].filename },
+          update: { lastSeen: recordings[0].filename },
+          create: { username, streamId, lastSeen: recordings[0].filename },
         })
       }
     },
