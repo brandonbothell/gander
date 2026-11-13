@@ -11,7 +11,11 @@ export function initializeCredentials() {
 
   if (!admin.getApps().length) {
     admin.initializeApp({
-      credential: admin.cert(credentials as admin.ServiceAccount),
+      credential: admin.cert({
+        projectId: credentials.project_id,
+        clientEmail: credentials.client_email,
+        privateKey: credentials.private_key,
+      }),
     })
   }
 }
