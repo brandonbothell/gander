@@ -349,7 +349,7 @@ export default function RecordingsGrid(props: {
     let onVideoLoad: (() => void) | undefined
 
     const loadRecording = async () => {
-      if (!videoElement) return
+      if (!videoElement || !lightboxOpen || cancelled) return
       setLoading(true)
       const src = await fetchRecordingUrl(videoElement.src || undefined)
       if (cancelled || !src) {
