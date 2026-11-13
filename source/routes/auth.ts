@@ -323,7 +323,7 @@ export default function initializeAuthRoutes(
           token,
           ...(isVerifiedMobile ? { refreshToken } : {}),
           statusToken,
-          csrfToken: generateCsrfToken(req, res),
+          csrfToken: generateCsrfToken(req, res, { overwrite: true }),
         })
       } else {
         setTimeout(
@@ -653,10 +653,8 @@ export default function initializeAuthRoutes(
 
       res.json({
         success: true,
-        ...(isVerifiedMobile
-          ? { refreshToken: newRefreshToken }
-          : // Only regenerate the CSRF token for web clients on refresh, since it's not implemented on mobile yet.
-            { csrfToken: generateCsrfToken(req, res, { overwrite: true }) }),
+        ...(isVerifiedMobile ? { refreshToken: newRefreshToken } : {}),
+        csrfToken: generateCsrfToken(req, res),
         token,
         statusToken,
       })
