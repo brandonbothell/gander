@@ -40,9 +40,18 @@ export default function initializeSignedRoutes(
     },
   )
 
+  const signedStreamThumbnailLimiter = rateLimit({
+    validate: { ip: false },
+    windowMs: 1000, // 1 second
+    max: 4,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+
   // --- Serve signed latest thumbnail for a stream, generating it from the latest HLS segment ---
   app.get(
     '/signed/recordings/:streamId/thumbnails/latest.jpg',
+    signedStreamThumbnailLimiter,
     async (req, res) => {
       const { streamId } = req.params
       const { expires, sig } = req.query
@@ -373,8 +382,8 @@ export default function initializeSignedRoutes(
 
   const videoAndThumbnailSignedUrlLimiter = rateLimit({
     validate: { ip: false },
-    windowMs: 500, // Half second
-    max: 50,
+    windowMs: 1000, // 1 second
+    max: 2,
     standardHeaders: true,
     legacyHeaders: false,
   })
@@ -419,6 +428,7 @@ export default function initializeSignedRoutes(
       const { streamId } = req.params
       const { type } = req.query
       const filenames = String(req.query.filenames).split(',')
+      filenames.splice(20) // No more than 20 signed URLs at a time
 
       if (type !== 'video' && type !== 'thumbnail') {
         res.status(400).json({ error: 'Invalid parameters' })
@@ -434,123 +444,199 @@ export default function initializeSignedRoutes(
     },
   )
 
-  // Serve video file via signed URL
-  app.get('/signed/video/:streamId/:filename', (req, res) => {
-    const { streamId, filename } = req.params
-    const { expires, sig } = req.query
-    if (
-      typeof expires !== 'string' ||
-      typeof sig !== 'string' ||
-      !verifySignedUrl(streamId, filename, 'video', expires, sig)
-    ) {
-      res.status(403).send('Forbidden')
-      return
-    }
-    const filePath = path.join(
-      dynamicStreams[streamId].config.recordDir,
-      filename,
-    )
-    if (!filePath.startsWith(dynamicStreams[streamId].config.recordDir)) {
-      res.status(403).send('Forbidden')
-      return
-    }
-
-    res.sendFile(filePath, (err) => {
-      if (res.headersSent) return
-      // @ts-expect-error types
-      if (err && err.code !== 'ECONNABORTED') {
-        res.status(404).json({ error: 'File not found' })
-        console.error(
-          `[${streamId}] Failed to serve recording file ${filename}:`,
-          JSON.stringify(err, null, 2),
-        )
-      }
-    })
+  const signedVideoLimiter = rateLimit({
+    validate: { ip: false },
+    windowMs: 1000, // 1 second
+    max: 3,
+    standardHeaders: true,
+    legacyHeaders: false,
   })
 
-  app.get('/signed/thumbnail/:streamId/:filename', (req, res) => {
-    const { streamId, filename } = req.params
-    const { expires, sig } = req.query
-    if (
-      typeof expires !== 'string' ||
-      typeof sig !== 'string' ||
-      !verifySignedUrl(streamId, filename, 'thumbnail', expires, sig)
-    ) {
-      res.status(403).send('Forbidden')
-      return
-    }
-    const thumbPath = path.join(
-      dynamicStreams[streamId].config.thumbDir,
-      filename,
-    )
-    if (!thumbPath.startsWith(dynamicStreams[streamId].config.thumbDir)) {
-      res.status(403).send('Forbidden')
-      return
-    }
-
-    if (!req.url.endsWith('latest.jpg')) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
-    }
-
-    res.sendFile(thumbPath, (err) => {
-      if (res.headersSent) return
-      // @ts-expect-error types
-      if (err && err.code !== 'ECONNABORTED') {
-        res.status(404).json({ error: 'File not found' })
-        console.error(
-          `[${streamId}] Failed to serve thumbnail file ${filename}:`,
-          JSON.stringify(err, null, 2),
-        )
+  // Serve video file via signed URL
+  app.get(
+    '/signed/video/:streamId/:filename',
+    signedVideoLimiter,
+    (req, res) => {
+      const { streamId, filename } = req.params
+      const { expires, sig } = req.query
+      if (
+        typeof expires !== 'string' ||
+        typeof sig !== 'string' ||
+        !verifySignedUrl(streamId, filename, 'video', expires, sig)
+      ) {
+        res.status(403).send('Forbidden')
+        return
       }
-    })
+      const filePath = path.join(
+        dynamicStreams[streamId].config.recordDir,
+        filename,
+      )
+      if (!filePath.startsWith(dynamicStreams[streamId].config.recordDir)) {
+        res.status(403).send('Forbidden')
+        return
+      }
+
+      res.sendFile(filePath, (err) => {
+        if (res.headersSent) return
+        // @ts-expect-error types
+        if (err && err.code !== 'ECONNABORTED') {
+          res.status(404).json({ error: 'File not found' })
+          console.error(
+            `[${streamId}] Failed to serve recording file ${filename}:`,
+            JSON.stringify(err, null, 2),
+          )
+        }
+      })
+    },
+  )
+
+  const signedRecordingThumbnailLimiter = rateLimit({
+    validate: { ip: false },
+    windowMs: 500, // Half second
+    max: 50,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+
+  app.get(
+    '/signed/thumbnail/:streamId/:filename',
+    signedRecordingThumbnailLimiter,
+    (req, res) => {
+      const { streamId, filename } = req.params
+      const { expires, sig } = req.query
+      if (
+        typeof expires !== 'string' ||
+        typeof sig !== 'string' ||
+        !verifySignedUrl(streamId, filename, 'thumbnail', expires, sig)
+      ) {
+        res.status(403).send('Forbidden')
+        return
+      }
+      const thumbPath = path.join(
+        dynamicStreams[streamId].config.thumbDir,
+        filename,
+      )
+      if (!thumbPath.startsWith(dynamicStreams[streamId].config.thumbDir)) {
+        res.status(403).send('Forbidden')
+        return
+      }
+
+      if (!req.url.endsWith('latest.jpg')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+      }
+
+      res.sendFile(thumbPath, (err) => {
+        if (res.headersSent) return
+        // @ts-expect-error types
+        if (err && err.code !== 'ECONNABORTED') {
+          res.status(404).json({ error: 'File not found' })
+          console.error(
+            `[${streamId}] Failed to serve thumbnail file ${filename}:`,
+            JSON.stringify(err, null, 2),
+          )
+        }
+      })
+    },
+  )
+
+  const signedStreamLimiter = rateLimit({
+    validate: { ip: false },
+    windowMs: 1000, // 1 second
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
   })
 
   // Serve signed stream playlist for a specific stream
-  app.get('/signed/stream/:streamId/stream.m3u8', (req, res) => {
-    const { streamId } = req.params
-    const { expires, sig } = req.query
-    if (
-      typeof streamId !== 'string' ||
-      typeof expires !== 'string' ||
-      typeof sig !== 'string' ||
-      !dynamicStreams[streamId] ||
-      !verifySignedStreamUrl(streamId, expires, sig)
-    ) {
-      res.status(403).send('Forbidden')
-      return
-    }
-    const playlistPath = dynamicStreams[streamId].getPlaylistPath()
-    fs.readFile(playlistPath, 'utf8', (err, data) => {
-      if (err) {
-        res.status(404).send('Not found')
+  app.get(
+    '/signed/stream/:streamId/stream.m3u8',
+    signedStreamLimiter,
+    (req, res) => {
+      const { streamId } = req.params
+      const { expires, sig } = req.query
+      if (
+        typeof streamId !== 'string' ||
+        typeof expires !== 'string' ||
+        typeof sig !== 'string' ||
+        !dynamicStreams[streamId] ||
+        !verifySignedStreamUrl(streamId, expires, sig)
+      ) {
+        res.status(403).send('Forbidden')
         return
       }
-      let lines = data.split('\n')
-      if (!lines.some((line) => line.startsWith('#EXT-X-PLAYLIST-TYPE'))) {
-        lines.splice(
-          lines.findIndex((line) => line.startsWith('#EXTM3U')) + 1,
-          0,
-          '#EXT-X-PLAYLIST-TYPE:LIVE',
+      const playlistPath = dynamicStreams[streamId].getPlaylistPath()
+      fs.readFile(playlistPath, 'utf8', (err, data) => {
+        if (err) {
+          res.status(404).send('Not found')
+          return
+        }
+        let lines = data.split('\n')
+        if (!lines.some((line) => line.startsWith('#EXT-X-PLAYLIST-TYPE'))) {
+          lines.splice(
+            lines.findIndex((line) => line.startsWith('#EXTM3U')) + 1,
+            0,
+            '#EXT-X-PLAYLIST-TYPE:LIVE',
+          )
+        }
+        if (!lines.some((line) => line.startsWith('#EXT-X-ALLOW-CACHE'))) {
+          lines.splice(
+            lines.findIndex((line) =>
+              line.startsWith('#EXT-X-PLAYLIST-TYPE:LIVE'),
+            ) + 1,
+            0,
+            '#EXT-X-ALLOW-CACHE:NO',
+          )
+        }
+        lines = lines.filter((line) => !line.startsWith('#EXT-X-ENDLIST'))
+        // Rewrite segment URLs to signed segment URLs for this stream
+        const rewritten = lines
+          .join('\n')
+          .replace(
+            /(segment_\d+\.ts)/g,
+            (segment) =>
+              `/signed/stream/${streamId}/${segment}?expires=${expires}&sig=${sig}`,
+          )
+        res.setHeader(
+          'Cache-Control',
+          'no-store, no-cache, must-revalidate, proxy-revalidate',
         )
+        res.setHeader('Pragma', 'no-cache')
+        res.setHeader('Expires', '0')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Headers', '*')
+        res.type('application/vnd.apple.mpegurl').send(rewritten)
+      })
+    },
+  )
+
+  const signedStreamSegmentLimiter = rateLimit({
+    validate: { ip: false },
+    windowMs: 5000, // 5 seconds
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+
+  // Serve signed stream segment for a specific stream
+  app.get(
+    '/signed/stream/:streamId/:segment',
+    signedStreamSegmentLimiter,
+    (req, res) => {
+      const { streamId, segment } = req.params
+      const { expires, sig } = req.query
+      if (
+        typeof streamId !== 'string' ||
+        typeof segment !== 'string' ||
+        typeof expires !== 'string' ||
+        typeof sig !== 'string' ||
+        !/^segment_\d+\.ts$/.test(segment) ||
+        !dynamicStreams[streamId] ||
+        !verifySignedStreamUrl(streamId, expires, sig)
+      ) {
+        res.status(403).send('Forbidden')
+        return
       }
-      if (!lines.some((line) => line.startsWith('#EXT-X-ALLOW-CACHE'))) {
-        lines.splice(
-          lines.findIndex((line) =>
-            line.startsWith('#EXT-X-PLAYLIST-TYPE:LIVE'),
-          ) + 1,
-          0,
-          '#EXT-X-ALLOW-CACHE:NO',
-        )
-      }
-      lines = lines.filter((line) => !line.startsWith('#EXT-X-ENDLIST'))
-      // Rewrite segment URLs to signed segment URLs for this stream
-      const rewritten = lines
-        .join('\n')
-        .replace(
-          /(segment_\d+\.ts)/g,
-          (segment) =>
-            `/signed/stream/${streamId}/${segment}?expires=${expires}&sig=${sig}`,
-        )
+      const segmentPath = dynamicStreams[streamId].getSegmentPath(segment)
       res.setHeader(
         'Cache-Control',
         'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -559,50 +645,25 @@ export default function initializeSignedRoutes(
       res.setHeader('Expires', '0')
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Headers', '*')
-      res.type('application/vnd.apple.mpegurl').send(rewritten)
-    })
-  })
-
-  // Serve signed stream segment for a specific stream
-  app.get('/signed/stream/:streamId/:segment', (req, res) => {
-    const { streamId, segment } = req.params
-    const { expires, sig } = req.query
-    if (
-      typeof streamId !== 'string' ||
-      typeof segment !== 'string' ||
-      typeof expires !== 'string' ||
-      typeof sig !== 'string' ||
-      !/^segment_\d+\.ts$/.test(segment) ||
-      !dynamicStreams[streamId] ||
-      !verifySignedStreamUrl(streamId, expires, sig)
-    ) {
-      res.status(403).send('Forbidden')
-      return
-    }
-    const segmentPath = dynamicStreams[streamId].getSegmentPath(segment)
-    res.setHeader(
-      'Cache-Control',
-      'no-store, no-cache, must-revalidate, proxy-revalidate',
-    )
-    res.setHeader('Pragma', 'no-cache')
-    res.setHeader('Expires', '0')
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Headers', '*')
-    try {
-      fs.createReadStream(segmentPath)
-        .on('error', () => {
-          res.type('text/html').status(404).send('Segment not found')
-        })
-        .pipe(res.type('video/MP2T'))
-    } catch (err) {
-      if (res.headersSent) return
-      res.type('application/json').status(404).json({ error: 'File not found' })
-      console.error(
-        `[${streamId}] Failed to serve segment file ${segment}:`,
-        JSON.stringify(err, null, 2),
-      )
-    }
-  })
+      try {
+        fs.createReadStream(segmentPath)
+          .on('error', () => {
+            res.type('text/html').status(404).send('Segment not found')
+          })
+          .pipe(res.type('video/MP2T'))
+      } catch (err) {
+        if (res.headersSent) return
+        res
+          .type('application/json')
+          .status(404)
+          .json({ error: 'File not found' })
+        console.error(
+          `[${streamId}] Failed to serve segment file ${segment}:`,
+          JSON.stringify(err, null, 2),
+        )
+      }
+    },
+  )
 }
 
 // --- Helper to create a signed latest thumbnail URL for a stream ---

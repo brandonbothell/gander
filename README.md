@@ -9,7 +9,7 @@ A security camera application.
 3. Generate SSL certificates: `yarn generate:ssl`.
 4. Build and start: `yarn build && yarn start`.
 5. Access via your reverse-proxy (see [nginx config](#nginx-configuration))
-    - Serve the SSL certificates from `greenlock.d/live/YourWebsite.com/`
+   - Serve the SSL certificates from `greenlock.d/live/YourWebsite.com/`
 
 ## Prerequisites
 
@@ -20,16 +20,17 @@ A security camera application.
 ## Detailed Setup
 
 1. **Configuration Files**: Rename the following example configuration files, replacing placeholders with your real values:
-  - `.env`
-   - `config.json`
-   - `web/config.json`
-   - `greenlock.d/config.json` (if you don't have SSL certificates already)
+
+- `.env`
+- `config.json`
+- `web/config.json`
+- `greenlock.d/config.json` (if you don't have SSL certificates already)
 
 2. **Database**: Run `yarn db:generate` to initialize the database manager and `yarn db:migrate:deploy` to set up the database tables.
 
 3. **SSL Certificates**: Use `yarn generate:ssl` to generate SSL (HTTPS) certificates **after** editing `greenlock.d/config.json` with greenlock-express.
-    - This starts an ACME authentication server on ports 80/443 and terminates automatically after certificate renewal or a 40-second timeout.
-    - If you wish, you can instead use your own SSL certificates with your reverse-proxy (nginx) by pointing nginx to wherever those are located on your system.
+   - This starts an ACME authentication server on ports 80/443 and terminates automatically after certificate renewal or a 40-second timeout.
+   - If you wish, you can instead use your own SSL certificates with your reverse-proxy (nginx) by pointing nginx to wherever those are located on your system.
 
 4. **Build**: Run `yarn build` to compile the server and client.
 
@@ -89,3 +90,11 @@ server {
   }
 }
 ```
+
+## Working With Android
+
+To provide the most secure application possible, the Android app is integrated with the Firebase App Check Play Integrity API.
+
+- [Click here](https://firebase.google.com/docs/android/setup#create-firebase-project) to learn how to setup a Firebase project
+  - When prompted for a package name, enter `net.strangled.dutta.securitycam`
+- Place a copy of the downloaded `google-services.json` in both the project root (`./`) and [`./android/app/`](./android/app)

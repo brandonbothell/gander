@@ -99,13 +99,32 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   // Try the request up to 3 times before attempting token refresh
   let attempt = 1
   let resp = response
-  while (resp.status >= 500 && resp.status !== 401 && attempt < 3) {
+  while (
+    resp.status >= 500 &&
+    ![401, 429].includes(resp.status) &&
+    attempt < 3
+  ) {
     await new Promise((res) => setTimeout(res, 300 * attempt)) // Exponential backoff
     attempt++
     resp = await makeRequest()
-    if (resp.status < 500 && resp.status !== 401) {
+    if (resp.status < 500 && ![401, 429].includes(resp.status)) {
       return resp
     }
+  }
+
+  if (resp.status === 429) {
+    const rateLimitResetSeconds = resp.headers.has('RateLimit-Reset')
+      ? Number.parseInt(resp.headers.get('RateLimit-Reset')!)
+      : null
+    console.warn(
+      `A request was rate limited. Waiting for ${rateLimitResetSeconds}s to request again.`,
+    )
+    return new Promise((resolve) =>
+      setTimeout(
+        async () => resolve(await authFetch(input, init)),
+        rateLimitResetSeconds ? rateLimitResetSeconds * 1000 : 5000,
+      ),
+    )
   }
   // If we get a 401 and we have refresh handlers, try to refresh the token
   if (resp.status === 401 && globalTryRefreshToken && globalLogout) {
