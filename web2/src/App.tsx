@@ -512,10 +512,14 @@ export default function App() {
         setSignedUrlCache({})
         setSignedLiveThumbUrls({})
         localStorage.setItem('lastUsedAppVersion', currentVersion)
-        alert('Cache reset due to website update or new deployment.')
+        notifications.show({
+          message:
+            "There's been an update to the website. Things may take a little longer to load.",
+          color: 'yellow',
+          autoClose: 10000,
+        })
       }
     } catch (err) {
-      alert('Error checking localStorageState consistency!')
       console.error('LocalStorage consistency check failed:', err)
     }
   }
