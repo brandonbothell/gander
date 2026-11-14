@@ -12,6 +12,11 @@ const apiBaseUrl =
 
 const appBaseUrl = process.env.ANDROID_APP_BASE_URL
 
+const appHostname =
+  process.env.CLIENT_ANDROID_ENV === 'development'
+    ? getLocalIp() || 'localhost'
+    : (process.env.ANDROID_HOSTNAME ?? 'localhost')
+
 const config: CapacitorConfig = {
   appId: localConfig.appId,
   appName: localConfig.appName,
@@ -20,6 +25,7 @@ const config: CapacitorConfig = {
     // @ts-ignore
     baseUrl: apiBaseUrl,
     url: appBaseUrl,
+    hostname: appHostname,
     cleartext: process.env.CLIENT_ANDROID_ENV === 'development', // Allow cleartext traffic in development
     androidScheme:
       process.env.CLIENT_ANDROID_ENV === 'development' ? 'http' : 'https',
@@ -38,7 +44,7 @@ const config: CapacitorConfig = {
   },
 }
 
-function getLocalIp() {
+export function getLocalIp() {
   let ip = ''
 
   try {
