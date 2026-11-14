@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: ['web2', 'main']
+    branches: ['web2.0', 'main']
   pull_request:
-    branches: ['web2', 'main']
+    branches: ['web2.0', 'main']
 
 jobs:
   build:
