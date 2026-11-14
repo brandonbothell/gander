@@ -10,7 +10,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "SecurePreferences")
 public class SecurePreferencesPlugin extends Plugin {
-    private final String filename = "capacitorapp_encrypedsharedpreferences";
     private SecureSharedPreferencesManager sharedPreferences;
 
     @Override
