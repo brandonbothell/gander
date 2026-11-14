@@ -5,7 +5,6 @@ import {
   type PushNotificationSchema,
 } from '@capacitor/push-notifications'
 import { Preferences } from '@capacitor/preferences'
-import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
 import { App } from '@capacitor/app'
 import { API_BASE, authFetch } from './main'
@@ -34,15 +33,6 @@ export async function setupPushNotifications() {
           console.log(
             'Push notification action recieved:' +
               JSON.stringify(action, null, 2),
-          )
-        },
-      )
-
-      LocalNotifications.addListener(
-        'localNotificationActionPerformed',
-        (event) => {
-          console.log(
-            'Local notification tapped: ' + JSON.stringify(event, null, 2),
           )
         },
       )
