@@ -372,11 +372,15 @@ export default function initializeSignedRoutes(
     jwtAuth,
     (req, res) => {
       const { streamId } = req.params
+      const { base } = req.query
+      if (base && typeof base !== 'string') {
+        return res.status(400).send({ error: 'Invalid base URL' })
+      }
       if (!dynamicStreams[streamId]) {
         res.status(404).json({ error: 'Stream not found' })
         return
       }
-      const url = createSignedStreamUrl(streamId)
+      const url = createSignedStreamUrl(streamId, 60, base)
       res.json({ url })
     },
   )
@@ -562,11 +566,12 @@ export default function initializeSignedRoutes(
     signedStreamLimiter,
     (req, res) => {
       const { streamId } = req.params
-      const { expires, sig } = req.query
+      const { expires, sig, base } = req.query
       if (
         typeof streamId !== 'string' ||
         typeof expires !== 'string' ||
         typeof sig !== 'string' ||
+        (base && typeof base !== 'string') ||
         !verifySignedStreamUrl(streamId, expires, sig)
       ) {
         res.status(403).send('Forbidden')
@@ -606,7 +611,7 @@ export default function initializeSignedRoutes(
           .replace(
             /(segment_\d+\.ts)/g,
             (segment) =>
-              `/signed/stream/${encodedStreamId}/${segment}?expires=${encodedExpires}&sig=${encodedSig}`,
+              `${base ? base : ''}/signed/stream/${encodedStreamId}/${segment}?expires=${encodedExpires}&sig=${encodedSig}`,
           )
         res.setHeader(
           'Cache-Control',
@@ -759,12 +764,16 @@ function verifySignedUrl(
 }
 
 // --- Helper to create a signed stream playlist URL for a specific stream ---
-function createSignedStreamUrl(streamId: string, expiresInSeconds = 60) {
+function createSignedStreamUrl(
+  streamId: string,
+  expiresInSeconds = 60,
+  baseUrl?: string,
+) {
   const expires = Math.floor(Date.now() / 1000) + expiresInSeconds
   const secret = process.env.SIGNED_URL_SECRET ?? JWT_SECRET
   const data = `stream:${streamId}:${expires}`
   const sig = crypto.createHmac('sha256', secret).update(data).digest('hex')
-  return `/signed/stream/${streamId}/stream.m3u8?expires=${expires}&sig=${sig}`
+  return `/signed/stream/${streamId}/stream.m3u8?expires=${expires}&sig=${sig}${baseUrl ? `&base=${encodeURIComponent(baseUrl)}` : ''}`
 }
 
 // --- Helper to verify a signed stream playlist/segment URL ---

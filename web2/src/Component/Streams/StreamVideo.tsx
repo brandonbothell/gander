@@ -76,7 +76,7 @@ export default function StreamVideo(props: {
       if (!force && isFresh) return
 
       const requestId = ++streamRequestId.current
-      const url = `${API_BASE}/api/signed-stream-url/${props.stream.id}`
+      const url = `${API_BASE}/api/signed-stream-url/${props.stream.id}?base=${encodeURIComponent(API_BASE)}`
 
       try {
         const response = await fetchWithRetry(() => authFetch(url))
@@ -146,7 +146,12 @@ export default function StreamVideo(props: {
       }, 5000)
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.log('HLS error:', data.type, data.details, data)
+        console.log(
+          'HLS error:',
+          data.type,
+          data.details,
+          JSON.stringify(data, null, 2),
+        )
 
         // Check for 403 Forbidden on fragment/network errors
         if (

@@ -366,7 +366,7 @@ export default function initializeAuthRoutes(
 
   function refreshTokenEndpoint({ mobile }: { mobile: boolean }) {
     return async (req: Request, res: Response) => {
-      let refreshToken = req.headers['refresh-token'] ?? req.cookies['_rt']
+      let refreshToken = req.headers['x-refresh-token'] ?? req.cookies['_rt']
 
       if (refreshToken) {
         logAuth('[Refresh Token] Refresh token retrieved from cookie/header')

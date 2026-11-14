@@ -126,7 +126,7 @@ export default function FullLayout(props: {
   useEffect(() => {
     if (loadingFailed < 3 && !loadingStreams && !streamsLoaded) {
       setLoadingStreams(true)
-      authFetch('/api/streams')
+      authFetch(`${API_BASE}/api/streams`)
         .then((res) => {
           if (!res.ok) {
             incrementLoadingFailed()

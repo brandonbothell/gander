@@ -210,10 +210,12 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json',
           'x-csrf-token': csrfToken,
+          ...(deviceInfo.appCheckToken && refreshToken
+            ? { 'x-refresh-token': refreshToken }
+            : {}),
         },
         body: JSON.stringify({
           deviceInfo,
-          ...(refreshToken ? { 'refresh-token': refreshToken } : {}),
         }),
       }
 

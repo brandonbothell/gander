@@ -5,9 +5,6 @@ project(':capacitor-android').projectDir = new File('../.yarn/unplugged/@capacit
 include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../.yarn/unplugged/@capacitor-app-virtual-f093effcc7/node_modules/@capacitor/app/android')
 
-include ':capacitor-local-notifications'
-project(':capacitor-local-notifications').projectDir = new File('../.yarn/unplugged/@capacitor-local-notifications-virtual-730adad8c6/node_modules/@capacitor/local-notifications/android')
-
 include ':capacitor-preferences'
 project(':capacitor-preferences').projectDir = new File('../.yarn/unplugged/@capacitor-preferences-virtual-145482f746/node_modules/@capacitor/preferences/android')
 

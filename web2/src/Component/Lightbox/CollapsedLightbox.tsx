@@ -15,7 +15,7 @@ import {
 import { Text } from '@mantine/core'
 import { useVideo } from '@gfazioli/mantine-video'
 import { Recording } from '../../types'
-import { authFetch } from '../../main'
+import { API_BASE, authFetch } from '../../main'
 import { LightboxSlides } from './Slides/LightboxSlides'
 import { LightboxSlide } from './Slides/LightboxSlide'
 import { LightboxToolbar } from './LightboxToolbar'
@@ -112,7 +112,7 @@ export default function CollapsedLightbox({
           })
 
           const res = await authFetch(
-            `/api/recordings/${props.activeRecording.streamId}/${props.activeRecording.filename}`,
+            `${API_BASE}/api/recordings/${props.activeRecording.streamId}/${props.activeRecording.filename}`,
             {
               method: 'DELETE',
             },

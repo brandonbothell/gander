@@ -645,13 +645,19 @@ loadStreamsFromDb()
       }
     })
 
-    httpServer.listen(port, () => {
-      console.debug(`HTTP server running on http://localhost:${port}`)
-      if (process.env.API_ENV === 'production') return
-      setTimeout(() => {
-        open(`http://localhost:${port}`)
-      }, 3000)
-    })
+    httpServer.listen(
+      {
+        port: port !== 3000 ? parseInt(port) : port,
+        host: '0.0.0.0',
+      },
+      () => {
+        console.debug(`HTTP server running on http://localhost:${port}`)
+        if (process.env.API_ENV === 'production') return
+        setTimeout(() => {
+          open(`http://localhost:${port}`)
+        }, 3000)
+      },
+    )
   })
 
 /**
@@ -777,7 +783,6 @@ app.use(
     },
   }),
 )
-app.use(cookieParser(JWT_SECRET))
 
 // --- CORS ---
 app.use(
@@ -786,10 +791,16 @@ app.use(
       const allowedOrigins = (
         process.env.API_ENV === 'production'
           ? []
-          : [`http://localhost:${process.env.PORT ?? 3000}`]
-      ).concat(config.domains ?? [])
+          : [`http://localhost:${process.env.PORT ?? 3000}`, 'http://localhost']
+      )
+        .concat(
+          process.env.CLIENT_ANDROID_ENV === 'production'
+            ? ['https://localhost']
+            : [],
+        )
+        .concat(config.domains ?? [])
       if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true)
+        callback(null, origin)
       } else {
         console.error(`[CORS] Denied request from origin: ${origin}`)
         callback(new Error(`[CORS] Denied request from origin: ${origin}`))
@@ -798,6 +809,8 @@ app.use(
     credentials: true,
   }),
 )
+
+app.use(cookieParser(JWT_SECRET))
 
 app.use(express.json())
 

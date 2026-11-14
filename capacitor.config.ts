@@ -10,10 +10,7 @@ const apiBaseUrl =
     : (process.env.CLIENT_ANDROID_API_BASE_URL ??
       process.env.CLIENT_API_BASE_URL)
 
-const appBaseUrl =
-  process.env.CLIENT_ANDROID_ENV === 'development'
-    ? `http://${getLocalIp() || 'localhost'}:${process.env.PORT ?? 3000}`
-    : process.env.ANDROID_APP_BASE_URL
+const appBaseUrl = process.env.ANDROID_APP_BASE_URL
 
 const config: CapacitorConfig = {
   appId: localConfig.appId,
@@ -24,6 +21,8 @@ const config: CapacitorConfig = {
     baseUrl: apiBaseUrl,
     url: appBaseUrl,
     cleartext: process.env.CLIENT_ANDROID_ENV === 'development', // Allow cleartext traffic in development
+    androidScheme:
+      process.env.CLIENT_ANDROID_ENV === 'development' ? 'http' : 'https',
   },
   plugins: {
     SplashScreen: {
@@ -32,6 +31,9 @@ const config: CapacitorConfig = {
       showSpinner: true,
       androidSpinnerStyle: 'large',
       spinnerColor: '#999999',
+    },
+    CapacitorHttp: {
+      enabled: true,
     },
   },
 }

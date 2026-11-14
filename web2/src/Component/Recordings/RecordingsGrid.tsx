@@ -226,11 +226,11 @@ export default function RecordingsGrid(props: {
                 <Image
                   radius="md"
                   h="100%"
-                  src={
+                  src={`${API_BASE}${
                     signedUrlsMap
                       .get(recording.streamId)!
                       .get(recording.filename.replace('.mp4', '.jpg'))!.url
-                  }
+                  }`}
                 />
               </>
             ) : (
@@ -453,11 +453,11 @@ export default function RecordingsGrid(props: {
                 <Image
                   radius="md"
                   h="100%"
-                  src={
+                  src={`${API_BASE}${
                     signedUrlsMap
                       .get(recording.streamId)!
                       .get(recording.filename.replace('.mp4', '.jpg'))!.url
-                  }
+                  }`}
                   onLoad={() => {
                     loadedThumbnailMap.set(
                       `${recording.streamId}-${recording.filename}`,
