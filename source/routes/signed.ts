@@ -577,6 +577,27 @@ export default function initializeSignedRoutes(
         res.status(403).send('Forbidden')
         return
       }
+
+      let basePrefix = ''
+      if (typeof base === 'string' && base.length > 0) {
+        try {
+          const parsedBase = new URL(base)
+          if (
+            (parsedBase.protocol !== 'http:' &&
+              parsedBase.protocol !== 'https:') ||
+            parsedBase.search ||
+            parsedBase.hash
+          ) {
+            res.status(403).send('Forbidden')
+            return
+          }
+          basePrefix = parsedBase.toString().replace(/\/+$/, '')
+        } catch {
+          res.status(403).send('Forbidden')
+          return
+        }
+      }
+
       if (!dynamicStreams[streamId]) return res.status(404).send('Not found')
 
       const playlistPath = dynamicStreams[streamId].getPlaylistPath()
@@ -611,7 +632,7 @@ export default function initializeSignedRoutes(
           .replace(
             /(segment_\d+\.ts)/g,
             (segment) =>
-              `${base ? base : ''}/signed/stream/${encodedStreamId}/${segment}?expires=${encodedExpires}&sig=${encodedSig}`,
+              `${basePrefix}/signed/stream/${encodedStreamId}/${segment}?expires=${encodedExpires}&sig=${encodedSig}`,
           )
         res.setHeader(
           'Cache-Control',
