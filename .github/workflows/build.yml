@@ -31,7 +31,6 @@ jobs:
         run: |
           mv config.example.json config.json
           mv .env.example .env
-          mv web/config.example.json web/config.json
       - name: Generate database ORM
         run: |
           yarn db:generate
