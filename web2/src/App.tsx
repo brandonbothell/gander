@@ -515,9 +515,7 @@ export default function App() {
 
       if (lastUsedVersion === 'unknown') {
         setLastUsedUpdate(currentVersion)
-      }
-      // If new version, reset cached data
-      else if (!notifiedUpdate && lastUsedVersion !== currentVersion) {
+      } else if (!notifiedUpdate && lastUsedVersion !== currentVersion) {
         // Reset all cached states if the website was updated
         setCachedRecordings({})
         setCachedRecordingRanges({})

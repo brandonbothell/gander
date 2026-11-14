@@ -9,8 +9,8 @@ import { spawn } from 'child_process'
 import { Jimp, diff as getDiff } from 'jimp'
 import { StreamMotionState } from './types/stream'
 import { StreamManager } from './streamManager'
-import { logMotion } from './logMotion'
 import { initializeStreamState, prisma } from './server'
+import { logMotion } from './logMotion'
 
 const STANDARD_WIDTH = 160 // Much smaller for performance
 const STANDARD_HEIGHT = 90

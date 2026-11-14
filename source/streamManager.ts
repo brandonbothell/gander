@@ -2,13 +2,13 @@ import path from 'path'
 import fs from 'fs'
 import { exec, spawn } from 'child_process'
 import { StreamMotionState } from './types/stream'
-import { logMotion } from './logMotion'
-import { isNvidiaAvailable } from './hardwareCheck'
 import {
   saveMotionSegments,
   setupStreamMotionMonitoring,
   stopStreamMotionMonitoring,
 } from './server'
+import { logMotion } from './logMotion'
+import { isNvidiaAvailable } from './hardwareCheck'
 
 export interface StreamConfig {
   id: string

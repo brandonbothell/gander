@@ -34,7 +34,9 @@ export function VideoSlide({ slide, active, stylesApiProps }: VideoSlideProps) {
     // slide that happens to be active on mount – playback has to be started explicitly
     // when an already mounted video becomes the current slide.
     if (slide.autoPlay) {
-      video.play().catch(() => {})
+      video.play().catch(() => {
+        /* empty */
+      })
     }
   }, [playing, slide.autoPlay])
 

@@ -2,9 +2,9 @@ import webpush from 'web-push'
 import * as fcm from 'firebase-admin/messaging'
 import express from 'express'
 import { StreamManager } from '../streamManager'
+import { io, prisma, RequestWithUser, socketDisconnectMap } from '../server'
 import { jwtAuth } from '../middleware/jwtAuth'
 import { logNotify } from '../logMotion'
-import { io, prisma, RequestWithUser, socketDisconnectMap } from '../server'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeNotificationRoutes(app: express.Application) {

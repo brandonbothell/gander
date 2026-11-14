@@ -4,9 +4,6 @@ import { exec } from 'child_process'
 import express, { Express } from 'express'
 import { StreamMotionState } from '../types/stream'
 import { StreamManager } from '../streamManager'
-import { clearMotionHistory } from '../motionDetector'
-import { jwtAuth } from '../middleware/jwtAuth'
-import { logMotion } from '../logMotion'
 import {
   initializeStreamState,
   persistStreamState,
@@ -15,6 +12,9 @@ import {
   safeUnlinkWithRetry,
   saveMotionSegments as saveMotionSegmentsCamera,
 } from '../server'
+import { clearMotionHistory } from '../motionDetector'
+import { jwtAuth } from '../middleware/jwtAuth'
+import { logMotion } from '../logMotion'
 import { recordingsLowSpaceThresholdMb } from '../../config.json'
 import { notify } from './notifications'
 import { rateLimit } from 'express-rate-limit'

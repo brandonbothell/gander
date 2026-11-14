@@ -1,6 +1,6 @@
 import express from 'express'
-import { jwtAuth } from '../middleware/jwtAuth'
 import { prisma } from '../server'
+import { jwtAuth } from '../middleware/jwtAuth'
 import { rateLimit } from 'express-rate-limit'
 
 export default function initializeMaskRoutes(app: express.Application) {

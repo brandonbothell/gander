@@ -8,10 +8,10 @@ import {
   getDeviceDisplayName,
 } from '../types/deviceInfo'
 import { StreamManager } from '../streamManager'
+import { prisma, RequestWithUser } from '../server'
 import { jwtAuth } from '../middleware/jwtAuth'
 import { logAuth } from '../logMotion'
 import { JWT_SECRET } from '../credentials'
-import { prisma, RequestWithUser } from '../server'
 import config from '../../config.json'
 import { notify } from './notifications'
 import { rateLimit } from 'express-rate-limit'

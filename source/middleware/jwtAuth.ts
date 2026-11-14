@@ -1,8 +1,8 @@
 import os from 'os'
 import jwt from 'jsonwebtoken'
 import express from 'express'
-import { JWT_SECRET } from '../credentials'
 import { RequestWithUser } from '../server'
+import { JWT_SECRET } from '../credentials'
 import config from '../../config.json'
 
 // --- JWT Middleware ---
