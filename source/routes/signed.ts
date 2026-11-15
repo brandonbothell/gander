@@ -11,6 +11,128 @@ import { jwtAuth } from '../middleware/jwtAuth'
 import { JWT_SECRET } from '../credentials'
 import { rateLimit } from 'express-rate-limit'
 
+const socialMediaTranscodes = new Map<string, Promise<string>>()
+
+async function getSocialMediaVideo(sourcePath: string, filename: string) {
+  const sourceStat = await fs.promises.stat(sourcePath)
+  const cacheDirectory = path.join(path.dirname(sourcePath), '.social-media')
+  await fs.promises.mkdir(cacheDirectory, { recursive: true })
+
+  const cacheKey = crypto
+    .createHash('sha256')
+    .update(`${filename}\0${sourceStat.size}\0${sourceStat.mtimeMs}`)
+    .digest('hex')
+  const outputPath = path.join(cacheDirectory, `v1-${cacheKey}.mp4`)
+
+  const cachedStat = await fs.promises
+    .stat(outputPath)
+    .catch((error: unknown) => {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        return null
+      }
+      throw error
+    })
+  if (cachedStat?.isFile() && cachedStat.size > 0) return outputPath
+  if (cachedStat) await fs.promises.rm(outputPath, { force: true })
+
+  const pending = socialMediaTranscodes.get(outputPath)
+  if (pending) return pending
+
+  const conversion = transcodeSocialMediaVideo(sourcePath, outputPath)
+  socialMediaTranscodes.set(outputPath, conversion)
+  try {
+    return await conversion
+  } finally {
+    if (socialMediaTranscodes.get(outputPath) === conversion) {
+      socialMediaTranscodes.delete(outputPath)
+    }
+  }
+}
+
+async function transcodeSocialMediaVideo(
+  sourcePath: string,
+  outputPath: string,
+) {
+  const temporaryPath = `${outputPath}.${process.pid}.${crypto.randomUUID()}.tmp.mp4`
+  try {
+    let stderr = ''
+    await new Promise<void>((resolve, reject) => {
+      const ffmpeg = childProcess.spawn(
+        'ffmpeg',
+        [
+          '-nostdin',
+          '-y',
+          '-i',
+          sourcePath,
+          '-map',
+          '0:v:0',
+          '-map',
+          '0:a:0?',
+          '-vf',
+          "scale=w='min(1920,iw)':h='min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+          '-c:v',
+          'libx264',
+          '-preset',
+          'medium',
+          '-crf',
+          '23',
+          '-maxrate',
+          '8M',
+          '-bufsize',
+          '16M',
+          '-pix_fmt',
+          'yuv420p',
+          '-tag:v',
+          'avc1',
+          '-c:a',
+          'aac',
+          '-b:a',
+          '128k',
+          '-movflags',
+          '+faststart',
+          '-f',
+          'mp4',
+          temporaryPath,
+        ],
+        { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] },
+      )
+
+      ffmpeg.stderr?.on('data', (chunk: Buffer) => {
+        stderr = `${stderr}${chunk.toString()}`.slice(-8000)
+      })
+      ffmpeg.once('error', (error) => {
+        reject(new Error(`Failed to start FFmpeg: ${error.message}`))
+      })
+      ffmpeg.once('close', (code, signal) => {
+        if (code === 0) {
+          resolve()
+        } else {
+          reject(
+            new Error(
+              `FFmpeg exited with ${code === null ? `signal ${signal}` : `code ${code}`}.${stderr ? ` ${stderr}` : ''}`,
+            ),
+          )
+        }
+      })
+    })
+
+    const temporaryStat = await fs.promises.stat(temporaryPath)
+    if (!temporaryStat.isFile() || temporaryStat.size === 0) {
+      throw new Error('FFmpeg produced an empty output file')
+    }
+
+    await fs.promises.rename(temporaryPath, outputPath)
+    return outputPath
+  } finally {
+    await fs.promises.rm(temporaryPath, { force: true })
+  }
+}
+
 export default function initializeSignedRoutes(
   app: express.Express,
   dynamicStreams: Record<string, StreamManager>,
@@ -467,9 +589,17 @@ export default function initializeSignedRoutes(
     '/signed/video/:streamId/:filename',
     allowCrossOriginMedia,
     signedVideoLimiter,
-    (req, res) => {
+    async (req, res) => {
       const { streamId, filename } = req.params
-      const { expires, sig } = req.query
+      const { expires, sig, download } = req.query
+      if (
+        download !== undefined &&
+        download !== 'true' &&
+        download !== 'false'
+      ) {
+        res.status(400).send('Invalid download parameter')
+        return
+      }
       if (
         typeof expires !== 'string' ||
         typeof sig !== 'string' ||
@@ -480,12 +610,56 @@ export default function initializeSignedRoutes(
       }
       if (!dynamicStreams[streamId]) return res.status(404).send('Not found')
 
-      const filePath = path.join(
+      const recordDirectory = path.resolve(
         dynamicStreams[streamId].config.recordDir,
-        filename,
       )
-      if (!filePath.startsWith(dynamicStreams[streamId].config.recordDir)) {
+      const filePath = path.resolve(recordDirectory, filename)
+      const relativePath = path.relative(recordDirectory, filePath)
+      if (
+        relativePath === '..' ||
+        relativePath.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relativePath)
+      ) {
         res.status(403).send('Forbidden')
+        return
+      }
+
+      if (download === 'true') {
+        try {
+          const outputPath = await getSocialMediaVideo(filePath, filename)
+          res.download(
+            outputPath,
+            `${path.parse(filename).name}-social.mp4`,
+            { dotfiles: 'allow' },
+            (err) => {
+              if (res.headersSent) return
+              if (err) {
+                res.status(500).json({
+                  error: 'Failed to send processed video',
+                })
+                console.error(
+                  `[${streamId}] Failed to send processed recording ${outputPath}:`,
+                  err,
+                )
+              }
+            },
+          )
+        } catch (err) {
+          const isMissingSource =
+            typeof err === 'object' &&
+            err !== null &&
+            'code' in err &&
+            err.code === 'ENOENT'
+          res.status(isMissingSource ? 404 : 500).json({
+            error: isMissingSource
+              ? 'File not found'
+              : 'Failed to process video',
+          })
+          console.error(
+            `[${streamId}] Failed to prepare processed recording ${filename}:`,
+            err,
+          )
+        }
         return
       }
 

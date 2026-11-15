@@ -135,7 +135,10 @@ export default function CollapsedLightbox({
         },
         position: 'right',
       },
-      createDownloadToolbarItem(props.currentSrc, payload.labels),
+      createDownloadToolbarItem(
+        `${props.currentSrc}&download=true`,
+        payload.labels,
+      ),
       createFullscreenToolbarItem(
         canFullscreen ? payload.toggleFullscreen : props.toggleInlineFullscreen,
         payload.isFullscreen,
