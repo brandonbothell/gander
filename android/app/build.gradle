@@ -98,6 +98,14 @@ tasks.register('prepareVscode') {
     dependsOn 'copyIdeLibs', 'compileDebugJavaWithJavac'
 }
 
+gradle.taskGraph.whenReady { taskGraph ->
+    if (taskGraph.allTasks.any { it.name == 'prepareVscode' }) {
+        tasks.matching { it.name == 'processDebugGoogleServices' }.configureEach {
+            enabled = false
+        }
+    }
+}
+
 eclipse {
     classpath {
         file {
