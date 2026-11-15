@@ -1,4 +1,4 @@
-import webpush from 'web-push'
+import { sendNotification as sendWebpushNotification } from 'web-push'
 import * as fcm from 'firebase-admin/messaging'
 import express from 'express'
 import { StreamManager } from '../streamManager'
@@ -202,7 +202,7 @@ export async function notify(
         'info',
       )
       try {
-        await webpush.sendNotification(
+        await sendWebpushNotification(
           {
             endpoint: sub.endpoint,
             expirationTime: sub.expirationTime

@@ -2,7 +2,7 @@ import '@dotenvx/dotenvx/config'
 import path from 'path'
 import http from 'http'
 import fs from 'fs'
-import webpush from 'web-push'
+import { setVapidDetails } from 'web-push'
 import { Server as SocketIOServer } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import helmet from 'helmet'
@@ -898,7 +898,7 @@ app.get('/api/vapid-public-key', (_req, res) => {
   res.json({ publicKey: config.vapid.publicKey })
 })
 
-webpush.setVapidDetails(
+setVapidDetails(
   config.vapid.email,
   config.vapid.publicKey,
   config.vapid.privateKey,
