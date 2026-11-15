@@ -5,7 +5,6 @@ import {
   useDisclosure,
   useLocalStorage,
   useMap,
-  useViewportSize,
 } from '@mantine/hooks'
 import {
   AppShell,
@@ -57,7 +56,6 @@ export default function FullLayout(props: {
   >(() => {
     /* empty */
   })
-  const { width } = useViewportSize()
   const { colors } = useMantineTheme()
   const { colorScheme } = useMantineColorScheme()
 
