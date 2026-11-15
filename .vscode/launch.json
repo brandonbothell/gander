@@ -22,7 +22,8 @@
       "type": "node-terminal",
       "request": "launch",
       "command": "yarn dev:server",
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "outputCapture": "std"
     }
   ]
 }
