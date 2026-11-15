@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'eclipse'
 
 android {
     namespace "tld.example.gander"
@@ -70,4 +71,57 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+tasks.register('cleanIdeLibs', Delete) {
+    delete layout.buildDirectory.dir('ide-libs')
+}
+
+tasks.register('copyIdeLibs', Copy) {
+    dependsOn 'cleanIdeLibs'
+    def libsView = configurations.debugCompileClasspath.incoming.artifactView {
+        attributes {
+            attribute(Attribute.of('artifactType', String), 'android-classes-jar')
+        }
+    }
+    def index = 0
+    from libsView.files
+    into layout.buildDirectory.dir('ide-libs')
+    eachFile { details ->
+        details.name = "${index++}-${details.name}"
+    }
+}
+
+tasks.register('prepareVscode') {
+    group = 'ide'
+    description = 'Generates BuildConfig, R.jar, and extracts Android dependencies for VS Code IntelliSense.'
+    dependsOn 'copyIdeLibs', 'compileDebugJavaWithJavac'
+}
+
+eclipse {
+    classpath {
+        file {
+            whenMerged { cp ->
+                def SourceFolder = Class.forName('org.gradle.plugins.ide.eclipse.model.SourceFolder')
+                def Library = Class.forName('org.gradle.plugins.ide.eclipse.model.Library')
+
+                cp.entries.add(SourceFolder.newInstance('src/main/java', null))
+                cp.entries.add(SourceFolder.newInstance('build/generated/source/buildConfig/debug', null))
+
+                def sdkDir = androidComponents.sdkComponents.sdkDirectory.get().asFile
+                def androidJar = file("${sdkDir}/platforms/${android.compileSdkVersion}/android.jar")
+                if (androidJar.exists()) {
+                    cp.entries.add(Library.newInstance(fileReference(androidJar)))
+                }
+
+                fileTree('build/ide-libs').matching { include '**/*.jar' }.each { jar ->
+                    cp.entries.add(Library.newInstance(fileReference(jar)))
+                }
+
+                fileTree('build/intermediates/compile_r_class_jar/debug').matching { include '**/R.jar' }.each { jar ->
+                    cp.entries.add(Library.newInstance(fileReference(jar)))
+                }
+            }
+        }
+    }
 }
