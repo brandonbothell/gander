@@ -85,5 +85,4 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Required to request the manage overlay permission -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>
