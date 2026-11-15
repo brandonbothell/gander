@@ -22,8 +22,26 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    signingConfigs {
+        release {
+            def propsFile = rootProject.file('local.properties')
+            if (propsFile.exists()) {
+                def props = new Properties()
+                propsFile.withInputStream { props.load(it) }
+                if (props['storeFile']) {
+                    storeFile file(props['storeFile'])
+                    storePassword props['storePassword']
+                    keyAlias props['keyAlias']
+                    keyPassword props['keyPassword']
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
@@ -104,6 +122,16 @@ gradle.taskGraph.whenReady { taskGraph ->
             enabled = false
         }
     }
+}
+
+tasks.register('copyReleaseApk', Copy) {
+    from layout.buildDirectory.dir('outputs/apk/release')
+    include '*.apk'
+    into layout.projectDirectory.dir('release')
+}
+
+tasks.matching { it.name == 'assembleRelease' }.configureEach {
+    finalizedBy 'copyReleaseApk'
 }
 
 eclipse {
