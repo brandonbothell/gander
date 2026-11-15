@@ -5,6 +5,7 @@ import fs from 'fs'
 import webpush from 'web-push'
 import { Server as SocketIOServer } from 'socket.io'
 import jwt from 'jsonwebtoken'
+import helmet from 'helmet'
 import session from 'express-session'
 import express from 'express'
 import cors from 'cors'
@@ -765,6 +766,28 @@ async function cleanupExpiredTokensAndDevices() {
 }
 
 app.use(
+  helmet({
+    strictTransportSecurity: process.env.API_ENV !== 'development',
+    contentSecurityPolicy: {
+      directives: {
+        // Disable upgrade-insecure-requests in development or if streams use HTTP/WS
+        'upgrade-insecure-requests':
+          process.env.API_ENV === 'development' ? null : [],
+        'script-src': [
+          "'self'",
+          "'sha256-rw1yi8tu5a4BFePBZUhZ49Gmua0sH2YF0eFeQIZHOKM='",
+          "'sha256-4Cuud3fvDYwlW2fnNDfZbPz1VqkikuIVADizyvL8Kuc='",
+        ],
+        // Explicitly allow media and stream connections
+        'img-src': ["'self'", 'data:', 'blob:', ...(config.domains ?? [])],
+        'media-src': ["'self'", 'blob:', ...(config.domains ?? [])],
+        'connect-src': ["'self'", ...(config.domains ?? [])],
+      },
+    },
+  }),
+)
+
+app.use(
   session({
     store: new SQLiteStore({
       client: db,
@@ -785,20 +808,21 @@ app.use(
 )
 
 // --- CORS ---
+const allowedOrigins = (
+  process.env.API_ENV === 'production'
+    ? []
+    : [`http://localhost:${process.env.PORT ?? 3000}`, 'http://localhost']
+)
+  .concat(
+    process.env.CLIENT_ANDROID_ENV === 'production'
+      ? ['https://localhost']
+      : [],
+  )
+  .concat(config.domains ?? [])
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      const allowedOrigins = (
-        process.env.API_ENV === 'production'
-          ? []
-          : [`http://localhost:${process.env.PORT ?? 3000}`, 'http://localhost']
-      )
-        .concat(
-          process.env.CLIENT_ANDROID_ENV === 'production'
-            ? ['https://localhost']
-            : [],
-        )
-        .concat(config.domains ?? [])
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, origin)
       } else {

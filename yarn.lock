@@ -6360,6 +6360,7 @@ __metadata:
     firebase-admin: "npm:14.5.1"
     globals: "npm:17.14.0"
     greenlock-express: "npm:4.0.3"
+    helmet: "npm:8.3.0"
     jimp: "npm:1.6.1"
     jiti: "npm:2.7.0"
     jsonwebtoken: "npm:9.0.3"
@@ -6907,6 +6908,13 @@ __metadata:
   dependencies:
     function-bind: "npm:^1.1.2"
   checksum: 10c0/3769d434703b8ac66b209a4cca0737519925bbdb61dd887f93a16372b14694c63ff4e797686d87c90f08168e81082248b9b028bad60d4da9e0d1148766f56eb9
+  languageName: node
+  linkType: hard
+
+"helmet@npm:8.3.0":
+  version: 8.3.0
+  resolution: "helmet@npm:8.3.0"
+  checksum: 10c0/69f33ca716ed3ce34f1f2f48ce8618846dfa9c89e3a15d6bccefc882541e8b028517448c6b0e7450792fd23e5580bfe6d410d4f22bedc2a94f6b1188817a059a
   languageName: node
   linkType: hard
 

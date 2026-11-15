@@ -2,6 +2,7 @@ import path from 'path'
 import fs from 'fs'
 import crypto from 'crypto'
 import childProcess from 'child_process'
+import helmet from 'helmet'
 import express from 'express'
 
 import { SignedUrl, StreamMotionState } from '../types/stream'
@@ -457,9 +458,14 @@ export default function initializeSignedRoutes(
     legacyHeaders: false,
   })
 
+  const allowCrossOriginMedia = helmet.crossOriginResourcePolicy({
+    policy: 'cross-origin',
+  })
+
   // Serve video file via signed URL
   app.get(
     '/signed/video/:streamId/:filename',
+    allowCrossOriginMedia,
     signedVideoLimiter,
     (req, res) => {
       const { streamId, filename } = req.params
@@ -509,6 +515,7 @@ export default function initializeSignedRoutes(
 
   app.get(
     '/signed/thumbnail/:streamId/:filename',
+    allowCrossOriginMedia,
     signedRecordingThumbnailLimiter,
     (req, res) => {
       const { streamId, filename } = req.params
@@ -563,6 +570,7 @@ export default function initializeSignedRoutes(
   // Serve signed stream playlist for a specific stream
   app.get(
     '/signed/stream/:streamId/stream.m3u8',
+    allowCrossOriginMedia,
     signedStreamLimiter,
     (req, res) => {
       const { streamId } = req.params
