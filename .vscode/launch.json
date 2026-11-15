@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "compounds": [
+    {
+      "name": "Launch Dev Terminals",
+      "configurations": ["Frontend Watcher", "Backend API"],
+      "presentation": {
+        "order": 1
+      }
+    }
+  ],
+  "configurations": [
+    {
+      "name": "Frontend Watcher",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "yarn dev:client",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Backend API",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "yarn dev:server",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
