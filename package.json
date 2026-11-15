@@ -11,6 +11,7 @@
   "scripts": {
     "start": "node ./compiled/server.js",
     "build": "yarn build:server & yarn build:client",
+    "android:init": "dotenvx run -- yarn trapeze run .trapeze.yml --android-project android -y",
     "android:sync": "yarn cap sync android",
     "android:open": "yarn cap open android",
     "dev": "concurrently --kill-others-on-fail --raw \"yarn dev:client\" \"yarn dev:server -- --host 0.0.0.0\"",
@@ -41,6 +42,7 @@
     "@eslint/eslintrc": "3.3.7",
     "@eslint/js": "10.0.1",
     "@stylistic/eslint-plugin": "5.10.0",
+    "@trapezedev/configure": "7.1.11",
     "@types/better-sqlite3": "9.6.0",
     "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",

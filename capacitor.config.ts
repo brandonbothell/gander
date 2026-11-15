@@ -2,7 +2,6 @@ import '@dotenvx/dotenvx/config'
 import os from 'os'
 import type { CapacitorConfig } from '@capacitor/cli'
 import { isLocalIPv4 } from './web2/src/util'
-import localConfig from './config.json'
 
 const apiBaseUrl =
   process.env.CLIENT_ANDROID_ENV === 'development'
@@ -18,8 +17,8 @@ const appHostname =
     : (process.env.ANDROID_HOSTNAME ?? 'localhost')
 
 const config: CapacitorConfig = {
-  appId: localConfig.appId,
-  appName: localConfig.appName,
+  appId: process.env.ANDROID_APP_ID,
+  appName: 'Gander',
   webDir: './web2/dist',
   server: {
     // @ts-ignore

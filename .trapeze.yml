@@ -1,0 +1,19 @@
+vars:
+  ANDROID_APP_ID:
+
+platforms:
+  android:
+    appName: Gander
+    packageName: $ANDROID_APP_ID
+    gradle:
+      - file: app/build.gradle
+        target:
+          android:
+        replace:
+          namespace: '"$ANDROID_APP_ID"'
+      - file: app/build.gradle
+        target:
+          android:
+            defaultConfig:
+        replace:
+          - applicationId: '"$ANDROID_APP_ID"'

@@ -16,7 +16,7 @@ A security camera application.
 - Node.js v22+ (install via `nvm`, [install yarn with `corepack`](https://yarnpkg.com/getting-started/install)) (Latest tested: **v26.13.1**)
 - ffmpeg v7+ (Latest tested: **v8.1**)
 - _Production_:
-  - A reverse proxy like nginx to handle HTTPS (see [configuration](#nginx-configuration))
+  - A reverse proxy like [nginx](https://nginx.org/) to handle HTTPS (see [configuration](#nginx-configuration))
 
 ## Quick Start
 
@@ -31,7 +31,7 @@ A security camera application.
 4. Build and start: `yarn build && yarn start`.
 
 5. Access via your reverse-proxy (see [nginx config](#nginx-configuration))
-   - Serve the SSL certificates from `greenlock.d/live/YourWebsite.com/`
+   - Serve the SSL certificates from `greenlock.d/live/YourWebsite.tld/` (replace `YourWebsite.tld` with your website, of course)
 
 ## Detailed Setup
 
@@ -57,13 +57,13 @@ A security camera application.
 
 ## Starting the Server
 
+- Development/Testing:
+  - Ensure `API_ENV` and `ANDROID_ENV` are set to `development` in [`.env`](./.env.example).
+  - Run `yarn dev`. Ensure port `3000` (change by adding `PORT` to [`.env`](./.env.example)) is available for the server. The site should open in your preferred browser. If not, go to [localhost:3000](http://localhost:3000).
+
 - Production
   - Ensure `API_ENV` and `ANDROID_ENV` are set to `production` in [`.env`](./.env.example).
   - Run `yarn build` and then `yarn start`. Ensure ports 80 and 443 are available for the reverse proxy. Access your site through the proxy.
-
-- Development/Testing:
-  - Ensure `API_ENV` and `ANDROID_ENV` are set to `development` in [`.env`](./.env.example).
-  - Run `yarn dev`. Ensure port `3000` (default dev port, change by adding `PORT` to [`.env`](./.env.example)) is available for the server. The site should open by itself. If not, open [localhost:3000](http://localhost:3000) in a browser.
 
 ## Nginx Configuration
 
@@ -118,13 +118,19 @@ server {
 
 ## Working With Android
 
-To provide the most secure application possible, the Android app is integrated with the Firebase App Check Play Integrity API. A [Google Play Console](https://play.google.com/console/developers) developer account ($25 one-time fee) is required for this to function, but you can remove the functionality from the app if you so please, _noting that it increases the impact of XSS attacks_.
+Android-specific configuration starts with configuring the Android section of variables in [`.env`](./.env.example) and running `yarn android:sync` followed by `yarn android:init`. You should never have to run the `init` command again, but you should run `sync` every time you edit the project files/configuration and plan to build the Android app.
+
+You can then open and build in the app in Android Studio (by running `yarn android:open`) once you download `google-services.json` in step 2 of the following instructions.
 
 1. [**Click here**](https://firebase.google.com/docs/android/setup#create-firebase-project) to learn how to setup a Firebase project
-   - When prompted for a package name, enter `net.strangled.dutta.securitycam`
+   - When prompted for a package name, copy _exactly_ what you have set `ANDROID_APP_ID` to in [`.env`](./.env.example).
    - **_Important Note:_** Stop at **step 3.1** - you should have just downloaded a `google-services.json` file.
 
 2. Place a copy of the downloaded `google-services.json` in both the project root (`./`) and [`./android/app/`](./android/app)
+
+### Firebase App Check
+
+To provide the most secure application possible, the Android app is integrated with the Firebase App Check Play Integrity API. A [Google Play Console](https://play.google.com/console/developers) developer account ($25 one-time fee) is required for this to function, but you can remove the functionality from the app if you so please, _noting that it increases the potential impact of XSS attacks_.
 
 3. Then, follow [**these steps**](https://firebase.google.com/docs/app-check/android/play-integrity-provider#project-setup) to enable the Play Integrity API.
 

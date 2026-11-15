@@ -1,15 +1,13 @@
 {
-  "appId":                "com.example.securitycam",
-  "appName":              "SecurityCam",
   "recordingsDirectory":  "D:/Recordings/ExampleDirectory",
-  "maintainerEmail":      "example@email.com",
+  "maintainerEmail":      "example@email.tld",
   "recordingsLowSpaceThresholdMb":  1024,
   "domains": [
     "https://example.tld"
   ],
   "vapid": {
-    "email":              "mailto:example@email.com",
-    "publicKey":          "BEXAMPLEPUBLICKEY1234567890",
+    "email":              "mailto:example@email.tld",
+    "publicKey":          "EXAMPLEPUBLICKEY1234567890",
     "privateKey":         "EXAMPLEPRIVATEKEY0987654321"
   },
   "restrictApiKeysToLocalNetwork": true,
