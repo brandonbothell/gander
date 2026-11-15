@@ -26,7 +26,7 @@ public class SecureSharedPreferencesManager {
     }
 
     private SecureSharedPreferencesManager(Context ctx) {
-        MasterKey masterKey = null;
+        MasterKey masterKey;
         try {
             masterKey = new MasterKey.Builder(ctx)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -37,16 +37,28 @@ public class SecureSharedPreferencesManager {
         }
 
         try {
-            sharedPreferences = EncryptedSharedPreferences.create(
-                    ctx,
-                    filename,
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            );
+            sharedPreferences = createEncryptedPrefs(ctx, masterKey);
         } catch (GeneralSecurityException | IOException e) {
-            Log.e("SecurePreferencesPlugin", "Failed to create/load shared preferences file", e);
+            Log.w("SecurePreferencesPlugin", "Corrupted or restored preferences detected; resetting file", e);
+            // Delete the unreadable preferences file (likely restored by Auto Backup) and recreate
+            ctx.deleteSharedPreferences(filename);
+            try {
+                sharedPreferences = createEncryptedPrefs(ctx, masterKey);
+            } catch (GeneralSecurityException | IOException retryEx) {
+                Log.e("SecurePreferencesPlugin", "Failed to recreate shared preferences file", retryEx);
+            }
         }
+    }
+
+    private SharedPreferences createEncryptedPrefs(Context ctx, MasterKey masterKey)
+            throws GeneralSecurityException, IOException {
+        return EncryptedSharedPreferences.create(
+                ctx,
+                filename,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        );
     }
 
     public String getStringOrNull(String key) {
