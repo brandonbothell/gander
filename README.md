@@ -63,7 +63,7 @@ A security camera application.
 
 - Development/Testing:
   - Ensure `API_ENV` and `ANDROID_ENV` are set to `development` in [`.env`](./.env.example).
-  - Run `yarn build` and then `yarn start`. Ensure port `3000` (default dev port, change by adding `PORT` to [`.env`](./.env.example)) is available for the server. The site should open by itself. If not, open [localhost:3000](http://localhost:3000) in a browser.
+  - Run `yarn dev`. Ensure port `3000` (default dev port, change by adding `PORT` to [`.env`](./.env.example)) is available for the server. The site should open by itself. If not, open [localhost:3000](http://localhost:3000) in a browser.
 
 ## Nginx Configuration
 
@@ -94,7 +94,7 @@ server {
   add_header Strict-Transport-Security "max-age=31536000;";
 
   location / {
-    # You may have changed the port from the default of 3000 in config.json
+    # You may have changed the port from the default of 3000 in .env
     proxy_pass http://localhost:3000;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
