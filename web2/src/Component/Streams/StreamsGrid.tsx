@@ -249,7 +249,7 @@ export default function StreamsGrid(props: {
 
   return (
     <Group mb="md" display={'flex'} justify="center">
-      <Splitter style={splitterStyles} splitterRef={splitterRef}>
+      <Splitter style={splitterStyles} splitterRef={splitterRef} lineSize={0}>
         <Splitter.Pane
           defaultSize={50}
           min={10}
@@ -257,6 +257,7 @@ export default function StreamsGrid(props: {
           collapsible
         >
           <Splitter
+            lineSize={0}
             splitterRef={splitter2Ref}
             orientation="vertical"
             h="100%"
@@ -345,6 +346,7 @@ export default function StreamsGrid(props: {
           collapsible
         >
           <Splitter
+            lineSize={0}
             splitterRef={splitter3Ref}
             orientation="vertical"
             h="100%"
