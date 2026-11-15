@@ -146,12 +146,7 @@ export default function StreamVideo(props: {
       }, 5000)
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.log(
-          'HLS error:',
-          data.type,
-          data.details,
-          JSON.stringify(data, null, 2),
-        )
+        console.log('HLS error:', data.type, data.details, data)
 
         // Check for 403 Forbidden on fragment/network errors
         if (
