@@ -240,3 +240,13 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <App />,
   </StrictMode>,
 )
+
+let domReady = (cb: () => void) =>
+  document.readyState === 'interactive' || document.readyState === 'complete'
+    ? cb()
+    : document.addEventListener('DOMContentLoaded', cb)
+
+domReady(() => {
+  // Display body when DOM is loaded
+  document.body.style.visibility = 'visible'
+})

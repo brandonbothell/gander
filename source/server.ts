@@ -773,6 +773,7 @@ app.use(
         // Disable upgrade-insecure-requests in development or if streams use HTTP/WS
         'upgrade-insecure-requests':
           process.env.API_ENV === 'development' ? null : [],
+        // Allow for the FOUC fix via <script> tags
         'script-src': [
           "'self'",
           "'sha256-rw1yi8tu5a4BFePBZUhZ49Gmua0sH2YF0eFeQIZHOKM='",
