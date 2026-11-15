@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam.plugins.BatteryOptimization;
+package tld.example.gander.plugins.BatteryOptimization;
 
 import android.content.Intent;
 import android.os.PowerManager;

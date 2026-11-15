@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam.plugins.AppIntegrityCheck;
+package tld.example.gander.plugins.AppIntegrityCheck;
 
 import com.google.firebase.appcheck.FirebaseAppCheck;
 

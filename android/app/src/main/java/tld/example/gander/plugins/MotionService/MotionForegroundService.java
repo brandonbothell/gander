@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam.plugins.MotionService;
+package tld.example.gander.plugins.MotionService;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -33,10 +33,10 @@ import androidx.core.graphics.drawable.IconCompat;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import net.strangled.dutta.securitycam.API.HTTP;
-import net.strangled.dutta.securitycam.PauseDetectionNotificationActionReceiver;
-import net.strangled.dutta.securitycam.R;
-import net.strangled.dutta.securitycam.plugins.SecurePreferences.SecureSharedPreferencesManager;
+import tld.example.gander.API.HTTP;
+import tld.example.gander.PauseDetectionNotificationActionReceiver;
+import tld.example.gander.R;
+import tld.example.gander.plugins.SecurePreferences.SecureSharedPreferencesManager;
 
 import org.json.JSONException;
 import org.json.JSONObject;

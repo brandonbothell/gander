@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "net.strangled.dutta.securitycam"
+    namespace "tld.example.gander"
     compileSdk = rootProject.ext.compileSdkVersion
 
     buildFeatures {
@@ -9,7 +9,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "net.strangled.dutta.securitycam"
+        applicationId "tld.example.gander"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

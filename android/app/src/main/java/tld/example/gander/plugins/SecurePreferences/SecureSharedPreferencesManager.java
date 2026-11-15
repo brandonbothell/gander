@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam.plugins.SecurePreferences;
+package tld.example.gander.plugins.SecurePreferences;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -7,7 +7,7 @@ import android.util.Log;
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKey;
 
-import net.strangled.dutta.securitycam.API.HTTP;
+import tld.example.gander.API.HTTP;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;

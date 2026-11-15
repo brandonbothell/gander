@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam;
+package tld.example.gander;
 
 import android.os.Bundle;
 import android.util.Log;
@@ -9,10 +9,10 @@ import com.google.firebase.appcheck.AppCheckProviderFactory;
 import com.google.firebase.appcheck.FirebaseAppCheck;
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
 
-import net.strangled.dutta.securitycam.plugins.AppIntegrityCheck.AppIntegrityCheckPlugin;
-import net.strangled.dutta.securitycam.plugins.BatteryOptimization.BatteryOptimizationPlugin;
-import net.strangled.dutta.securitycam.plugins.MotionService.MotionServicePlugin;
-import net.strangled.dutta.securitycam.plugins.SecurePreferences.SecurePreferencesPlugin;
+import tld.example.gander.plugins.AppIntegrityCheck.AppIntegrityCheckPlugin;
+import tld.example.gander.plugins.BatteryOptimization.BatteryOptimizationPlugin;
+import tld.example.gander.plugins.MotionService.MotionServicePlugin;
+import tld.example.gander.plugins.SecurePreferences.SecurePreferencesPlugin;
 
 public class MainActivity extends BridgeActivity {
     public static String userAgent = null;

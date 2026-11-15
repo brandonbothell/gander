@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam;
+package tld.example.gander;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -24,8 +24,8 @@ import androidx.core.app.NotificationCompat;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
-import net.strangled.dutta.securitycam.API.HTTP;
-import net.strangled.dutta.securitycam.plugins.MotionService.MotionForegroundService;
+import tld.example.gander.API.HTTP;
+import tld.example.gander.plugins.MotionService.MotionForegroundService;
 
 import java.io.IOException;
 import java.io.InputStream;

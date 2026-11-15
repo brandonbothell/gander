@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam.plugins.SecurePreferences;
+package tld.example.gander.plugins.SecurePreferences;
 
 import androidx.annotation.Nullable;
 

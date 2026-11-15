@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam;
+package tld.example.gander;
 
 import android.Manifest;
 import android.app.Notification;
@@ -14,7 +14,7 @@ import android.util.Log;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
 
-import net.strangled.dutta.securitycam.API.HTTP;
+import tld.example.gander.API.HTTP;
 
 import java.util.Objects;
 import java.util.Optional;

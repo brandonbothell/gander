@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam.plugins.MotionService;
+package tld.example.gander.plugins.MotionService;
 
 import android.content.Intent;
 import android.content.Context;

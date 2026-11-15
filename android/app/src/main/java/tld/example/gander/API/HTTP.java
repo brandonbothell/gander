@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam.API;
+package tld.example.gander.API;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -12,9 +12,9 @@ import androidx.annotation.Nullable;
 
 import com.google.gson.JsonObject;
 
-import net.strangled.dutta.securitycam.MainActivity;
-import net.strangled.dutta.securitycam.plugins.AppIntegrityCheck.AppIntegrityCheckManager;
-import net.strangled.dutta.securitycam.plugins.SecurePreferences.SecureSharedPreferencesManager;
+import tld.example.gander.MainActivity;
+import tld.example.gander.plugins.AppIntegrityCheck.AppIntegrityCheckManager;
+import tld.example.gander.plugins.SecurePreferences.SecureSharedPreferencesManager;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

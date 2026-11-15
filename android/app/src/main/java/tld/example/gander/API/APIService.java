@@ -1,4 +1,4 @@
-package net.strangled.dutta.securitycam.API;
+package tld.example.gander.API;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Gander</string>
     <string name="title_activity_main">Gander</string>
-    <string name="package_name">net.strangled.dutta.securitycam</string>
-    <string name="custom_url_scheme">net.strangled.dutta.securitycam</string>
+    <string name="package_name">tld.example.gander</string>
+    <string name="custom_url_scheme">tld.example.gander</string>
     <string name="audio_playback_attribution">Attribution for audio playback features</string>
 </resources>
