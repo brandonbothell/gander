@@ -2,7 +2,6 @@ package tld.example.gander.plugins.MotionService;
 
 import android.content.Intent;
 import android.content.Context;
-import android.os.Build;
 
 import androidx.core.content.ContextCompat;
 

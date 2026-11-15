@@ -18,7 +18,6 @@ import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -57,7 +56,6 @@ public class MotionForegroundService extends Service {
     private PowerManager.WakeLock wakeLock;
     private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
     private final Handler wakeLockHandler = new Handler(Looper.getMainLooper());
-    private final Handler tokenUpdateHandler = new Handler(Looper.getMainLooper());
     private final Handler unmuteHandler = new Handler(Looper.getMainLooper());
     private final Handler socketConnectionLoopHandler = new Handler(Looper.getMainLooper());
     private static final String CHANNEL_ID = "motion_service_channel";
@@ -65,7 +63,7 @@ public class MotionForegroundService extends Service {
     private static final String LOW_EVENT_CHANNEL_ID = "motion_event_low_channel";
 
     private static long muteUntilTimestamp = 0;
-    private static String refreshToken = null;
+
     private SecureSharedPreferencesManager encryptedSharedPref;
 
     public static long getMuteUntilTimestamp() {
@@ -505,9 +503,5 @@ public class MotionForegroundService extends Service {
 
     public static boolean getIsSocketConnected() {
         return mSocket != null && mSocket.connected();
-    }
-
-    public static void setCurrentRefreshToken(String token) {
-        refreshToken = token;
     }
 }
