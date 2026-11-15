@@ -118,9 +118,9 @@ server {
 
 ## Working With Android
 
-Android-specific configuration starts with configuring the Android section of variables in [`.env`](./.env.example) and running `yarn android:sync` followed by `yarn android:init`. You should never have to run the `init` command again, but you should run `sync` every time you edit the project files/configuration and plan to build the Android app.
+Android-specific configuration starts with configuring the Android section of variables in [`.env`](./.env.example) and running `yarn android:sync`. You should run this command every time you edit any files/configuration/dependencies in the web or android directories and plan to build the Android app.
 
-You can then open and build in the app in Android Studio (by running `yarn android:open`) once you download `google-services.json` in step 2 of the following instructions.
+You can then use VSCode Java extensions to manage the project, or open and build in the app in Android Studio (by running `yarn android:open`) once you retrieve `google-services.json`:
 
 1. [**Click here**](https://firebase.google.com/docs/android/setup#create-firebase-project) to learn how to setup a Firebase project
    - When prompted for a package name, copy _exactly_ what you have set `ANDROID_APP_ID` to in [`.env`](./.env.example).
