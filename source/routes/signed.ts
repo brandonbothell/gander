@@ -632,7 +632,15 @@ export default function initializeSignedRoutes(
             `${path.parse(filename).name}-social.mp4`,
             { dotfiles: 'allow' },
             (err) => {
-              if (res.headersSent) return
+              if (
+                err &&
+                typeof err === 'object' &&
+                'code' in err &&
+                (err.code === 'ECONNABORTED' || err.code === 'ECONNRESET')
+              ) {
+                return
+              }
+              if (res.headersSent || res.destroyed) return
               if (err) {
                 res.status(500).json({
                   error: 'Failed to send processed video',

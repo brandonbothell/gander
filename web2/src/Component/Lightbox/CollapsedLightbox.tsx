@@ -138,25 +138,68 @@ export default function CollapsedLightbox({
         key: 'social-download',
         icon: <FiDownload />,
         label: payload.labels.downloadLabel,
-        onClick() {
+        async onClick() {
           if (!props.currentSrc) return
 
-          notifications.show({
+          const notificationId = notifications.show({
             title: 'Preparing download',
             message:
-              'This may take a few minutes. The download will begin automatically when ready. If the request times out, try again shortly; the processed video will be cached.',
+              'This may take a few minutes. Please keep this screen open; the download will start automatically when ready.',
             color: 'blue',
-            autoClose: 15000,
+            autoClose: false,
+            loading: true,
           })
 
-          const downloadUrl = new URL(props.currentSrc, window.location.href)
-          downloadUrl.searchParams.set('download', 'true')
+          try {
+            const downloadUrl = new URL(
+              props.currentSrc,
+              window.location.href,
+            )
+            downloadUrl.searchParams.set('download', 'true')
 
-          const link = document.createElement('a')
-          link.href = downloadUrl.toString()
-          document.body.appendChild(link)
-          link.click()
-          link.remove()
+            const response = await authFetch(downloadUrl.toString())
+            if (!response.ok) {
+              throw new Error(
+                `Download request failed with status ${response.status}: ${await response.text()}`,
+              )
+            }
+
+            const downloadBlob = await response.blob()
+            const downloadObjectUrl = URL.createObjectURL(downloadBlob)
+            const link = document.createElement('a')
+            const filename =
+              props.activeRecording?.filename.replace(/\.[^.]+$/, '') ??
+              'recording'
+            link.href = downloadObjectUrl
+            link.download = `${filename}-social.mp4`
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            window.setTimeout(
+              () => URL.revokeObjectURL(downloadObjectUrl),
+              60_000,
+            )
+
+            notifications.update({
+              id: notificationId,
+              title: 'Download started',
+              message: 'Your social-media-ready video is downloading.',
+              color: 'teal',
+              autoClose: 5000,
+              loading: false,
+            })
+          } catch (error) {
+            console.error('Failed to download processed video:', error)
+            notifications.update({
+              id: notificationId,
+              title: 'Download failed',
+              message:
+                'The request may have timed out. Try again shortly; the processed video will be cached.',
+              color: 'red',
+              autoClose: false,
+              loading: false,
+            })
+          }
         },
         position: 'right',
       },
