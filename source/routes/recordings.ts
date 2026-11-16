@@ -330,7 +330,9 @@ export default function initializeRecordingRoutes(
         ) {
           res.status(404).json({ error: 'File not found' })
           console.error(
-            `[${streamId}] Failed to serve recording file ${filename}:`,
+            '[%s] Failed to serve recording file %s:',
+            streamId,
+            filename,
             JSON.stringify(err, null, 2),
           )
         }
