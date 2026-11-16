@@ -262,7 +262,8 @@ export default function initializeStreamRoutes(
             dynamicStreams[id].destroy()
           } catch (err) {
             console.error(
-              `[StreamManager] Failed to destroy stream ${id}:`,
+              '[StreamManager] Failed to destroy stream %s:',
+              id,
               err,
             )
             res.status(500).json({
