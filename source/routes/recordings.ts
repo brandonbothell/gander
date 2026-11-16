@@ -141,7 +141,9 @@ export default function initializeRecordingRoutes(
           }
         } catch (err) {
           console.error(
-            `[${streamId}] [Recordings] Failed to update last seen recording for ${username}:`,
+            '[%s] [Recordings] Failed to update last seen recording for %s:',
+            streamId,
+            username,
             err,
           )
         }
