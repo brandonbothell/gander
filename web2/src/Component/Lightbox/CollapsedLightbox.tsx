@@ -1,10 +1,9 @@
-import { FiTrash } from 'react-icons/fi'
+import { FiDownload, FiTrash } from 'react-icons/fi'
 import { useEffect, useRef, useState } from 'react'
 import { notifications } from '@mantine/notifications'
 import { modals } from '@mantine/modals'
 import {
   createCloseToolbarItem,
-  createDownloadToolbarItem,
   createThumbnailsToolbarItem,
   type LightboxSlideData,
   type LightboxProps,
@@ -135,10 +134,32 @@ export default function CollapsedLightbox({
         },
         position: 'right',
       },
-      createDownloadToolbarItem(
-        `${props.currentSrc}&download=true`,
-        payload.labels,
-      ),
+      {
+        key: 'social-download',
+        icon: <FiDownload />,
+        label: payload.labels.downloadLabel,
+        onClick() {
+          if (!props.currentSrc) return
+
+          notifications.show({
+            title: 'Preparing download',
+            message:
+              'This may take a few minutes. The download will begin automatically when ready. If the request times out, try again shortly; the processed video will be cached.',
+            color: 'blue',
+            autoClose: 15000,
+          })
+
+          const downloadUrl = new URL(props.currentSrc, window.location.href)
+          downloadUrl.searchParams.set('download', 'true')
+
+          const link = document.createElement('a')
+          link.href = downloadUrl.toString()
+          document.body.appendChild(link)
+          link.click()
+          link.remove()
+        },
+        position: 'right',
+      },
       createFullscreenToolbarItem(
         canFullscreen ? payload.toggleFullscreen : props.toggleInlineFullscreen,
         payload.isFullscreen,
