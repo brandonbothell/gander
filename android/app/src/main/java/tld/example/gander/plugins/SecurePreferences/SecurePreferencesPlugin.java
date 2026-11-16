@@ -1,7 +1,5 @@
 package tld.example.gander.plugins.SecurePreferences;
 
-import androidx.annotation.Nullable;
-
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
