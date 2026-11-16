@@ -102,7 +102,9 @@ export default function initializeMaskRoutes(app: express.Application) {
         !['x', 'y', 'w', 'h'].every((k) => Number.isInteger(mask[k]))
       ) {
         console.log(
-          `[PATCH] Invalid mask data for stream ${streamId}, maskId ${maskId}:`,
+          '[PATCH] Invalid mask data for stream %s, maskId %s:',
+          streamId,
+          maskId,
           mask,
         )
         res.status(400).json({ success: false, error: 'Invalid mask data' })
