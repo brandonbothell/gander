@@ -785,7 +785,9 @@ export default function initializeSignedRoutes(
                   error: 'Failed to send processed video',
                 })
                 console.error(
-                  `[${streamId}] Failed to send processed recording ${outputPath}:`,
+                  '[%s] Failed to send processed recording %s:',
+                  streamId,
+                  outputPath,
                   err,
                 )
               }
@@ -803,7 +805,9 @@ export default function initializeSignedRoutes(
               : 'Failed to process video',
           })
           console.error(
-            `[${streamId}] Failed to prepare processed recording ${filename}:`,
+            '[%s] Failed to prepare processed recording %s:',
+            streamId,
+            filename,
             err,
           )
         }
