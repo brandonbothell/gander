@@ -12,7 +12,7 @@
     "start": "node ./compiled/server.js",
     "build": "yarn build:server & yarn build:client",
     "android:init": "dotenvx run -- yarn trapeze run .trapeze.yml --android-project android -y",
-    "android:sync": "yarn cap sync android && yarn android:init && node -e \"require('child_process').execSync(process.platform === 'win32' ? 'gradlew.bat prepareVscode' : './gradlew prepareVscode', { cwd: 'android', stdio: 'inherit' })\"",
+    "android:sync": "yarn build:client && yarn cap sync android && yarn android:init && node -e \"require('child_process').execSync(process.platform === 'win32' ? 'gradlew.bat prepareVscode' : './gradlew prepareVscode', { cwd: 'android', stdio: 'inherit' })\"",
     "android:open": "yarn cap open android",
     "dev": "concurrently --kill-others-on-fail --raw \"yarn dev:client\" \"yarn dev:server -- --host 0.0.0.0\"",
     "build:server": "yarn build:server:safe",
