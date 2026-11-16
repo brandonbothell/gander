@@ -580,7 +580,9 @@ export default function initializeSignedRoutes(
               childProcess.exec(ffmpegCmd, { windowsHide: true }, (err) => {
                 if (err) {
                   console.error(
-                    `[${streamId}] Failed to generate thumbnail from ${latestTs}:`,
+                    '[%s] Failed to generate thumbnail from %s:',
+                    streamId,
+                    latestTs,
                     err,
                   )
                   resolve({ success: false })
