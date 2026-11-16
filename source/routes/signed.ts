@@ -541,7 +541,9 @@ export default function initializeSignedRoutes(
               if (err && err.code !== 'ECONNABORTED') {
                 res.status(404).json({ error: 'File not found' })
                 console.error(
-                  `[${streamId}] Failed to serve motion thumbnail file ${latestMotionJpg}:`,
+                  '[%s] Failed to serve motion thumbnail file %s:',
+                  streamId,
+                  latestMotionJpg,
                   JSON.stringify(err, null, 2),
                 )
               }
