@@ -15,44 +15,140 @@ import { rateLimit } from 'express-rate-limit'
 const socialMediaTranscodes = new Map<string, Promise<string>>()
 
 async function getSocialMediaVideo(sourcePath: string, filename: string) {
-  const sourceStat = await fs.promises.stat(sourcePath)
+  const sourceKey = path.resolve(sourcePath)
+  const pending = socialMediaTranscodes.get(sourceKey)
+  if (pending) return pending
+
+  const conversion = getOrCreateSocialMediaVideo(sourcePath, filename)
+  socialMediaTranscodes.set(sourceKey, conversion)
+  try {
+    return await conversion
+  } finally {
+    if (socialMediaTranscodes.get(sourceKey) === conversion) {
+      socialMediaTranscodes.delete(sourceKey)
+    }
+  }
+}
+
+async function getOrCreateSocialMediaVideo(
+  sourcePath: string,
+  filename: string,
+) {
+  const sourceKey = path.resolve(sourcePath)
   const cacheDirectory = path.join(path.dirname(sourcePath), '.social-media')
   await fs.promises.mkdir(cacheDirectory, { recursive: true })
 
+  const lockKey = crypto.createHash('sha256').update(sourceKey).digest('hex')
+  const lockPath = path.join(cacheDirectory, `v2-${lockKey}.lock`)
+
+  while (true) {
+    const { outputPath, cachedStat } = await getSocialMediaCacheState(
+      sourcePath,
+      filename,
+      cacheDirectory,
+    )
+    if (cachedStat?.isFile() && cachedStat.size > 0) return outputPath
+
+    let lockHandle: fs.promises.FileHandle
+    try {
+      lockHandle = await fs.promises.open(lockPath, 'wx')
+    } catch (error) {
+      if (!hasErrorCode(error, 'EEXIST')) throw error
+      if (await isSocialMediaLockStale(lockPath)) {
+        await fs.promises.rm(lockPath, { force: true })
+        continue
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 250))
+      continue
+    }
+
+    try {
+      await lockHandle.writeFile(String(process.pid))
+      const currentCache = await getSocialMediaCacheState(
+        sourcePath,
+        filename,
+        cacheDirectory,
+      )
+      if (
+        currentCache.cachedStat?.isFile() &&
+        currentCache.cachedStat.size > 0
+      ) {
+        return currentCache.outputPath
+      }
+      if (currentCache.cachedStat) {
+        await fs.promises.rm(currentCache.outputPath, { force: true })
+      }
+
+      return await transcodeSocialMediaVideo(
+        sourcePath,
+        currentCache.outputPath,
+      )
+    } finally {
+      try {
+        await lockHandle.close()
+      } finally {
+        await fs.promises.rm(lockPath, { force: true })
+      }
+    }
+  }
+}
+
+async function getSocialMediaCacheState(
+  sourcePath: string,
+  filename: string,
+  cacheDirectory: string,
+) {
+  const sourceStat = await fs.promises.stat(sourcePath)
   const cacheKey = crypto
     .createHash('sha256')
     .update(`${filename}\0${sourceStat.size}\0${sourceStat.mtimeMs}`)
     .digest('hex')
   const outputPath = path.join(cacheDirectory, `v2-${cacheKey}.mp4`)
-
   const cachedStat = await fs.promises
     .stat(outputPath)
     .catch((error: unknown) => {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        return null
-      }
+      if (hasErrorCode(error, 'ENOENT')) return null
       throw error
     })
-  if (cachedStat?.isFile() && cachedStat.size > 0) return outputPath
-  if (cachedStat) await fs.promises.rm(outputPath, { force: true })
+  return { outputPath, cachedStat }
+}
 
-  const pending = socialMediaTranscodes.get(outputPath)
-  if (pending) return pending
-
-  const conversion = transcodeSocialMediaVideo(sourcePath, outputPath)
-  socialMediaTranscodes.set(outputPath, conversion)
+async function isSocialMediaLockStale(lockPath: string) {
+  let lockContents: string
+  let lockMtimeMs: number
   try {
-    return await conversion
-  } finally {
-    if (socialMediaTranscodes.get(outputPath) === conversion) {
-      socialMediaTranscodes.delete(outputPath)
-    }
+    const [contents, lockStat] = await Promise.all([
+      fs.promises.readFile(lockPath, 'utf8'),
+      fs.promises.stat(lockPath),
+    ])
+    lockContents = contents
+    lockMtimeMs = lockStat.mtimeMs
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return true
+    throw error
   }
+
+  if (Date.now() - lockMtimeMs < 5000) return false
+  const ownerPid = Number.parseInt(lockContents, 10)
+  if (!Number.isInteger(ownerPid) || ownerPid <= 0) return true
+
+  try {
+    process.kill(ownerPid, 0)
+    return false
+  } catch (error) {
+    if (hasErrorCode(error, 'ESRCH')) return true
+    if (hasErrorCode(error, 'EPERM')) return false
+    throw error
+  }
+}
+
+function hasErrorCode(error: unknown, code: string) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === code
+  )
 }
 
 async function transcodeSocialMediaVideo(
