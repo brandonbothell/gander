@@ -110,7 +110,8 @@
     "web-push": "4.0.0"
   },
   "resolutions": {
-    "@yarnpkg/core/got": "npm:^11.8.2"
+    "@yarnpkg/core/got": "npm:11.8.6",
+    "ip-address": "10.7.1"
   },
   "dependenciesMeta": {
     "@prisma/client": {
