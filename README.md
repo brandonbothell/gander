@@ -70,49 +70,59 @@ A security camera application.
 ```properties
 # Gander HTTPS server configuration
 
- # Redirect HTTP to HTTPS
+# Redirect HTTP to HTTPS
 server {
-  listen 80;
-  listen [::]:80;
-  # Change example.tld to your website's address (like example.com)
-  server_name example.tld;
-  return 301 https://$host$request_uri;
+   listen 80;
+   listen [::]:80;
+   # Change example.tld to your website's address (like example.com)
+   server_name example.tld;
+   return 301 https://$host$request_uri;
 }
 
 # HTTPS
 server {
-  listen 443 ssl;
-  listen [::]:443 ssl;
-  http2 on;
-  # Change example.tld to your website's address (like example.com)
-  server_name example.tld;
+   listen 443 ssl;
+   listen [::]:443 ssl;
+   http2 on;
+   # Change example.tld to your website's address (like example.com)
+   server_name example.tld;
 
-  # CHANGE these paths to include YOUR website's domain, NOT "example.tld"
-  ssl_certificate /path/to/gander/greenlock.d/live/example.tld/fullchain.pem;
-  ssl_certificate_key /path/to/gander/greenlock.d/live/example.tld/privkey.pem;
-  ssl_trusted_certificate /path/to/gander/greenlock.d/live/example.tld/fullchain.pem;
-  add_header Strict-Transport-Security "max-age=31536000;";
+   # CHANGE these paths to include YOUR website's domain, NOT "example.tld"
+   ssl_certificate /path/to/gander/greenlock.d/live/example.tld/fullchain.pem;
+   ssl_certificate_key /path/to/gander/greenlock.d/live/example.tld/privkey.pem;
+   ssl_trusted_certificate /path/to/gander/greenlock.d/live/example.tld/fullchain.pem;
+   add_header Strict-Transport-Security "max-age=31536000;";
 
-  location / {
-    # You may have changed the port from the default of 3000 in .env
-    proxy_pass http://localhost:3000;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    # If you use Cloudflare proxying, replace $remote_addr with $http_cf_connecting_ip
-    # See https://developers.cloudflare.com/support/troubleshooting/restoring-visitor-ips/restoring-original-visitor-ips/#nginx-1
-    # alternatively use ngx_http_realip_module
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+   location / {
+      # You may have changed the port from the default of 3000 in .env
+      proxy_pass http://localhost:3000;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      # If you use Cloudflare proxying, replace with $http_cf_connecting_ip
+      # See https://developers.cloudflare.com/support/troubleshooting/restoring-visitor-ips/restoring-original-visitor-ips/#nginx-1
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
 
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-  }
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+   }
 
-  error_page 500 502 503 504 /50x.html;
-  location = /50x.html {
-    root /usr/share/nginx/html;
-  }
+   location /signed/video/ {
+      # You may have changed the port from the default of 3000 in .env
+      proxy_pass http://localhost:3000;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+
+      proxy_read_timeout 15m;
+   }
+
+   error_page 500 502 503 504 /50x.html;
+   location = /50x.html {
+      root /usr/share/nginx/html;
+   }
 }
 ```
 
