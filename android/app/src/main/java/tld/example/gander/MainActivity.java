@@ -12,6 +12,7 @@ import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderF
 import tld.example.gander.plugins.AppIntegrityCheck.AppIntegrityCheckPlugin;
 import tld.example.gander.plugins.BatteryOptimization.BatteryOptimizationPlugin;
 import tld.example.gander.plugins.MotionService.MotionServicePlugin;
+import tld.example.gander.plugins.NativeVideoDownload.NativeVideoDownloadPlugin;
 import tld.example.gander.plugins.SecurePreferences.SecurePreferencesPlugin;
 
 public class MainActivity extends BridgeActivity {
@@ -37,6 +38,7 @@ public class MainActivity extends BridgeActivity {
 
         registerPlugin(BatteryOptimizationPlugin.class);
         registerPlugin(MotionServicePlugin.class);
+        registerPlugin(NativeVideoDownloadPlugin.class);
         registerPlugin(SecurePreferencesPlugin.class);
         registerPlugin(AppIntegrityCheckPlugin.class);
 

@@ -11,10 +11,12 @@ import {
   type ToolbarItemsPayload,
   createFullscreenToolbarItem,
 } from '@mantine/lightbox'
-import { Text } from '@mantine/core'
+import { Anchor, Text } from '@mantine/core'
 import { useVideo } from '@gfazioli/mantine-video'
+import { Capacitor } from '@capacitor/core'
 import { Recording } from '../../types'
 import { API_BASE, authFetch } from '../../main'
+import { NativeVideoDownload } from '../../capacitor-plugins/native-video-download'
 import { LightboxSlides } from './Slides/LightboxSlides'
 import { LightboxSlide } from './Slides/LightboxSlide'
 import { LightboxToolbar } from './LightboxToolbar'
@@ -144,18 +146,65 @@ export default function CollapsedLightbox({
           const notificationId = notifications.show({
             title: 'Preparing download',
             message:
-              'This may take a few minutes. Please keep this screen open; the download will start automatically when ready.',
+              Capacitor.getPlatform() === 'android'
+                ? 'Android will save the processed video to Downloads. You can leave this app while it downloads.'
+                : 'This may take a few minutes. The download will begin automatically when ready.',
             color: 'blue',
             autoClose: false,
             loading: true,
           })
 
           try {
-            const downloadUrl = new URL(
-              props.currentSrc,
-              window.location.href,
-            )
+            const downloadUrl = new URL(props.currentSrc, window.location.href)
             downloadUrl.searchParams.set('download', 'true')
+
+            const filename =
+              props.activeRecording?.filename.replace(/\.[^.]+$/, '') ??
+              'recording'
+            const downloadFileName = `${filename}-social.mp4`
+            if (Capacitor.getPlatform() === 'android') {
+              const { fileName: queuedFileName } =
+                await NativeVideoDownload.queueDownload({
+                  url: downloadUrl.toString(),
+                  fileName: downloadFileName,
+                })
+              notifications.update({
+                id: notificationId,
+                title: 'Download queued',
+                message: (
+                  <>
+                    {queuedFileName} will appear in your{' '}
+                    <Anchor
+                      component="button"
+                      type="button"
+                      onClick={() => {
+                        void NativeVideoDownload.openDownloads().catch(
+                          (error: unknown) => {
+                            console.error(
+                              'Failed to open Android Downloads:',
+                              error,
+                            )
+                            notifications.show({
+                              title: 'Could not open Downloads',
+                              message:
+                                'Open the Files app on your device to find the video.',
+                              color: 'red',
+                            })
+                          },
+                        )
+                      }}
+                    >
+                      Downloads folder
+                    </Anchor>
+                    .
+                  </>
+                ),
+                color: 'teal',
+                autoClose: false,
+                loading: false,
+              })
+              return
+            }
 
             const response = await authFetch(downloadUrl.toString())
             if (!response.ok) {
@@ -167,11 +216,8 @@ export default function CollapsedLightbox({
             const downloadBlob = await response.blob()
             const downloadObjectUrl = URL.createObjectURL(downloadBlob)
             const link = document.createElement('a')
-            const filename =
-              props.activeRecording?.filename.replace(/\.[^.]+$/, '') ??
-              'recording'
             link.href = downloadObjectUrl
-            link.download = `${filename}-social.mp4`
+            link.download = downloadFileName
             document.body.appendChild(link)
             link.click()
             link.remove()

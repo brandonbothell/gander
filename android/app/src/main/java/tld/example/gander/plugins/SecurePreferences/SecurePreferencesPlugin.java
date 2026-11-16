@@ -19,7 +19,6 @@ public class SecurePreferencesPlugin extends Plugin {
     }
 
     @PluginMethod
-    @Nullable
     public void getStringOrNull(PluginCall call) {
         if (call.getString("key") == null) return;
         call.resolve(new JSObject().put("value", sharedPreferences.getStringOrNull(call.getString("key"))));

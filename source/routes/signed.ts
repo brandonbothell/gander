@@ -8,6 +8,7 @@ import express from 'express'
 import { SignedUrl, StreamMotionState } from '../types/stream'
 import { StreamManager } from '../streamManager'
 import { jwtAuth } from '../middleware/jwtAuth'
+import { isNvidiaAvailable } from '../hardwareCheck'
 import { JWT_SECRET } from '../credentials'
 import { rateLimit } from 'express-rate-limit'
 
@@ -22,7 +23,7 @@ async function getSocialMediaVideo(sourcePath: string, filename: string) {
     .createHash('sha256')
     .update(`${filename}\0${sourceStat.size}\0${sourceStat.mtimeMs}`)
     .digest('hex')
-  const outputPath = path.join(cacheDirectory, `v1-${cacheKey}.mp4`)
+  const outputPath = path.join(cacheDirectory, `v2-${cacheKey}.mp4`)
 
   const cachedStat = await fs.promises
     .stat(outputPath)
@@ -60,66 +61,44 @@ async function transcodeSocialMediaVideo(
 ) {
   const temporaryPath = `${outputPath}.${process.pid}.${crypto.randomUUID()}.tmp.mp4`
   try {
-    let stderr = ''
-    await new Promise<void>((resolve, reject) => {
-      const ffmpeg = childProcess.spawn(
-        'ffmpeg',
-        [
-          '-nostdin',
-          '-y',
-          '-i',
-          sourcePath,
-          '-map',
-          '0:v:0',
-          '-map',
-          '0:a:0?',
-          '-vf',
-          "scale=w='min(1920,iw)':h='min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
-          '-c:v',
-          'libx264',
-          '-preset',
-          'medium',
-          '-crf',
-          '23',
-          '-maxrate',
-          '8M',
-          '-bufsize',
-          '16M',
-          '-pix_fmt',
-          'yuv420p',
-          '-tag:v',
-          'avc1',
-          '-c:a',
-          'aac',
-          '-b:a',
-          '128k',
-          '-movflags',
-          '+faststart',
-          '-f',
-          'mp4',
-          temporaryPath,
-        ],
-        { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] },
+    const nvidiaAvailable = isNvidiaAvailable()
+    try {
+      await runSocialMediaFfmpeg(
+        sourcePath,
+        temporaryPath,
+        nvidiaAvailable
+          ? [
+              '-c:v',
+              'h264_nvenc',
+              '-preset',
+              'p4',
+              '-tune',
+              'hq',
+              '-rc',
+              'vbr',
+              '-cq',
+              '24',
+              '-b:v',
+              '0',
+            ]
+          : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24'],
       )
-
-      ffmpeg.stderr?.on('data', (chunk: Buffer) => {
-        stderr = `${stderr}${chunk.toString()}`.slice(-8000)
-      })
-      ffmpeg.once('error', (error) => {
-        reject(new Error(`Failed to start FFmpeg: ${error.message}`))
-      })
-      ffmpeg.once('close', (code, signal) => {
-        if (code === 0) {
-          resolve()
-        } else {
-          reject(
-            new Error(
-              `FFmpeg exited with ${code === null ? `signal ${signal}` : `code ${code}`}.${stderr ? ` ${stderr}` : ''}`,
-            ),
-          )
-        }
-      })
-    })
+    } catch (error) {
+      if (!nvidiaAvailable) throw error
+      await fs.promises.rm(temporaryPath, { force: true })
+      console.warn(
+        'NVIDIA video encoding failed; retrying with the CPU encoder.',
+        error,
+      )
+      await runSocialMediaFfmpeg(sourcePath, temporaryPath, [
+        '-c:v',
+        'libx264',
+        '-preset',
+        'veryfast',
+        '-crf',
+        '24',
+      ])
+    }
 
     const temporaryStat = await fs.promises.stat(temporaryPath)
     if (!temporaryStat.isFile() || temporaryStat.size === 0) {
@@ -131,6 +110,70 @@ async function transcodeSocialMediaVideo(
   } finally {
     await fs.promises.rm(temporaryPath, { force: true })
   }
+}
+
+async function runSocialMediaFfmpeg(
+  sourcePath: string,
+  temporaryPath: string,
+  videoEncoderArgs: string[],
+) {
+  let stderr = ''
+  await new Promise<void>((resolve, reject) => {
+    const ffmpeg = childProcess.spawn(
+      'ffmpeg',
+      [
+        '-nostdin',
+        '-y',
+        '-i',
+        sourcePath,
+        '-map',
+        '0:v:0',
+        '-map',
+        '0:a:0?',
+        '-vf',
+        "scale=w='min(1920,iw)':h='min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+        ...videoEncoderArgs,
+        '-maxrate',
+        '6M',
+        '-bufsize',
+        '12M',
+        '-pix_fmt',
+        'yuv420p',
+        '-tag:v',
+        'avc1',
+        '-c:a',
+        'aac',
+        '-ac',
+        '2',
+        '-b:a',
+        '96k',
+        '-movflags',
+        '+faststart',
+        '-f',
+        'mp4',
+        temporaryPath,
+      ],
+      { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] },
+    )
+
+    ffmpeg.stderr?.on('data', (chunk: Buffer) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-8000)
+    })
+    ffmpeg.once('error', (error) => {
+      reject(new Error(`Failed to start FFmpeg: ${error.message}`))
+    })
+    ffmpeg.once('close', (code, signal) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(
+          new Error(
+            `FFmpeg exited with ${code === null ? `signal ${signal}` : `code ${code}`}.${stderr ? ` ${stderr}` : ''}`,
+          ),
+        )
+      }
+    })
+  })
 }
 
 export default function initializeSignedRoutes(
