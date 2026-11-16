@@ -111,7 +111,7 @@
   },
   "resolutions": {
     "@yarnpkg/core/got": "npm:11.8.6",
-    "ip-address": "10.7.1"
+    "ip-address": "10.7.4"
   },
   "dependenciesMeta": {
     "@prisma/client": {
