@@ -38,6 +38,7 @@
     "env:decrypt": "yarn dotenvx decrypt"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.0",
     "@eslint/compat": "2.1.1",
     "@eslint/eslintrc": "3.3.7",
     "@eslint/js": "10.0.1",
@@ -47,6 +48,7 @@
     "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
+    "@types/express-rate-limit": "6.0.2",
     "@types/express-session": "1.19.0",
     "@types/greenlock-express": "4.0.3",
     "@types/jsonwebtoken": "9.0.10",
@@ -74,7 +76,6 @@
   "dependencies": {
     "@capacitor/android": "8.6.0",
     "@capacitor/app": "8.1.2",
-    "@capacitor/cli": "8.6.0",
     "@capacitor/core": "8.6.0",
     "@capacitor/preferences": "8.0.1",
     "@capacitor/push-notifications": "8.1.3",
@@ -86,7 +87,6 @@
     "@prisma/client-runtime-utils": "7.10.1",
     "@root/encoding": "1.0.1",
     "@root/keypairs": "0.10.3",
-    "@types/express-rate-limit": "6.0.2",
     "@yarnpkg/pnpify": "4.1.7",
     "better-sqlite3": "13.1.1",
     "better-sqlite3-session-store": "0.1.0",
