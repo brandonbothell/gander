@@ -194,7 +194,8 @@ export default function initializeStreamRoutes(
             })
           } catch (err) {
             console.error(
-              `[StreamManager] Failed to restart FFmpeg for stream ${id}:`,
+              '[StreamManager] Failed to restart FFmpeg for stream %s:',
+              id,
               err,
             )
             res
