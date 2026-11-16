@@ -57,6 +57,15 @@
                 android:value="Monitoring self-hosted security camera socket for real-time motion alerts." />
         </service>
 
+        <receiver
+            android:name=".plugins.NativeVideoDownload.NativeVideoDownloadReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
         <receiver android:name=".PauseDetectionNotificationActionReceiver" android:exported="false" />
 
         <receiver

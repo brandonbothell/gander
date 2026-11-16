@@ -196,7 +196,7 @@ export default function CollapsedLightbox({
                     >
                       Downloads folder
                     </Anchor>
-                    .
+                    . Check the bottom of your notifications for progress.
                   </>
                 ),
                 color: 'teal',
