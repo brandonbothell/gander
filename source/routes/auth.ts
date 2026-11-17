@@ -359,21 +359,24 @@ export default function initializeAuthRoutes(
     }
   }
 
-  app.post(
-    '/api/refresh-token',
+  const refreshTokenRouter = express.Router()
+
+  refreshTokenRouter.use(cookieParser(JWT_SECRET))
+  refreshTokenRouter.use(doubleCsrfProtection)
+
+  refreshTokenRouter.post(
+    '/refresh-token',
     refreshTokenLimiter,
-    cookieParser(JWT_SECRET),
-    doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: false }),
   )
 
-  app.post(
-    '/api/mobile/refresh-token',
+  refreshTokenRouter.post(
+    '/mobile/refresh-token',
     refreshTokenLimiter,
-    cookieParser(JWT_SECRET),
-    doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: true }),
   )
+
+  app.use('/api', refreshTokenRouter)
 
   function refreshTokenEndpoint({ mobile }: { mobile: boolean }) {
     return async (req: Request, res: Response) => {
