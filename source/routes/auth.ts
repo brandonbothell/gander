@@ -724,7 +724,13 @@ export default function initializeAuthRoutes(
       }
     },
   )
-  app.post('/api/logout', logoutLimiter, async (req, res) => {
+
+  const logoutRouter = express.Router()
+
+  logoutRouter.use(cookieParser(JWT_SECRET))
+  logoutRouter.use(doubleCsrfProtection)
+
+  logoutRouter.post('/logout', logoutLimiter, async (req, res) => {
     let refreshToken = req.cookies['_rt']
     if (refreshToken) {
       logAuth('[Logout] Refresh token retrieved from cookie')
@@ -781,6 +787,8 @@ export default function initializeAuthRoutes(
       res.status(500).json({ error: 'Failed to logout' })
     }
   })
+
+  app.use('/api', logoutRouter)
 
   app.get('/api/authcheck', authCheckLimiter, jwtAuth, async (req, res) =>
     res.json({ success: true }),

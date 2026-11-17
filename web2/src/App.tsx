@@ -342,6 +342,7 @@ export default function App() {
         return
       }
 
+      const csrfToken = await SecureStorage.getCsrfToken()
       const fingerprint = await getDeviceFingerprint()
 
       // Notify server of logout - use fetch directly to avoid recursive authFetch calls
@@ -349,6 +350,7 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
         },
         body: JSON.stringify({
           clientId: fingerprint.clientId,
