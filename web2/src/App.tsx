@@ -332,11 +332,11 @@ export default function App() {
       const refreshToken = await SecureStorage.getRefreshToken().catch((err) =>
         console.error('Error loading refresh token during logout', err),
       )
-      const rtExists = Capacitor.isNativePlatform()
-        ? !!refreshToken
-        : !refreshToken
+      const rtExists =
+        !!refreshToken ||
+        (!Capacitor.isNativePlatform()
           ? !!(await cookieStore?.get('_rtexists'))?.value
-          : false
+          : false)
       if (!rtExists) {
         console.warn(
           `No refresh token available for logout attempt, _rtexists: '${rtExists}'`,
@@ -344,6 +344,7 @@ export default function App() {
         return
       }
 
+      const accessToken = localStorage.getItem('jwt')
       const csrfToken = await SecureStorage.getCsrfToken()
       const fingerprint = await getDeviceFingerprint()
 
@@ -353,10 +354,10 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json',
           ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           clientId: fingerprint.clientId,
-          ...(refreshToken ? { Cookie: `_rt=${refreshToken}` } : {}),
         }),
       }).catch((err) => console.error('Error logging out from API: ', err))
     } catch (error) {
