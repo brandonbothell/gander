@@ -357,24 +357,21 @@ export default function initializeAuthRoutes(
     }
   }
 
-  const refreshTokenRouter = express.Router()
-
-  refreshTokenRouter.use(cookieParser(JWT_SECRET))
-  refreshTokenRouter.use(doubleCsrfProtection)
-
-  refreshTokenRouter.post(
-    '/refresh-token',
+  app.post(
+    '/api/refresh-token',
     refreshTokenLimiter,
+    cookieParser(JWT_SECRET),
+    doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: false }),
   )
 
-  refreshTokenRouter.post(
-    '/mobile/refresh-token',
+  app.post(
+    '/api/mobile/refresh-token',
     refreshTokenLimiter,
+    cookieParser(JWT_SECRET),
+    doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: true }),
   )
-
-  app.use('/api', refreshTokenRouter)
 
   function refreshTokenEndpoint({ mobile }: { mobile: boolean }) {
     return async (req: Request, res: Response) => {
@@ -751,70 +748,71 @@ export default function initializeAuthRoutes(
     },
   )
 
-  const logoutRouter = express.Router()
-
-  logoutRouter.use(cookieParser(JWT_SECRET))
-  logoutRouter.use(doubleCsrfProtection)
-
-  logoutRouter.post('/logout', logoutLimiter, async (req, res) => {
-    let refreshToken = req.cookies['_rt']
-    if (refreshToken) {
-      logAuth('[Logout] Refresh token retrieved from cookie')
-    } else {
-      logAuth('[Logout] No refresh token provided', 'warn')
-      res.status(401).json({ error: 'No refresh token provided' })
-      return
-    }
-
-    const { clientId }: { clientId?: string } = req.body
-
-    res.clearCookie('_rt').clearCookie('_rtexists')
-
-    let payload: { username: string; type: string }
-
-    try {
-      payload = jwt.verify(refreshToken, JWT_SECRET) as any
-    } catch {
-      res.status(401).json({ error: 'Invalid refresh token' })
-      return
-    }
-    // Remove the refreshToken from the user's refreshTokens array
-    const user = await prisma.user.findUnique({
-      where: { username: payload.username },
-    })
-
-    if (!user) {
-      res.status(401).send({ error: 'User no longer exists' })
-      return
-    }
-
-    try {
-      const tokens = JSON.parse(user.refreshTokens ?? '[]')
-      if (Array.isArray(tokens) && tokens.includes(refreshToken)) {
-        const newTokens = tokens.filter((t: string) => t !== refreshToken)
-        await prisma.user.update({
-          where: { username: user.username },
-          data: {
-            refreshTokens: JSON.stringify(newTokens),
-          },
-        })
-
-        const ip =
-          'x-real-ip' in req.headers ? String(req.headers['x-real-ip']) : req.ip
-        logAuth(`[Logout] User ${user.username} logged out from IP: ${ip}`)
-        res.json({ success: true })
+  app.post(
+    '/api/logout',
+    cookieParser(JWT_SECRET),
+    doubleCsrfProtection,
+    logoutLimiter,
+    async (req, res) => {
+      let refreshToken = req.cookies['_rt']
+      if (refreshToken) {
+        logAuth('[Logout] Refresh token retrieved from cookie')
+      } else {
+        logAuth('[Logout] No refresh token provided', 'warn')
+        res.status(401).json({ error: 'No refresh token provided' })
         return
       }
-    } catch {
-      logAuth(
-        `Failed to parse refreshTokens for user ${user.username}, skipping logout.`,
-        'error',
-      )
-      res.status(500).json({ error: 'Failed to logout' })
-    }
-  })
 
-  app.use('/api', logoutRouter)
+      const { clientId }: { clientId?: string } = req.body
+
+      res.clearCookie('_rt').clearCookie('_rtexists')
+
+      let payload: { username: string; type: string }
+
+      try {
+        payload = jwt.verify(refreshToken, JWT_SECRET) as any
+      } catch {
+        res.status(401).json({ error: 'Invalid refresh token' })
+        return
+      }
+      // Remove the refreshToken from the user's refreshTokens array
+      const user = await prisma.user.findUnique({
+        where: { username: payload.username },
+      })
+
+      if (!user) {
+        res.status(401).send({ error: 'User no longer exists' })
+        return
+      }
+
+      try {
+        const tokens = JSON.parse(user.refreshTokens ?? '[]')
+        if (Array.isArray(tokens) && tokens.includes(refreshToken)) {
+          const newTokens = tokens.filter((t: string) => t !== refreshToken)
+          await prisma.user.update({
+            where: { username: user.username },
+            data: {
+              refreshTokens: JSON.stringify(newTokens),
+            },
+          })
+
+          const ip =
+            'x-real-ip' in req.headers
+              ? String(req.headers['x-real-ip'])
+              : req.ip
+          logAuth(`[Logout] User ${user.username} logged out from IP: ${ip}`)
+          res.json({ success: true })
+          return
+        }
+      } catch {
+        logAuth(
+          `Failed to parse refreshTokens for user ${user.username}, skipping logout.`,
+          'error',
+        )
+        res.status(500).json({ error: 'Failed to logout' })
+      }
+    },
+  )
 
   app.get('/api/authcheck', authCheckLimiter, jwtAuth, async (req, res) =>
     res.json({ success: true }),
