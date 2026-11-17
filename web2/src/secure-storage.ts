@@ -155,11 +155,37 @@ class SecureStorageService {
     localStorage.removeItem('_rt')
   }
 
+  async setCsrfToken(token: string): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      await SecurePreferences.setString({ key: 'csrfToken', value: token })
+    } else localStorage.setItem('csrf', token)
+  }
+
+  async getCsrfToken(): Promise<string | null> {
+    if (Capacitor.isNativePlatform()) {
+      const { value: token } = await SecurePreferences.getStringOrNull({
+        key: 'csrfToken',
+      })
+      return token
+    }
+
+    return localStorage.getItem('csrf')
+  }
+
+  async removeCsrfToken(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      await SecurePreferences.unset({ key: 'csrfToken' })
+      return
+    }
+    localStorage.removeItem('csrf')
+  }
+
   async clearAll(): Promise<void> {
     if (Capacitor.isNativePlatform()) {
       await SecurePreferences.unset({ key: 'refreshToken' })
       await SecurePreferences.unset({ key: 'statusToken' })
       await SecurePreferences.unset({ key: 'token' })
+      await SecurePreferences.unset({ key: 'csrfToken' })
 
       MotionService.stopService()
     }
@@ -167,6 +193,7 @@ class SecureStorageService {
     localStorage.removeItem('jwt')
     localStorage.removeItem('_rt')
     localStorage.removeItem('_encKey')
+    localStorage.removeItem('csrf')
   }
 }
 

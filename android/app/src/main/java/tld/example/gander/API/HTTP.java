@@ -126,12 +126,14 @@ public class HTTP {
             return;
         }
 
+        String csrfToken = encryptedSharedPreferences.getStringOrNull("csrfToken");
         currentRefreshToken = encryptedSharedPreferences.getStringOrNull("refreshToken");
         if (refreshToken == null) refreshToken = currentRefreshToken;
 
         assert baseUrl != null;
         assert clientId != null;
         assert refreshToken != null;
+        assert csrfToken != null;
         String finalRefreshToken = refreshToken;
 
         if (finalRefreshToken.equals(dontTryThisTokenAgain)) {
@@ -168,7 +170,7 @@ public class HTTP {
 
             APIService service = retrofit.create(APIService.class);
 
-            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(finalRefreshToken), dummyDeviceInfo);
+            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(finalRefreshToken), csrfToken, dummyDeviceInfo);
 
             refreshTokenResponse.enqueue(new Callback<>() {
                 @Override
@@ -214,6 +216,7 @@ public class HTTP {
                         HTTP.currentStatusToken = body.statusToken;
                         if (sharedPreferences != null) {
                             SharedPreferences.Editor editor = encryptedSharedPreferences.getEditor();
+                            editor.putString("csrfToken", body.csrfToken);
                             editor.putString("refreshToken", body.refreshToken);
                             editor.putString("statusToken", body.statusToken);
                             editor.putString("token", body.token);

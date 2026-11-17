@@ -203,7 +203,7 @@ export default function App() {
       // Mark refresh as in progress
       localStorage.setItem('tokenRefreshInProgress', Date.now().toString())
 
-      const csrfToken = localStorage.getItem('csrf')
+      const csrfToken = await SecureStorage.getCsrfToken()
       const deviceInfo = await getDeviceFingerprint()
       const data = {
         method: 'POST',
@@ -249,11 +249,11 @@ export default function App() {
           debugLog('Token refresh successful, storing new tokens')
 
           localStorage.setItem('jwt', data.token)
-          localStorage.setItem('csrf', data.csrfToken)
+          await SecureStorage.setCsrfToken(data.csrfToken)
+          await SecureStorage.setRefreshToken(data.refreshToken)
 
           localStorage.removeItem('tokenRefreshInProgress')
 
-          await SecureStorage.setRefreshToken(data.refreshToken)
           if (Capacitor.isNativePlatform()) {
             await SecurePreferences.setString({
               key: 'statusToken',
@@ -634,7 +634,7 @@ export default function App() {
       }
 
       if (csrfToken) {
-        localStorage.setItem('csrf', csrfToken)
+        await SecureStorage.setCsrfToken(csrfToken)
       } else {
         console.warn('No CSRF token from login!')
       }

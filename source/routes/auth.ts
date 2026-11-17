@@ -68,11 +68,14 @@ export default function initializeAuthRoutes(
   } = doubleCsrf({
     cookieName: 'x-csrf-token',
     cookieOptions: {
+      sameSite: 'strict',
       secure: process.env.API_ENV !== 'development',
       expires: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      httpOnly: true,
     },
     getSecret: () => JWT_SECRET,
-    getSessionIdentifier: (req) => req.session.id, // return the requests unique identifier
+    getSessionIdentifier: (req) =>
+      req.headers['x-refresh-token'] ?? req.cookies['_rt'] ?? '', // return the requests unique identifier
   })
 
   app.post('/api/login', loginLimiter, express.json(), loginEndpoint())
@@ -316,6 +319,9 @@ export default function initializeAuthRoutes(
           })
         }
 
+        req.headers['x-refresh-token'] = refreshToken
+        req.cookies['_rt'] = refreshToken
+
         res.cookie('_rt', refreshToken, {
           httpOnly: true,
           secure: process.env.API_ENV !== 'development',
@@ -353,14 +359,15 @@ export default function initializeAuthRoutes(
 
   app.post(
     '/api/refresh-token',
-    doubleCsrfProtection,
     refreshTokenLimiter,
+    doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: false }),
   )
-  // Mobile doesn't need CSRF prevention due to requiring an app check token
+
   app.post(
     '/api/mobile/refresh-token',
     refreshTokenLimiter,
+    doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: true }),
   )
 
@@ -664,6 +671,9 @@ export default function initializeAuthRoutes(
             : {}),
         },
       })
+
+      req.headers['x-refresh-token'] = newRefreshToken
+      req.cookies['_rt'] = newRefreshToken
 
       res.cookie('_rt', newRefreshToken, {
         httpOnly: true,

@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom/client'
 import { StrictMode } from 'react'
 import { Capacitor } from '@capacitor/core'
+import SecureStorage from './secure-storage'
 import App from './App'
 
 function isIOS() {
@@ -76,7 +77,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
 
   // Use the latest JWT
   const finalToken = getTokenOrApiKey()
-  const csrfToken = localStorage.getItem('csrf')
+  const csrfToken = await SecureStorage.getCsrfToken()
 
   const makeRequest = (authToken?: { token: string; type: 'jwt' | 'api' }) => {
     return fetch(input, {

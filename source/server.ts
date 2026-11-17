@@ -6,13 +6,10 @@ import { setVapidDetails } from 'web-push'
 import { Server as SocketIOServer } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import helmet from 'helmet'
-import session from 'express-session'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import * as chokidar from 'chokidar'
-// @ts-ignore
-import SessionStore from 'better-sqlite3-session-store'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import config from '../config.json'
 import { StreamMotionState } from './types/stream'
@@ -41,10 +38,6 @@ import { initializeCredentials, JWT_SECRET } from './credentials'
 import { initializeConsole } from './console'
 import open from 'open'
 import { rateLimit } from 'express-rate-limit'
-import sqlite from 'better-sqlite3'
-
-const SQLiteStore = SessionStore(session)
-const db = new sqlite('sessions.sqlite')
 
 initializeConsole()
 initializeCredentials()
@@ -788,26 +781,6 @@ app.use(
   }),
 )
 
-app.use(
-  session({
-    store: new SQLiteStore({
-      client: db,
-      expired: {
-        clear: true,
-        intervalMs: 7 * 24 * 60 * 60 * 1000, // 7 days
-      },
-    }),
-    resave: false,
-    saveUninitialized: true,
-    secret: JWT_SECRET,
-    rolling: true,
-    cookie: {
-      secure: process.env.API_ENV !== 'development',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    },
-  }),
-)
-
 // --- CORS ---
 const allowedOrigins = (
   process.env.API_ENV === 'production'
@@ -834,11 +807,8 @@ app.use(
     credentials: true,
   }),
 )
-
 app.use(cookieParser(JWT_SECRET))
-
 app.use(express.json())
-
 app.set('trust proxy', () => true)
 
 initializeHlsRoutes(app, dynamicStreams)
