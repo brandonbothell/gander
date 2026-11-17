@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken'
 import { getAppCheck } from 'firebase-admin/app-check'
 import express, { Request, Response } from 'express'
 import { doubleCsrf } from 'csrf-csrf'
+import cookieParser from 'cookie-parser'
 import {
   DeviceInfo,
   TrustedDevice,
@@ -320,6 +321,7 @@ export default function initializeAuthRoutes(
         }
 
         req.headers['x-refresh-token'] = refreshToken
+        if (!req.cookies) req.cookies = {}
         req.cookies['_rt'] = refreshToken
 
         res.cookie('_rt', refreshToken, {
@@ -360,6 +362,7 @@ export default function initializeAuthRoutes(
   app.post(
     '/api/refresh-token',
     refreshTokenLimiter,
+    cookieParser(JWT_SECRET),
     doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: false }),
   )
@@ -367,6 +370,7 @@ export default function initializeAuthRoutes(
   app.post(
     '/api/mobile/refresh-token',
     refreshTokenLimiter,
+    cookieParser(JWT_SECRET),
     doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: true }),
   )

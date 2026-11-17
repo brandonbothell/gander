@@ -8,7 +8,6 @@ import jwt from 'jsonwebtoken'
 import helmet from 'helmet'
 import express from 'express'
 import cors from 'cors'
-import cookieParser from 'cookie-parser'
 import * as chokidar from 'chokidar'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import config from '../config.json'
@@ -807,7 +806,6 @@ app.use(
     credentials: true,
   }),
 )
-app.use(cookieParser(JWT_SECRET))
 app.use(express.json())
 app.set('trust proxy', () => true)
 
