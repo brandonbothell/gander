@@ -162,7 +162,7 @@ export default function App() {
               const stillInProgress = localStorage.getItem(
                 'tokenRefreshInProgress',
               )
-              const newToken = localStorage.getItem('jwt')
+              const newToken = await SecureStorage.getAccessToken()
 
               if (!stillInProgress && newToken) {
                 debugLog(
@@ -203,7 +203,7 @@ export default function App() {
       // Mark refresh as in progress
       localStorage.setItem('tokenRefreshInProgress', Date.now().toString())
 
-      const accessToken = localStorage.getItem('jwt')
+      const accessToken = await SecureStorage.getAccessToken()
       const csrfToken = await SecureStorage.getCsrfToken()
       const deviceInfo = await getDeviceFingerprint()
       const data = {
@@ -211,7 +211,9 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
-          'x-csrf-token': csrfToken,
+          ...(!deviceInfo.appCheckToken && csrfToken
+            ? { 'x-csrf-token': csrfToken }
+            : {}),
           ...(deviceInfo.appCheckToken && refreshToken
             ? { 'x-refresh-token': refreshToken }
             : {}),
@@ -246,24 +248,28 @@ export default function App() {
       }
 
       if (res && res.status === 200) {
-        const data = await res.json()
-        if (data && data.token && data.csrfToken) {
+        const responseData = await res.json()
+        if (
+          responseData &&
+          responseData.token &&
+          (deviceInfo.appCheckToken || responseData.csrfToken)
+        ) {
           debugLog('Token refresh successful, storing new tokens')
 
-          localStorage.setItem('jwt', data.token)
-          await SecureStorage.setCsrfToken(data.csrfToken)
-          await SecureStorage.setRefreshToken(data.refreshToken)
+          await SecureStorage.setAccessToken(responseData.token)
+          if (responseData.csrfToken) {
+            await SecureStorage.setCsrfToken(responseData.csrfToken)
+          }
+          if (responseData.refreshToken) {
+            await SecureStorage.setRefreshToken(responseData.refreshToken)
+          }
 
           localStorage.removeItem('tokenRefreshInProgress')
 
           if (Capacitor.isNativePlatform()) {
             await SecurePreferences.setString({
               key: 'statusToken',
-              value: data.statusToken,
-            })
-            await SecurePreferences.setString({
-              key: 'token',
-              value: data.token,
+              value: responseData.statusToken,
             })
           }
 
@@ -271,7 +277,7 @@ export default function App() {
           const tokenChannel = new BroadcastChannel('tokenUpdates')
           tokenChannel.postMessage({
             type: 'TOKEN_UPDATED',
-            token: data.token,
+            token: responseData.token,
             timestamp: Date.now(),
           })
           tokenChannel.close()
@@ -344,7 +350,7 @@ export default function App() {
         return
       }
 
-      const accessToken = localStorage.getItem('jwt')
+      const accessToken = await SecureStorage.getAccessToken()
       const csrfToken = await SecureStorage.getCsrfToken()
       const fingerprint = await getDeviceFingerprint()
 
@@ -353,7 +359,9 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+          ...(csrfToken && !fingerprint.appCheckToken
+            ? { 'x-csrf-token': csrfToken }
+            : {}),
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
@@ -386,16 +394,16 @@ export default function App() {
   useEffect(() => {
     const tokenChannel = new BroadcastChannel('tokenUpdates')
 
-    const handleTokenUpdate = (event: MessageEvent) => {
+    const handleTokenUpdate = async (event: MessageEvent) => {
       console.log('Token update received via broadcast: ' + event.data.type)
 
       if (event.data.type === 'TOKEN_UPDATED') {
         const newToken = event.data.token
         if (newToken) {
           // Update localStorage if it's different (in case this tab missed it)
-          const currentToken = localStorage.getItem('jwt')
+          const currentToken = await SecureStorage.getAccessToken()
           if (currentToken !== newToken) {
-            localStorage.setItem('jwt', newToken)
+            await SecureStorage.setAccessToken(newToken)
           }
 
           console.log('JWT updated via broadcast, staying authenticated')
@@ -435,7 +443,7 @@ export default function App() {
       // Add a small delay to ensure BroadcastChannel is fully set up
       await new Promise((resolve) => setTimeout(resolve, 50))
 
-      const token = localStorage.getItem('jwt')
+      const token = await SecureStorage.getAccessToken()
 
       if (token) {
         debugLog('Found existing JWT, assuming authenticated')
@@ -591,7 +599,7 @@ export default function App() {
         navigationEntries[0].type === 'reload'
       ) {
         // Only on refresh, not on navigation
-        // localStorage.removeItem('jwt')
+        // await SecureStorage.removeAccessToken()
       }
     }
 
@@ -632,10 +640,6 @@ export default function App() {
           key: 'statusToken',
           value: statusToken,
         })
-        await SecurePreferences.setString({
-          key: 'token',
-          value: token,
-        })
       }
 
       if (csrfToken) {
@@ -644,16 +648,11 @@ export default function App() {
         console.warn('No CSRF token from login!')
       }
 
-      localStorage.setItem('jwt', token)
+      await SecureStorage.setAccessToken(token)
       setAuthenticated(true)
     } catch (error) {
       console.error('Error storing tokens: ' + error)
-
-      // Still try to authenticate even if secure storage fails
-      localStorage.setItem('jwt', token)
-      // Store refresh token as base64 fallback
-      // localStorage.setItem('_rt', btoa(refreshToken))
-      setAuthenticated(true)
+      setAuthenticated(false)
     }
   }
 

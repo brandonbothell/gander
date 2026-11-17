@@ -124,9 +124,8 @@ public class HTTP {
         }
 
         String currentToken = encryptedSharedPreferences.getStringOrNull("token");
-        String csrfToken = encryptedSharedPreferences.getStringOrNull("csrfToken");
 
-        if (currentToken == null || csrfToken == null) {
+        if (currentToken == null) {
             Log.w("Refresh Token", "Missing token or csrf token, cancelling refresh");
             callback.onFailure("Missing token or csrf token");
             return;
@@ -138,7 +137,6 @@ public class HTTP {
         assert baseUrl != null;
         assert clientId != null;
         assert refreshToken != null;
-        assert csrfToken != null;
         String finalRefreshToken = refreshToken;
 
         if (finalRefreshToken.equals(dontTryThisTokenAgain)) {
@@ -175,7 +173,7 @@ public class HTTP {
 
             APIService service = retrofit.create(APIService.class);
 
-            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(finalRefreshToken).concat("; x-csrf-token=".concat(csrfToken)), "Bearer ".concat(currentToken), csrfToken, dummyDeviceInfo);
+            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(finalRefreshToken), "Bearer ".concat(currentToken), dummyDeviceInfo);
 
             refreshTokenResponse.enqueue(new Callback<>() {
                 @Override
@@ -212,7 +210,7 @@ public class HTTP {
                     }
 
                     assert body != null;
-                    if (body.refreshToken != null && body.token != null) {
+                    if (body.refreshToken != null && body.token != null && body.statusToken != null) {
                         refreshFailuresInARow = 0;
                         Log.d("Refresh Token", "Token refreshed successfully!");
                         HTTP.lastRefreshed = System.currentTimeMillis();
@@ -221,7 +219,7 @@ public class HTTP {
                         HTTP.currentStatusToken = body.statusToken;
                         if (encryptedSharedPreferences != null) {
                             SharedPreferences.Editor editor = encryptedSharedPreferences.getEditor();
-                            editor.putString("csrfToken", body.csrfToken);
+                            // editor.putString("csrfToken", body.csrfToken);
                             editor.putString("refreshToken", body.refreshToken);
                             editor.putString("statusToken", body.statusToken);
                             editor.putString("token", body.token);
@@ -239,7 +237,7 @@ public class HTTP {
                             dontTryThisTokenAgain = finalRefreshToken;
                         }
                         Log.e("Refresh Token", "Failed to refresh token (attempt " + refreshFailuresInARow + ")");
-                        callback.onFailure("Refresh token or token is missing from the server response");
+                        callback.onFailure("Refresh, status, csrf, or access token is missing from the server response");
                     }
                 }
 

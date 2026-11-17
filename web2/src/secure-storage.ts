@@ -115,10 +115,31 @@ class SecureStorageService {
     }
   }
 
+  async setAccessToken(token: string): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      return SecurePreferences.setString({ key: 'token', value: token })
+    } else localStorage.setItem('jwt', token)
+  }
+
+  async getAccessToken(): Promise<string | null> {
+    if (Capacitor.isNativePlatform()) {
+      console.log('Getting access token from SecurePreferences')
+      const { value: token } = await SecurePreferences.getStringOrNull({
+        key: 'token',
+      })
+      return token
+    } else return localStorage.getItem('jwt')
+  }
+
+  async removeAccessToken(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      return SecurePreferences.unset({ key: 'token' })
+    } else localStorage.removeItem('jwt')
+  }
+
   async setRefreshToken(token: string): Promise<void> {
     if (Capacitor.isNativePlatform()) {
-      await SecurePreferences.setString({ key: 'refreshToken', value: token })
-      return
+      return SecurePreferences.setString({ key: 'refreshToken', value: token })
     } else if (!window.isSecureContext) {
       const encrypted = await this.encrypt(token)
       localStorage.setItem('_rt', encrypted)
@@ -149,15 +170,13 @@ class SecureStorageService {
 
   async removeRefreshToken(): Promise<void> {
     if (Capacitor.isNativePlatform()) {
-      await SecurePreferences.unset({ key: 'refreshToken' })
-      return
-    }
-    localStorage.removeItem('_rt')
+      return SecurePreferences.unset({ key: 'refreshToken' })
+    } else localStorage.removeItem('_rt')
   }
 
   async setCsrfToken(token: string): Promise<void> {
     if (Capacitor.isNativePlatform()) {
-      await SecurePreferences.setString({ key: 'csrfToken', value: token })
+      return SecurePreferences.setString({ key: 'csrfToken', value: token })
     } else localStorage.setItem('csrf', token)
   }
 

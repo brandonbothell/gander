@@ -365,11 +365,11 @@ export default function initializeAuthRoutes(
     refreshTokenEndpoint({ mobile: false }),
   )
 
+  // Mobile doesn't require CSRF protection due to using Firebase App Check with the Play Integrity API.
   app.post(
     '/api/mobile/refresh-token',
     refreshTokenLimiter,
     cookieParser(JWT_SECRET),
-    doubleCsrfProtection,
     refreshTokenEndpoint({ mobile: true }),
   )
 
@@ -713,8 +713,9 @@ export default function initializeAuthRoutes(
 
       res.json({
         success: true,
-        ...(isVerifiedMobile ? { refreshToken: newRefreshToken } : {}),
-        csrfToken: generateCsrfToken(req, res, { overwrite: true }),
+        ...(isVerifiedMobile
+          ? { refreshToken: newRefreshToken }
+          : { csrfToken: generateCsrfToken(req, res, { overwrite: true }) }),
         token,
         statusToken,
       })
@@ -751,7 +752,6 @@ export default function initializeAuthRoutes(
   app.post(
     '/api/logout',
     cookieParser(JWT_SECRET),
-    doubleCsrfProtection,
     logoutLimiter,
     async (req, res) => {
       let refreshToken = req.cookies['_rt']

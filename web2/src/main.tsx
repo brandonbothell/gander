@@ -25,9 +25,10 @@ if (isIOS()) {
   document.body.classList.add('ios')
 }
 
-function getTokenOrApiKey():
-  { token: string; type: 'jwt' | 'api' } | undefined {
-  const jwt = localStorage.getItem('jwt')
+async function getTokenOrApiKey(): Promise<
+  { token: string; type: 'jwt' | 'api' } | undefined
+> {
+  const jwt = await SecureStorage.getAccessToken()
   const apiKey = jwt ? null : atob(localStorage.getItem('ak') || '')
   return jwt
     ? { token: jwt, type: 'jwt' }
@@ -53,7 +54,7 @@ let tokenRefreshPromise: Promise<boolean> | null = null
 let isRefreshInProgress = false
 
 export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
-  const token = getTokenOrApiKey()
+  const token = await getTokenOrApiKey()
 
   if (
     ((!token &&
@@ -78,7 +79,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   }
 
   // Use the latest JWT
-  const finalToken = getTokenOrApiKey()
+  const finalToken = await getTokenOrApiKey()
   const csrfToken = await SecureStorage.getCsrfToken()
 
   const makeRequest = (authToken?: { token: string; type: 'jwt' | 'api' }) => {
@@ -136,7 +137,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
       const refreshSuccess = await tokenRefreshPromise
       if (refreshSuccess) {
         // Retry the original request with the new token
-        const newToken = localStorage.getItem('jwt')!
+        const newToken = (await SecureStorage.getAccessToken())!
         return makeRequest({ token: newToken, type: 'jwt' })
       } else {
         // Refresh failed, logout
@@ -158,7 +159,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
       if (tokenRefreshSuccess) {
         console.log('Token refresh successful, retrying request...')
         // Retry the original request with the new token
-        const newToken = localStorage.getItem('jwt')!
+        const newToken = (await SecureStorage.getAccessToken())!
         const retryResponse = await makeRequest({
           token: newToken,
           type: 'jwt',

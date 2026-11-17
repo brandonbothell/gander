@@ -66,7 +66,9 @@ export function getDeviceDisplayName(deviceInfo: DeviceInfo): string {
 }
 
 export async function getDeviceFingerprint(): Promise<DeviceInfo> {
-  let clientId = localStorage.getItem('clientId')
+  let clientId = Capacitor.isNativePlatform()
+    ? (await Preferences.get({ key: 'clientId' })).value
+    : localStorage.getItem('clientId')
   if (!clientId) {
     clientId = crypto.randomUUID
       ? crypto.randomUUID()
@@ -75,20 +77,21 @@ export async function getDeviceFingerprint(): Promise<DeviceInfo> {
           const v = c === 'x' ? r : (r & 0x3) | 0x8
           return v.toString(16)
         })
-    localStorage.setItem('clientId', clientId)
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.set({ key: 'clientId', value: clientId })
+    } else localStorage.setItem('clientId', clientId)
   }
 
   let appCheckToken: string | undefined = undefined
 
   if (Capacitor.isNativePlatform()) {
-    if (!(await Preferences.get({ key: 'clientId' })).value) {
-      await Preferences.set({ key: 'clientId', value: clientId })
-    }
-
     const appCheckResponse = await AppIntegrity.getAppCheckToken()
     if ('token' in appCheckResponse) appCheckToken = appCheckResponse.token
     else {
       console.error('Error getting app check token: ' + appCheckResponse.error)
+      throw new Error(
+        'Error getting app check token: ' + appCheckResponse.error,
+      )
     }
   }
 
