@@ -56,13 +56,15 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   const token = getTokenOrApiKey()
 
   if (
-    !token &&
-    (!init.headers ||
-      !(init.headers as { [key: string]: string })['Authorization']) &&
+    ((!token &&
+      (!init.headers ||
+        !(init.headers as { [key: string]: string })['Authorization'])) ||
+      localStorage.getItem('forceRefresh') === '1') &&
     globalTryRefreshToken &&
     globalLogout &&
     !isRefreshInProgress
   ) {
+    localStorage.setItem('forceRefresh', '0')
     isRefreshInProgress = true
     try {
       const refreshed = await globalTryRefreshToken()
