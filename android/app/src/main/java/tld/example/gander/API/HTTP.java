@@ -1,7 +1,5 @@
 package tld.example.gander.API;
 
-import android.annotation.SuppressLint;
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Handler;
@@ -38,7 +36,6 @@ public class HTTP {
     private static String currentStatusToken = null;
     private static String currentRefreshToken = null;
     private static String currentToken = null;
-    public static SharedPreferences sharedPreferences = null;
     private static boolean refreshingToken = false;
     private static SecureSharedPreferencesManager encryptedSharedPreferences;
 
@@ -178,7 +175,7 @@ public class HTTP {
 
             APIService service = retrofit.create(APIService.class);
 
-            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(finalRefreshToken), "Bearer ".concat(currentToken), csrfToken, dummyDeviceInfo);
+            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(finalRefreshToken).concat("; x-csrf-token=".concat(csrfToken)), "Bearer ".concat(currentToken), csrfToken, dummyDeviceInfo);
 
             refreshTokenResponse.enqueue(new Callback<>() {
                 @Override
@@ -222,7 +219,7 @@ public class HTTP {
                         HTTP.currentRefreshToken = body.refreshToken;
                         HTTP.currentToken = body.token;
                         HTTP.currentStatusToken = body.statusToken;
-                        if (sharedPreferences != null) {
+                        if (encryptedSharedPreferences != null) {
                             SharedPreferences.Editor editor = encryptedSharedPreferences.getEditor();
                             editor.putString("csrfToken", body.csrfToken);
                             editor.putString("refreshToken", body.refreshToken);
