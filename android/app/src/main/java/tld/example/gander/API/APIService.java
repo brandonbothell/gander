@@ -13,7 +13,7 @@ import retrofit2.http.Path;
 
 public interface APIService {
     @POST("/api/mobile/refresh-token")
-    Call<RefreshTokenResponse> refreshToken(@Header("Cookie") String cookie, @Header("x-csrf-token") String csrfToken, @Body JsonObject deviceInfo);
+    Call<RefreshTokenResponse> refreshToken(@Header("Cookie") String cookie, @Header("Authorization") String authorization, @Header("x-csrf-token") String csrfToken, @Body JsonObject deviceInfo);
 
     @POST("/api/subscribe")
     Call<APIResponse> fcmSubscribe(@Header("Authorization") String authorization, @Body JsonObject fcmSubscribeBody);

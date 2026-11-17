@@ -203,12 +203,14 @@ export default function App() {
       // Mark refresh as in progress
       localStorage.setItem('tokenRefreshInProgress', Date.now().toString())
 
+      const accessToken = localStorage.getItem('jwt')
       const csrfToken = await SecureStorage.getCsrfToken()
       const deviceInfo = await getDeviceFingerprint()
       const data = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
           'x-csrf-token': csrfToken,
           ...(deviceInfo.appCheckToken && refreshToken
             ? { 'x-refresh-token': refreshToken }

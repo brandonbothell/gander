@@ -75,8 +75,7 @@ export default function initializeAuthRoutes(
       httpOnly: true,
     },
     getSecret: () => JWT_SECRET,
-    getSessionIdentifier: (req) =>
-      req.headers['x-refresh-token'] ?? req.cookies['_rt'] ?? '', // return the requests unique identifier
+    getSessionIdentifier: (req) => req.headers['authorization']!, // return the requests unique identifier
   })
 
   app.post('/api/login', loginLimiter, express.json(), loginEndpoint())
@@ -320,9 +319,8 @@ export default function initializeAuthRoutes(
           })
         }
 
-        req.headers['x-refresh-token'] = refreshToken
-        if (!req.cookies) req.cookies = {}
-        req.cookies['_rt'] = refreshToken
+        req.cookies = {}
+        req.headers['authorization'] = `Bearer ${token}`
 
         res.cookie('_rt', refreshToken, {
           httpOnly: true,
@@ -380,7 +378,8 @@ export default function initializeAuthRoutes(
 
   function refreshTokenEndpoint({ mobile }: { mobile: boolean }) {
     return async (req: Request, res: Response) => {
-      let refreshToken = req.headers['x-refresh-token'] ?? req.cookies['_rt']
+      const refreshToken = req.headers['x-refresh-token'] ?? req.cookies['_rt']
+      const auth = req.headers['authorization']
 
       if (refreshToken) {
         logAuth('[Refresh Token] Refresh token retrieved from cookie/header')
@@ -390,21 +389,49 @@ export default function initializeAuthRoutes(
         return
       }
 
+      if (!auth || !auth.startsWith('Bearer ')) {
+        logAuth('[Refresh Token] Invalid Authorization header', 'error')
+        return res.status(401).json('No token provided')
+      }
+
+      const accessToken = auth.slice(7)
+
+      let accessTokenPayload: {
+        username: string
+        isAdmin: boolean
+        type?: string
+      }
+
       let payload: {
         username: string
         type: string
       }
 
       try {
+        accessTokenPayload = jwt.verify(accessToken, JWT_SECRET, {
+          ignoreExpiration: true,
+        }) as {
+          username: string
+          isAdmin: boolean
+          type?: 'status' | 'refresh' | 'access'
+        }
         payload = jwt.verify(refreshToken, JWT_SECRET) as {
           username: string
-          type: string
+          type: 'status' | 'refresh' | 'access'
         }
 
-        if (payload.type !== 'refresh') {
+        if (
+          payload.type !== 'refresh' ||
+          accessTokenPayload.type !== 'access'
+        ) {
           logAuth('[Refresh Token] Invalid token type', 'error')
-          res.status(401).json({ error: 'Invalid token provided' })
-          return
+          return res.status(401).json({ error: 'Invalid token provided' })
+        } else if (payload.username !== accessTokenPayload.username) {
+          logAuth(
+            `[Refresh Token] Token user mismatch: Access: ${accessTokenPayload.username}; refresh: ${payload.username}`,
+            'error',
+          )
+          return res.status(401).json({ error: 'Invalid token provided' })
         }
       } catch (err) {
         logAuth(
@@ -679,8 +706,7 @@ export default function initializeAuthRoutes(
         },
       })
 
-      req.headers['x-refresh-token'] = newRefreshToken
-      req.cookies['_rt'] = newRefreshToken
+      req.headers['authorization'] = `Bearer ${token}`
 
       res.cookie('_rt', newRefreshToken, {
         httpOnly: true,
@@ -691,7 +717,7 @@ export default function initializeAuthRoutes(
       res.json({
         success: true,
         ...(isVerifiedMobile ? { refreshToken: newRefreshToken } : {}),
-        csrfToken: generateCsrfToken(req, res),
+        csrfToken: generateCsrfToken(req, res, { overwrite: true }),
         token,
         statusToken,
       })

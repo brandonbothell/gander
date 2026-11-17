@@ -126,7 +126,15 @@ public class HTTP {
             return;
         }
 
+        String currentToken = encryptedSharedPreferences.getStringOrNull("token");
         String csrfToken = encryptedSharedPreferences.getStringOrNull("csrfToken");
+
+        if (currentToken == null || csrfToken == null) {
+            Log.w("Refresh Token", "Missing token or csrf token, cancelling refresh");
+            callback.onFailure("Missing token or csrf token");
+            return;
+        }
+
         currentRefreshToken = encryptedSharedPreferences.getStringOrNull("refreshToken");
         if (refreshToken == null) refreshToken = currentRefreshToken;
 
@@ -170,7 +178,7 @@ public class HTTP {
 
             APIService service = retrofit.create(APIService.class);
 
-            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(finalRefreshToken), csrfToken, dummyDeviceInfo);
+            Call<APIService.RefreshTokenResponse> refreshTokenResponse = service.refreshToken("_rt=".concat(finalRefreshToken), "Bearer ".concat(currentToken), csrfToken, dummyDeviceInfo);
 
             refreshTokenResponse.enqueue(new Callback<>() {
                 @Override
