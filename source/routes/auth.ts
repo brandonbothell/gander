@@ -12,7 +12,7 @@ import { StreamManager } from '../streamManager'
 import { prisma, RequestWithUser } from '../server'
 import { jwtAuth } from '../middleware/jwtAuth'
 import { logAuth } from '../logMotion'
-import { JWT_SECRET } from '../credentials'
+import { getMobileSdkAppId, JWT_SECRET } from '../credentials'
 import config from '../../config.json'
 import { notify } from './notifications'
 import { rateLimit } from 'express-rate-limit'
@@ -842,10 +842,7 @@ async function verifyAppCheckToken(
     const appCheck = await getAppCheck().verifyToken(appCheckToken, {
       consume: true,
     })
-    if (
-      appCheck.alreadyConsumed ||
-      appCheck.appId !== process.env.ANDROID_APP_ID
-    ) {
+    if (appCheck.alreadyConsumed || appCheck.appId !== getMobileSdkAppId()) {
       throw new Error()
     }
     logAuth('[Refresh Token] Client succeeded mobile attestation', 'info')

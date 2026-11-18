@@ -11,7 +11,7 @@ export function initializeCredentials() {
   )
   if (!fs.existsSync(credentialsPath)) {
     console.warn(
-      `Firebase credentials file not found: ${credentialsPath}; skipping app initialization.`,
+      `[Firebase] Credentials file not found: ${credentialsPath}; skipping app initialization.`,
     )
     return
   }
@@ -35,4 +35,18 @@ export function initializeCredentials() {
   } catch (err) {
     console.error('Error initializing Firebase: ', err)
   }
+}
+
+export function getMobileSdkAppId() {
+  const credentialsPath = path.resolve(__dirname, '../google-services.json')
+
+  if (!fs.existsSync(credentialsPath)) {
+    console.warn(
+      `[Firebase] Credentials file not found: ${credentialsPath}; unable to verify app check token validity. Android app won't work!`,
+    )
+    return
+  }
+
+  const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'))
+  return credentials.client?.client_info?.mobilesdk_app_id as string
 }
