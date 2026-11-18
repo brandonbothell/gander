@@ -843,13 +843,16 @@ async function verifyAppCheckToken(
       consume: true,
     })
     if (appCheck.alreadyConsumed || appCheck.appId !== getMobileSdkAppId()) {
-      throw new Error()
+      throw new Error(
+        `App check token error! Info: ${JSON.stringify(appCheck, null, 2)}`,
+      )
     }
     logAuth('[Refresh Token] Client succeeded mobile attestation', 'info')
     return true
   } catch (err) {
     logAuth(
-      '[Refresh Token] Client failed mobile attestation, returning 401',
+      '[Refresh Token] Client failed mobile attestation, returning 401. Error: ' +
+        err,
       'warn',
     )
     return false
