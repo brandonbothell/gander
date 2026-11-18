@@ -82,20 +82,39 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   const finalToken = await getTokenOrApiKey()
   const csrfToken = await SecureStorage.getCsrfToken()
 
-  const makeRequest = (authToken?: { token: string; type: 'jwt' | 'api' }) => {
-    return fetch(input, {
-      ...init,
-      // Normalize Authorization headers
-      headers: {
-        Authorization: authToken
-          ? `${authToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${authToken.token}`
-          : finalToken
-            ? `${finalToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${finalToken.token}`
-            : '',
-        ...(init.headers ?? {}),
-        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-      },
-    })
+  const makeRequest = (authToken?: {
+    token: string
+    type: 'jwt' | 'api'
+  }): Promise<Response> => {
+    return new Promise((resolve, reject) =>
+      fetch(input, {
+        ...init,
+        // Normalize Authorization headers
+        headers: {
+          Authorization: authToken
+            ? `${authToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${authToken.token}`
+            : finalToken
+              ? `${finalToken.type === 'jwt' ? 'Bearer' : 'ApiKey'} ${finalToken.token}`
+              : '',
+          ...(init.headers ?? {}),
+          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+        },
+      })
+        .then((response) => resolve(response))
+        .catch((err) => {
+          if (err instanceof TypeError) {
+            console.warn(
+              'TypeError making request: ' + err.message + '\n' + err.stack,
+            )
+            setTimeout(() => resolve(makeRequest(authToken)), 2000) // Try again after 2 seconds
+          } else {
+            console.warn(
+              'Unknown error making request: ' + JSON.stringify(err, null, 2),
+            )
+            reject(err)
+          }
+        }),
+    )
   }
 
   const response = await makeRequest()
@@ -103,7 +122,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   let attempt = 1
   let resp = response
   while (
-    resp.status >= 500 &&
+    resp.status >= 400 &&
     ![401, 429].includes(resp.status) &&
     attempt < 3
   ) {
@@ -131,9 +150,9 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
   }
   // If we get a 401 and we have refresh handlers, try to refresh the token
   if (resp.status === 401 && globalTryRefreshToken && globalLogout) {
-    console.warn('Received 401, waiting on current token refresh...')
     // If there's already a refresh in progress, wait for it
     if (tokenRefreshPromise) {
+      console.warn('Received 401, waiting on current token refresh...')
       const refreshSuccess = await tokenRefreshPromise
       if (refreshSuccess) {
         // Retry the original request with the new token
@@ -165,9 +184,26 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
           type: 'jwt',
         })
 
+        if (retryResponse.status === 429) {
+          const rateLimitResetSeconds = retryResponse.headers.has(
+            'RateLimit-Reset',
+          )
+            ? Number.parseInt(retryResponse.headers.get('RateLimit-Reset')!)
+            : null
+          console.warn(
+            `A request was rate limited. Waiting for ${rateLimitResetSeconds}s to request again.`,
+          )
+          return new Promise<Response>((resolve) =>
+            setTimeout(
+              async () => resolve(await authFetch(input, init)),
+              rateLimitResetSeconds ? rateLimitResetSeconds * 1000 : 5000,
+            ),
+          )
+        }
+
         // If the retry also fails with 401, logout
         if (retryResponse.status === 401) {
-          console.log('Retry request also failed with 401, logging out...')
+          console.warn('Retry request also failed with 401, logging out...')
           await globalLogout()
           throw new Error(
             'Authentication failed after attempting token refresh - logged out',
@@ -176,9 +212,7 @@ export async function authFetch(input: RequestInfo, init: RequestInit = {}) {
 
         return retryResponse
       } else {
-        console.log(
-          `Token refresh failed, logging out... (${await tokenRefreshPromise})`,
-        )
+        console.warn('Token refresh failed, logging out...')
         await globalLogout()
         throw new Error('Token refresh failed - logged out')
       }
@@ -210,12 +244,18 @@ export async function fetchWithRetry<T extends Response>(
       const response = await fetchFn()
 
       if (response.status === 429) {
-        console.warn(`Rate limit hit, attempt ${i + 1}/${tries}`)
+        const rateLimitResetSeconds = response.headers.has('RateLimit-Reset')
+          ? Number.parseInt(response.headers.get('RateLimit-Reset')!)
+          : null
         if (i === tries - 1) {
           throw new Error('Rate limit exceeded after multiple attempts')
         }
-        // Exponential backoff: 1s, 2s, 4s
-        const waitTime = delay * Math.pow(2, i)
+        console.warn(
+          `A request was rate limited. Waiting for ${rateLimitResetSeconds}s to request again (attempt ${i + 1}/${tries}).`,
+        )
+        const waitTime = rateLimitResetSeconds
+          ? rateLimitResetSeconds * 1000
+          : 5000
         console.log(`Waiting ${waitTime}ms before retry...`)
         await new Promise((resolve) => setTimeout(resolve, waitTime))
         continue
