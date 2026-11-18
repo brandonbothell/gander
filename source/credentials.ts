@@ -48,5 +48,5 @@ export function getMobileSdkAppId() {
   }
 
   const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'))
-  return credentials.client?.client_info?.mobilesdk_app_id as string
+  return credentials.client?.[0]?.client_info?.mobilesdk_app_id as string
 }
