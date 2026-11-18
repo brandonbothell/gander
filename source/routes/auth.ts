@@ -514,30 +514,9 @@ export default function initializeAuthRoutes(
       let isVerifiedMobile = false
 
       if (mobile) {
-        if (safeDeviceInfo.appCheckToken) {
-          try {
-            // Cryptographically verifies the token and confirms MEETS_DEVICE_INTEGRITY
-            const appCheck = await getAppCheck().verifyToken(
-              safeDeviceInfo.appCheckToken,
-              { consume: true },
-            )
-            if (appCheck.alreadyConsumed) {
-              throw new Error()
-            }
-            logAuth('[Refresh Token] Client succeeded mobile attestation')
-            isVerifiedMobile = true
-          } catch (err) {
-            logAuth(
-              '[Refresh Token] Client failed mobile attestation, returning 401',
-              'warn',
-            )
-            return res.status(401).json({ error: 'Invalid token provided' })
-          }
-        } else {
-          logAuth(
-            `[Refresh Token] User ${user.username} failed to provide an app check token in a mobile refresh request`,
-            'warn',
-          )
+        isVerifiedMobile = await verifyAppCheckToken(deviceInfo.appCheckToken)
+
+        if (!isVerifiedMobile) {
           return res.status(401).json({ error: 'Invalid token provided' })
         }
       }
@@ -751,9 +730,22 @@ export default function initializeAuthRoutes(
 
   app.post(
     '/api/logout',
-    cookieParser(JWT_SECRET),
     logoutLimiter,
-    async (req, res) => {
+    cookieParser(JWT_SECRET),
+    doubleCsrfProtection,
+    logoutEndpoint({ mobile: false }),
+  )
+
+  // Mobile doesn't require csrf protection since it uses Firebase App Check; see above
+  app.post(
+    '/api/mobile/logout',
+    logoutLimiter,
+    cookieParser(JWT_SECRET),
+    logoutEndpoint({ mobile: true }),
+  )
+
+  function logoutEndpoint({ mobile }: { mobile: boolean }) {
+    return async (req: express.Request, res: express.Response) => {
       let refreshToken = req.cookies['_rt']
       if (refreshToken) {
         logAuth('[Logout] Refresh token retrieved from cookie')
@@ -763,11 +755,24 @@ export default function initializeAuthRoutes(
         return
       }
 
-      const { clientId }: { clientId?: string } = req.body
+      const {
+        clientId,
+        appCheckToken,
+      }: { clientId?: string; appCheckToken?: string } = req.body
 
       res.clearCookie('_rt').clearCookie('_rtexists')
 
       let payload: { username: string; type: string }
+
+      let isVerifiedMobile = false
+
+      if (mobile) {
+        isVerifiedMobile = await verifyAppCheckToken(appCheckToken)
+
+        if (!isVerifiedMobile) {
+          return res.status(401).json({ error: 'Invalid token provided' })
+        }
+      }
 
       try {
         payload = jwt.verify(refreshToken, JWT_SECRET) as any
@@ -811,10 +816,43 @@ export default function initializeAuthRoutes(
         )
         res.status(500).json({ error: 'Failed to logout' })
       }
-    },
-  )
+    }
+  }
 
   app.get('/api/authcheck', authCheckLimiter, jwtAuth, async (req, res) =>
     res.json({ success: true }),
   )
+}
+
+async function verifyAppCheckToken(
+  appCheckToken: string | undefined,
+): Promise<boolean> {
+  if (!appCheckToken) {
+    logAuth(
+      '[Refresh Token] User failed to provide an app check token in a mobile refresh request',
+      'warn',
+    )
+    return false
+  }
+
+  try {
+    // Cryptographically verifies the token and confirms MEETS_DEVICE_INTEGRITY
+    const appCheck = await getAppCheck().verifyToken(appCheckToken, {
+      consume: true,
+    })
+    if (
+      appCheck.alreadyConsumed ||
+      appCheck.appId !== process.env.ANDROID_APP_ID
+    ) {
+      throw new Error()
+    }
+    logAuth('[Refresh Token] Client succeeded mobile attestation', 'info')
+    return true
+  } catch (err) {
+    logAuth(
+      '[Refresh Token] Client failed mobile attestation, returning 401',
+      'warn',
+    )
+    return false
+  }
 }

@@ -355,19 +355,25 @@ export default function App() {
       const fingerprint = await getDeviceFingerprint()
 
       // Notify server of logout - use fetch directly to avoid recursive authFetch calls
-      await fetch(`${API_BASE}/api/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken && !fingerprint.appCheckToken
-            ? { 'x-csrf-token': csrfToken }
-            : {}),
-          Authorization: `Bearer ${accessToken}`,
+      await fetch(
+        `${API_BASE}/api${fingerprint.appCheckToken ? '/mobile' : ''}/logout`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(csrfToken && !fingerprint.appCheckToken
+              ? { 'x-csrf-token': csrfToken }
+              : {}),
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            clientId: fingerprint.clientId,
+            ...(fingerprint.appCheckToken
+              ? { appCheckToken: fingerprint.appCheckToken }
+              : {}),
+          }),
         },
-        body: JSON.stringify({
-          clientId: fingerprint.clientId,
-        }),
-      }).catch((err) => console.error('Error logging out from API: ', err))
+      ).catch((err) => console.error('Error logging out from API: ', err))
     } catch (error) {
       console.error('Error during logout:', error)
     } finally {
