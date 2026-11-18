@@ -801,6 +801,8 @@ export default function initializeAuthRoutes(
             },
           })
 
+          generateCsrfToken(req, res, { overwrite: true }) // Invalidate old token
+
           const ip =
             'x-real-ip' in req.headers
               ? String(req.headers['x-real-ip'])
