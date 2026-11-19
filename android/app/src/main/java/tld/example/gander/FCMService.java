@@ -18,6 +18,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationCompat.Action;
 
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -138,7 +139,11 @@ public class FCMService extends FirebaseMessagingService {
 
         PendingIntent mutePendingIntent = PendingIntent.getService(
                 this, notificationId - 1, muteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        builder.addAction(android.R.drawable.ic_lock_silent_mode, "Mute for 1 Hour", mutePendingIntent);
+        Action muteAction = new Action.Builder(android.R.drawable.ic_lock_silent_mode, "Mute for 1hr", mutePendingIntent)
+                // .setAuthenticationRequired(true)
+                // .setContextual(true)
+                .build();
+        builder.addAction(muteAction);
 
         if (group != null) builder.setGroup(group);
         if (actions.equals("true")) {
@@ -171,7 +176,11 @@ public class FCMService extends FirebaseMessagingService {
                         pauseIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                builder.addAction(android.R.drawable.ic_media_pause, "Pause Detection", pausePendingIntent);
+                Action pauseAction = new Action.Builder(android.R.drawable.ic_media_pause, "Pause Detection", pausePendingIntent)
+                        // .setAuthenticationRequired(true)
+                        // .setContextual(true)
+                        .build();
+                builder.addAction(pauseAction);
             }
         }
 

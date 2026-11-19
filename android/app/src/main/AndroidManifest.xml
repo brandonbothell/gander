@@ -29,6 +29,14 @@
 
         </activity>
 
+        <activity
+            android:name=".UnlockTrampolineActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -69,7 +77,7 @@
         <receiver android:name=".PauseDetectionNotificationActionReceiver" android:exported="false" />
 
         <receiver
-            android:name=".BootReceiver"
+            android:name=".BootOrUpdateReceiver"
             android:enabled="true"
             android:directBootAware="true"
             android:exported="true">
@@ -77,6 +85,8 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" /> <!-- For some HTC/other devices -->
+
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

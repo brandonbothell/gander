@@ -26,6 +26,7 @@ import android.os.UserManager;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationCompat.Action;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.graphics.drawable.IconCompat;
 
@@ -359,16 +360,18 @@ public class MotionForegroundService extends Service {
 
         PendingIntent mutePendingIntent = PendingIntent.getService(
                 this, alertId - 1, muteIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        builder.addAction(android.R.drawable.ic_lock_silent_mode, "Mute for 1 Hour", mutePendingIntent);
+        Action muteAction = new Action.Builder(android.R.drawable.ic_lock_silent_mode, "Mute for 1hr", mutePendingIntent)
+                // .setAuthenticationRequired(true)
+                // .setContextual(true)
+                .build();
+        builder.addAction(muteAction);
 
         // if (sound != null) builder.setSound(Uri.parse("android.resource://" + getPackageName() + "/raw/" + sound));
         if (title.equals("Motion Detected!")) {
-            builder.setCategory(NotificationCompat.CATEGORY_ALARM);
             builder.setChannelId(EVENT_CHANNEL_ID);
             // res/drawable/push_icon.png
             builder.setSmallIcon(R.drawable.push_icon);
 
-            Log.d("MotionForegroundService", "Actions enabled");
             InputStream is = getAssets().open("capacitor.config.json");
             InputStreamReader reader = new InputStreamReader(is);
             JsonObject config = JsonParser.parseReader(reader).getAsJsonObject();
@@ -397,7 +400,11 @@ public class MotionForegroundService extends Service {
                         pauseIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                builder.addAction(android.R.drawable.ic_media_pause, "Pause Detection", pausePendingIntent);
+                Action pauseAction = new Action.Builder(android.R.drawable.ic_media_pause, "Pause Detection", pausePendingIntent)
+                        // .setAuthenticationRequired(true)
+                        // .setContextual(true)
+                        .build();
+                builder.addAction(pauseAction);
             }
         }
 
