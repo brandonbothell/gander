@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --port 3000",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bundle": "cd dist && bestzip ../bundle.zip *"
   },
   "dependencies": {
     "@capacitor/app": "8.1.2",
@@ -38,6 +39,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
+    "bestzip": "4.0.3",
     "postcss": "8.5.32",
     "postcss-preset-mantine": "1.18.0",
     "postcss-simple-vars": "7.0.1",

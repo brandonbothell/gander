@@ -47,6 +47,8 @@ greenlock.d/*
 
 # Android signing and builds
 android-signing-key.jks
+live-update-signing-key.pem
+live-update-public-key.pub.pem
 *.keystore
 *.apk
 *.aab

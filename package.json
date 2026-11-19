@@ -14,6 +14,8 @@
     "android:init": "dotenvx run -- yarn trapeze run .trapeze.yml --android-project android -y",
     "android:sync": "yarn build:client && yarn cap sync android && yarn android:init && node -e \"require('child_process').execSync(process.platform === 'win32' ? 'gradlew.bat prepareVscode' : './gradlew prepareVscode', { cwd: 'android', stdio: 'inherit' })\"",
     "android:open": "yarn cap open android",
+    "bundle:client": "yarn workspace web2 bundle",
+    "bundle:sign": "cd web2 && openssl dgst -sha256 -sign ../live-update-signing-key.pem bundle.zip | openssl base64 -A -out bundle.sig",
     "dev": "concurrently --kill-others-on-fail --raw \"yarn dev:client\" \"yarn dev:server -- --host 0.0.0.0\"",
     "build:server": "yarn build:server:safe",
     "build:server:safe": "tsc --project tsconfig.build.json --outDir compiled-temp && yarn cpy . \"../../compiled-temp/generated\" --cwd \"source/generated\" && tsx --tsconfig tsconfig.build.json scripts/safeReplace.ts",
