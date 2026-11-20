@@ -260,12 +260,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/android@npm:8.6.0":
-  version: 8.6.0
-  resolution: "@capacitor/android@npm:8.6.0"
+"@capacitor/android@npm:8.6.2":
+  version: 8.6.2
+  resolution: "@capacitor/android@npm:8.6.2"
   peerDependencies:
     "@capacitor/core": ^8.6.0
-  checksum: 10c0/46428782c38b1ef8b2fb5638b52f4252c31148ea96efd9bc404a4960a182764a71b739b563fbe4e131a4dd6947fc87f0adc8615db1236de2226b8416fe401422
+  checksum: 10c0/74f60ca517026ecefbfb2638e0795b781bdc3a1a239ab2928ef00a31cde90c6d7a55b6f4ab1418de2756de8ef8398e167af83ffb33b45bacfa07619c2063aea5
   languageName: node
   linkType: hard
 
@@ -278,9 +278,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/cli@npm:8.6.0":
-  version: 8.6.0
-  resolution: "@capacitor/cli@npm:8.6.0"
+"@capacitor/cli@npm:8.6.2":
+  version: 8.6.2
+  resolution: "@capacitor/cli@npm:8.6.2"
   dependencies:
     "@ionic/cli-framework-output": "npm:^2.2.8"
     "@ionic/utils-subprocess": "npm:^3.0.1"
@@ -303,16 +303,16 @@ __metadata:
   bin:
     cap: bin/capacitor
     capacitor: bin/capacitor
-  checksum: 10c0/5ccfa31710c56edb85e995425f3b09c0a50af39a1ca883acbc94d25413afc7ebea87df23fbfded778d7753fdc57ec3b269f6afd2b62b29021723d280ff07d012
+  checksum: 10c0/baa839a7fdcb527d663a591cb7bd16d24c19f8a0622e5b48ed7a732d69b7a6475861680415ab9283a5ed195a8416f71d5ec6d735252e4834bc5bd945e29d1867
   languageName: node
   linkType: hard
 
-"@capacitor/core@npm:8.6.0":
-  version: 8.6.0
-  resolution: "@capacitor/core@npm:8.6.0"
+"@capacitor/core@npm:8.6.2":
+  version: 8.6.2
+  resolution: "@capacitor/core@npm:8.6.2"
   dependencies:
     tslib: "npm:^2.1.0"
-  checksum: 10c0/3ebe05bb0e7b32111ac549c97b583a253127794094fc10179940c6abb01a0e4ca03e6ab909e0f35eeedf9efa2e9f4f80d8179da4efce245845748716a638a21d
+  checksum: 10c0/df8dfd522779c14de557c219a52920515c5da585219e38c474f964bdc1c9b8790c18e3ee161a430734395c73b553a50f2526470f780becb1812e54a836904b93
   languageName: node
   linkType: hard
 
@@ -651,6 +651,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@eslint-community/eslint-utils@npm:^4.10.1":
+  version: 4.10.1
+  resolution: "@eslint-community/eslint-utils@npm:4.10.1"
+  dependencies:
+    eslint-visitor-keys: "npm:^3.4.3"
+  peerDependencies:
+    eslint: ^6.0.0 || ^7.0.0 || >=8.0.0
+  checksum: 10c0/b514586655698bc6b74db72a496c77e813c78b63e36a83429845ac7057dd77113b0b6c31e6e590d5baaeee2abae6ea22363a41209bcafa078d895ab83ce83011
+  languageName: node
+  linkType: hard
+
 "@eslint-community/eslint-utils@npm:^4.8.0":
   version: 4.9.0
   resolution: "@eslint-community/eslint-utils@npm:4.9.0"
@@ -694,14 +705,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@eslint/config-array@npm:^0.23.5":
-  version: 0.23.5
-  resolution: "@eslint/config-array@npm:0.23.5"
+"@eslint/config-array@npm:^0.23.6":
+  version: 0.23.6
+  resolution: "@eslint/config-array@npm:0.23.6"
   dependencies:
     "@eslint/object-schema": "npm:^3.0.5"
     debug: "npm:^4.3.1"
-    minimatch: "npm:^10.2.4"
-  checksum: 10c0/b24833c4c76e78ee075d306cd3f095db46b2db0f90cc13a6ee6e4275f9889731c05bf5403ab5fefb79c756e07ac9184ed0e04570341382f9eccbccc80e6d1a0c
+    minimatch: "npm:^11.0.5"
+  checksum: 10c0/adf798a55b4f58e1db954347633ca2c07c51d413590f274f77d1d94d3413de3d321e3558e313f616a822cb76d90e9c378ec6dd2f49b3e51a2070e61f4405f2ae
   languageName: node
   linkType: hard
 
@@ -926,19 +937,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@gfazioli/mantine-video@npm:1.2.10":
-  version: 1.2.10
-  resolution: "@gfazioli/mantine-video@npm:1.2.10"
+"@gfazioli/mantine-video@npm:1.2.11":
+  version: 1.2.11
+  resolution: "@gfazioli/mantine-video@npm:1.2.11"
   peerDependencies:
     "@mantine/core": ">=9.0.0"
     "@mantine/hooks": ">=9.0.0"
     "@tabler/icons-react": ">=3.0.0"
     react: ^18.x || ^19.x
     react-dom: ^18.x || ^19.x
-  peerDependenciesMeta:
-    "@tabler/icons-react":
-      optional: true
-  checksum: 10c0/2084153176fd1eae30f8053178f95fde5df384061beb5fd518d09cdbc0a3e09a8f1f21a9c758a86bee8471eade9f94166780352b224c0809665dbac63f0a73e1
+  checksum: 10c0/9d063cbf335fa19b011facd065749fafc5c1200d38c0585865cfc06b6687e5cc5baf34514c79c62d04fa07f5e920356612e0cf92edafb74bc7af3d2c1d8476ff
   languageName: node
   linkType: hard
 
@@ -1656,23 +1664,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mantine/carousel@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/carousel@npm:9.8.0"
+"@mantine/carousel@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/carousel@npm:9.8.1"
   peerDependencies:
-    "@mantine/core": 9.8.0
-    "@mantine/hooks": 9.8.0
+    "@mantine/core": 9.8.1
+    "@mantine/hooks": 9.8.1
     embla-carousel: ">=8.0.0"
     embla-carousel-react: ">=8.0.0"
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/d9bf8340d38dbd7faacf6fcc4e2053a125bbf8b33b8d58417502a3c8bf3eaedd8b0bb093a601cbf881ee01e8eeedd93d3c02adb5949b0cec01e0d0ce4acf8540
+  checksum: 10c0/511081b99a922fe48e73f5f59e06840c16193ebe4e520af4f3d3d77230d251350bb733da267ccb101b7fc5de8237963335352a3d9f46da88701c77dec515fa24
   languageName: node
   linkType: hard
 
-"@mantine/core@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/core@npm:9.8.0"
+"@mantine/core@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/core@npm:9.8.1"
   dependencies:
     "@floating-ui/react": "npm:^0.27.20"
     clsx: "npm:^2.1.1"
@@ -1680,113 +1688,113 @@ __metadata:
     react-remove-scroll: "npm:^2.7.2"
     type-fest: "npm:^5.10.0"
   peerDependencies:
-    "@mantine/hooks": 9.8.0
+    "@mantine/hooks": 9.8.1
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/3f7738bd71df2e40354d589fb389e1886d7198e5d9302db31ac1f084e911e32b4facbd5f35e75a15241bcea242dcea5b0f99ea5a00586353d13f9423c012795d
+  checksum: 10c0/5e3a51841d7c1adad7f6e63897e4541d141a7bb794a0b5b8c7b74479b175a814d25ddc5371e43934684635469764fcf4a63a6e3f959ebf8ef5d26bbc3eea880e
   languageName: node
   linkType: hard
 
-"@mantine/dates@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/dates@npm:9.8.0"
+"@mantine/dates@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/dates@npm:9.8.1"
   dependencies:
     clsx: "npm:^2.1.1"
   peerDependencies:
-    "@mantine/core": 9.8.0
-    "@mantine/hooks": 9.8.0
+    "@mantine/core": 9.8.1
+    "@mantine/hooks": 9.8.1
     dayjs: ">=1.0.0"
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/1e7d317c8eb0433d1f408c7d0c7f9dbd0f3332f7119b2987a5438c40e9df8a9b3272e144906c37a47750893ca8dce8b09dbf2431ae19ce86df88bd9d02172d78
+  checksum: 10c0/87da47fa005653151e96ae2510eb8e822af4caf88c419ea2cc668b0188bbffb9dbbdee91ba45469c9d91f136d532a7ad34dd98dd0eeed267b1fb5e3d559cc67e
   languageName: node
   linkType: hard
 
-"@mantine/form@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/form@npm:9.8.0"
+"@mantine/form@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/form@npm:9.8.1"
   dependencies:
     "@standard-schema/spec": "npm:^1.1.0"
     fast-deep-equal: "npm:^3.1.3"
     klona: "npm:^2.0.6"
   peerDependencies:
     react: ^19.2.0
-  checksum: 10c0/be440939c517b94e5a0ff077024321633f551e3d6ec48b2c6c8f7f6c1916df019fd0ad6761aae45ba90cedcc000c625f9ab33fdca3315b36162adee72cd3d9b3
+  checksum: 10c0/0a387a994dd37838323ff721e9912038856ba8a67ab809799ee897db0e26ab5f1c6f338770cdc09f5d1f3c03ac61d2563ff3b648da4a7084b259db8354b6cbfb
   languageName: node
   linkType: hard
 
-"@mantine/hooks@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/hooks@npm:9.8.0"
+"@mantine/hooks@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/hooks@npm:9.8.1"
   peerDependencies:
     react: ^19.2.0
-  checksum: 10c0/ba53b359c0564e3bf2c6e3506b538b569620f7459c806d7853a821bb7718594e3a27e1a62e1c35a21f1fe1b33a1c5c77d5604146578cf99eec405b61b29eded4
+  checksum: 10c0/233bb8856c25617f880d1eb1754105accb8377d2bc31cdb1bc9b181c5ce5c7c9c815630e9e8ec082697c6d2444ebb6c022ea1a0cce1fc97fbf674e535bba4e8c
   languageName: node
   linkType: hard
 
-"@mantine/lightbox@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/lightbox@npm:9.8.0"
+"@mantine/lightbox@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/lightbox@npm:9.8.1"
   dependencies:
-    "@mantine/store": "npm:9.8.0"
+    "@mantine/store": "npm:9.8.1"
   peerDependencies:
-    "@mantine/core": 9.8.0
-    "@mantine/hooks": 9.8.0
+    "@mantine/core": 9.8.1
+    "@mantine/hooks": 9.8.1
     embla-carousel: ">=8.0.0"
     embla-carousel-react: ">=8.0.0"
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/46149ba67ed3ac1768d4317b21d059828eb7aea9f25e48a199e6b4850e0f0658ce3bda7550d9dbdc4880ffed99ed9dcbb204cadc8ba79131c9057e6aa4d15c78
+  checksum: 10c0/9bce9d05ecc2cde7822f1fd9512f65c59ff6291adbaa8a03f392071b0d9aa39495f73a7278f8ec455790101d22317ac7012bf46be9c1634345f43d14387fd8d7
   languageName: node
   linkType: hard
 
-"@mantine/modals@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/modals@npm:9.8.0"
+"@mantine/modals@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/modals@npm:9.8.1"
   peerDependencies:
-    "@mantine/core": 9.8.0
-    "@mantine/hooks": 9.8.0
+    "@mantine/core": 9.8.1
+    "@mantine/hooks": 9.8.1
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/e0fa99f3140e6f532ffa79109be8c29ab49c9d6a3f6c1489c53a605966edcb52671fda73321b67b5ad790240513781ba1d1589e8b5a5174aa78ef05d687a002f
+  checksum: 10c0/bed9e7f11c54b92642b0718352d07bdf37e1721c50697fdf23c7d59929dff9262c2c752e278036a3570533318a354c7e9cea222b36b83d785bd27326ad9bac7b
   languageName: node
   linkType: hard
 
-"@mantine/notifications@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/notifications@npm:9.8.0"
+"@mantine/notifications@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/notifications@npm:9.8.1"
   dependencies:
-    "@mantine/store": "npm:9.8.0"
+    "@mantine/store": "npm:9.8.1"
     react-transition-group: "npm:4.4.5"
   peerDependencies:
-    "@mantine/core": 9.8.0
-    "@mantine/hooks": 9.8.0
+    "@mantine/core": 9.8.1
+    "@mantine/hooks": 9.8.1
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/31b82cbf6695afd8321e31c06a3f4907d0c5ef4d7035514a4e1ceef41a08f15ce8fb8d94bc6b31530284b8fe15f706bdb236b84dbf664c214b84258a5d8befc7
+  checksum: 10c0/343d4e0d1e20719f8f8029054b535c800261a56058934844391d95e27c40d6ef6a694a79d7088e11217eaf9d3d347a0f4415a1bcf16eaf0d6812a61edaad12de
   languageName: node
   linkType: hard
 
-"@mantine/nprogress@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/nprogress@npm:9.8.0"
+"@mantine/nprogress@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/nprogress@npm:9.8.1"
   dependencies:
-    "@mantine/store": "npm:9.8.0"
+    "@mantine/store": "npm:9.8.1"
   peerDependencies:
-    "@mantine/core": 9.8.0
-    "@mantine/hooks": 9.8.0
+    "@mantine/core": 9.8.1
+    "@mantine/hooks": 9.8.1
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/d6c35d06fb2bfb639c9eae22219c675ff9d610c03d1a6700813dc6afd00920ed86653d734bccd10e81e1cccef6656f41696b7360b402b6671e4072885aae5729
+  checksum: 10c0/774d958eae7f60b1cf4c5478362a91af11337d629edff9c0c89806cb071fecde5f6a5f147eaaaf7a067b5926bf53abc7373fd2f22acc5e3b50ea76df72bbb9c3
   languageName: node
   linkType: hard
 
-"@mantine/store@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/store@npm:9.8.0"
+"@mantine/store@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/store@npm:9.8.1"
   peerDependencies:
     react: ^19.2.0
-  checksum: 10c0/ef84d4c43ee6b4428d8fd484e97bc7ea59fe1dddea2b7c5ece1def4021d92f2e3fa66aa6e4c650b1c205e8fef4ccff0a529b5473a8803579a4fc82e6e279ae04
+  checksum: 10c0/0cf997cc773616251b641232c839f9bea36ed8c4a3d3d427089abb99703d68f8ea92d9f8366fb763cccdc7c55a00431bad6519a95e67024902c4f53d0dd3dff8
   languageName: node
   linkType: hard
 
@@ -2534,19 +2542,24 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stylistic/eslint-plugin@npm:5.10.0":
-  version: 5.10.0
-  resolution: "@stylistic/eslint-plugin@npm:5.10.0"
+"@stylistic/eslint-plugin@npm:6.0.1":
+  version: 6.0.1
+  resolution: "@stylistic/eslint-plugin@npm:6.0.1"
   dependencies:
-    "@eslint-community/eslint-utils": "npm:^4.9.1"
-    "@typescript-eslint/types": "npm:^8.56.0"
-    eslint-visitor-keys: "npm:^4.2.1"
-    espree: "npm:^10.4.0"
-    estraverse: "npm:^5.3.0"
-    picomatch: "npm:^4.0.3"
+    "@eslint-community/eslint-utils": "npm:^4.10.1"
+    "@typescript-eslint/types": "npm:^8.72.2"
+    "@typescript-eslint/visitor-keys": "npm:^8.72.2"
+    espree: "npm:^11.2.0"
+    picomatch: "npm:^4.0.7"
   peerDependencies:
     eslint: ^9.0.0 || ^10.0.0
-  checksum: 10c0/2cc6e592d5b2ab691290cc39ed377c0f6226667b367ffc6a0bf3a4bf6dd36b011d17c83f377600a48946f6bb037390b35a8b3c273b3c40d161c00b44512a129e
+    oxlint: ^1.55.0
+  peerDependenciesMeta:
+    eslint:
+      optional: true
+    oxlint:
+      optional: true
+  checksum: 10c0/0a52be780f60997a83291a6da6d9c1bbd2e54c2d00b8929e27dd38d5565a8d621786994eec2a58b86aa3e0c7c10815180b5e2ff817a51b5386636cf26ebfd502
   languageName: node
   linkType: hard
 
@@ -2559,21 +2572,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tabler/icons-react@npm:3.51.0":
-  version: 3.51.0
-  resolution: "@tabler/icons-react@npm:3.51.0"
+"@tabler/icons-react@npm:3.52.0":
+  version: 3.52.0
+  resolution: "@tabler/icons-react@npm:3.52.0"
   dependencies:
-    "@tabler/icons": "npm:3.51.0"
+    "@tabler/icons": "npm:3.52.0"
   peerDependencies:
     react: ">= 16"
-  checksum: 10c0/e7a1d432dc9c76e1e0f4cd7545130077dec01ef65d247c5fe5fce5ff5cf3fcae2cdd7b953ffac469fb19c84fae528c01088f6e2948af0edaed5f43b21b84ff09
+  checksum: 10c0/356a04ea42cc4fdbe9d76d336b493e3d6d768445767cca13b5474997367de069ce4f77512c2b5dd857250b1e6f12d39b92fd47d5e27558b859581a3a4674f8e6
   languageName: node
   linkType: hard
 
-"@tabler/icons@npm:3.51.0":
-  version: 3.51.0
-  resolution: "@tabler/icons@npm:3.51.0"
-  checksum: 10c0/bb4e6f0280962adf08c39c98b8493d8ef155fac4afb5928299ddc7d7bc28c6b544123cdd37a34709a5091d6a16759946a78a6133dbaeef73973b1cefed396a62
+"@tabler/icons@npm:3.52.0":
+  version: 3.52.0
+  resolution: "@tabler/icons@npm:3.52.0"
+  checksum: 10c0/80cfbec0e159a7ec6786fd15903e75aa74c037cdcd011ec12ec497f21c85691e794b59175b283e0b667d5b223c09a71d013066b90cf06bb08e080522a47ea38f
   languageName: node
   linkType: hard
 
@@ -2594,14 +2607,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@trapezedev/configure@npm:7.1.11":
-  version: 7.1.11
-  resolution: "@trapezedev/configure@npm:7.1.11"
+"@trapezedev/configure@npm:7.1.13":
+  version: 7.1.13
+  resolution: "@trapezedev/configure@npm:7.1.13"
   dependencies:
     "@ionic/cli-framework-output": "npm:^2.2.2"
     "@ionic/utils-fs": "npm:^3.1.5"
     "@ionic/utils-terminal": "npm:^2.3.1"
-    "@trapezedev/project": "npm:^7.1.11"
+    "@trapezedev/project": "npm:^7.1.13"
     commander: "npm:^8.2.0"
     kleur: "npm:^4.1.4"
     lodash: "npm:^4.17.21"
@@ -2610,38 +2623,37 @@ __metadata:
     yargs: "npm:^17.2.1"
   bin:
     trapeze: bin/trapeze
-  checksum: 10c0/eccdc92a4bbd08453c1aabc146e13638b9a002431cbc3e66c5c7c33c9a6b8e02b48a6ac2e5aa2a117900145f58132f4cce7a084bdf10446875579ace6d4d2e1d
+  checksum: 10c0/40956c6b32b82779eba5deb5401a7eae0db469cf5e9d165178f918f8343abe52c4c5b81b303dbdcfe9fc09bfe5d4f4442d06efe1d759d52397b8ba5ac6b6c011
   languageName: node
   linkType: hard
 
-"@trapezedev/gradle-parse@npm:7.1.11":
-  version: 7.1.11
-  resolution: "@trapezedev/gradle-parse@npm:7.1.11"
-  checksum: 10c0/3cda0444a742b5485830574403c8045e7da7ce851faa542acc0f0d3be23e335f6253c2706bef1201b5921a7c2ff4fe538836aab7ad84528f52081187526dddcc
+"@trapezedev/gradle-parse@npm:7.1.13":
+  version: 7.1.13
+  resolution: "@trapezedev/gradle-parse@npm:7.1.13"
+  checksum: 10c0/e0502a28e4d1c1ec3143587990e74977c28b14f97dba7485d97c7372dbed52ee26de61a4db191fa82844085ea25bba967fa069d9505e34ac353b8c85238e18a5
   languageName: node
   linkType: hard
 
-"@trapezedev/project@npm:^7.1.11":
-  version: 7.1.11
-  resolution: "@trapezedev/project@npm:7.1.11"
+"@trapezedev/project@npm:^7.1.13":
+  version: 7.1.13
+  resolution: "@trapezedev/project@npm:7.1.13"
   dependencies:
     "@ionic/utils-fs": "npm:^3.1.5"
     "@ionic/utils-subprocess": "npm:^2.1.8"
     "@prettier/plugin-xml": "npm:^2.2.0"
-    "@trapezedev/gradle-parse": "npm:7.1.11"
+    "@trapezedev/gradle-parse": "npm:7.1.13"
     "@xmldom/xmldom": "npm:^0.9.12"
     cross-spawn: "npm:^7.0.3"
     diff: "npm:^5.1.0"
     gradle-to-js: "npm:^2.0.0"
-    ini: "npm:^2.0.0"
     kleur: "npm:^4.1.5"
     lodash: "npm:^4.17.21"
     plist: "npm:^3.0.4"
     prettier: "npm:^2.7.1"
-    xcode: "npm:^3.0.1"
+    xcode: "npm:^4.0.0"
     xml-js: "npm:^1.6.11"
     xpath: "npm:^0.0.32"
-  checksum: 10c0/a9e3bb53ed86f6932796a744421888bfffc04da101d6d7ccaacc28a2e5b17c7d160e218eeb56057845cbabd4e73f59cfc3fcca214bdf2a520a2f129691c4ce0c
+  checksum: 10c0/6f3bda8c50c4e56ecfb1a79faf9e31e7f23918df8fc7f21a17a193050814f6316efe8dcacc55a3f33349fe17bef5b74e0fcbb0cfaf18edbbd52242eedbf36609
   languageName: node
   linkType: hard
 
@@ -2964,12 +2976,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:25.9.9":
-  version: 25.9.9
-  resolution: "@types/node@npm:25.9.9"
+"@types/node@npm:26.6.6":
+  version: 26.6.6
+  resolution: "@types/node@npm:26.6.6"
   dependencies:
-    undici-types: "npm:>=7.24.0 <7.24.7"
-  checksum: 10c0/2ba08caa7118af2f2761f2f5db9b6304faf5bd027a2dcb72bf6fcae3dd9e470d17045fec27f89023c02e7d4e0661c6e5877174bd39794bef080db8b35ad4a1ea
+    undici-types: "npm:~8.9.0"
+  checksum: 10c0/5cb63f644f6e85a257a9cd2403cbcbe196760e2a35fd3ec9fb8b5cff663e14cc832b198cc17b53f870a2e30900ed45a1fb3f53e6589aba26b8e8c484aa672053
   languageName: node
   linkType: hard
 
@@ -3088,145 +3100,142 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript-eslint/eslint-plugin@npm:8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/eslint-plugin@npm:8.72.2"
+"@typescript-eslint/eslint-plugin@npm:8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/eslint-plugin@npm:8.73.0"
   dependencies:
     "@eslint-community/regexpp": "npm:^4.12.2"
-    "@typescript-eslint/scope-manager": "npm:8.72.2"
-    "@typescript-eslint/type-utils": "npm:8.72.2"
-    "@typescript-eslint/utils": "npm:8.72.2"
-    "@typescript-eslint/visitor-keys": "npm:8.72.2"
+    "@typescript-eslint/scope-manager": "npm:8.73.0"
+    "@typescript-eslint/type-utils": "npm:8.73.0"
+    "@typescript-eslint/utils": "npm:8.73.0"
+    "@typescript-eslint/visitor-keys": "npm:8.73.0"
     ignore: "npm:^7.0.5"
     natural-compare: "npm:^1.4.0"
     ts-api-utils: "npm:^2.5.0"
   peerDependencies:
-    "@typescript-eslint/parser": ^8.72.2
+    "@typescript-eslint/parser": ^8.73.0
     eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
     typescript: ">=4.8.4 <6.1.0"
-  checksum: 10c0/2464497406205ae4e48f4d6270583992f6a4d6990562f9a8a841ee01c2b0f6821409447f5ceef36a896d6fbcf92426debced014551d72263651d4752436d43d6
+  checksum: 10c0/fa312a80a4c677b5a35ce8b912e031da8c118407a51a86e2dd983ec53097214987b23cabd93ad967f25736c6fe3bd20e0b7b2b8dd280c666d04157d0c8db3c9e
   languageName: node
   linkType: hard
 
-"@typescript-eslint/parser@npm:8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/parser@npm:8.72.2"
+"@typescript-eslint/parser@npm:8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/parser@npm:8.73.0"
   dependencies:
-    "@typescript-eslint/scope-manager": "npm:8.72.2"
-    "@typescript-eslint/types": "npm:8.72.2"
-    "@typescript-eslint/typescript-estree": "npm:8.72.2"
-    "@typescript-eslint/visitor-keys": "npm:8.72.2"
+    "@typescript-eslint/scope-manager": "npm:8.73.0"
+    "@typescript-eslint/types": "npm:8.73.0"
+    "@typescript-eslint/typescript-estree": "npm:8.73.0"
+    "@typescript-eslint/visitor-keys": "npm:8.73.0"
     debug: "npm:^4.4.3"
   peerDependencies:
     eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
     typescript: ">=4.8.4 <6.1.0"
-  checksum: 10c0/17e14881171104d5a1729e08668252df1c9d7006a56616a04338c4f5091a7d62539e65ed431908449567b65cea327ee11abebb84d0471c3b5bbdb92c3a2a619f
+  checksum: 10c0/66a01aff4e81bb40e3d4d096da2d6a21cb8de13bb3e0ab4bd3d6755b210ba278b92f99113001fdc9a8ea0f3a7f1cf1cd9b727bf20fa094fd28ff34f2be75532d
   languageName: node
   linkType: hard
 
-"@typescript-eslint/project-service@npm:8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/project-service@npm:8.72.2"
+"@typescript-eslint/project-service@npm:8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/project-service@npm:8.73.0"
   dependencies:
-    "@typescript-eslint/tsconfig-utils": "npm:^8.72.2"
-    "@typescript-eslint/types": "npm:^8.72.2"
+    "@typescript-eslint/tsconfig-utils": "npm:^8.73.0"
+    "@typescript-eslint/types": "npm:^8.73.0"
     debug: "npm:^4.4.3"
   peerDependencies:
     typescript: ">=4.8.4 <6.1.0"
-  checksum: 10c0/655d448448b05e0394da913d36c6e527b88aaf5ee98dddfa06e7f674f9a55d729df2114f04ecdfb3657cd5ac1ce1dfed2da1c964e5cb766e6a2ea91c76b3f136
+  checksum: 10c0/786e3388aeca04a9bc565d91e2f16cf399fcc9118ac6945ad2b13b03f88dcbf81dfd1290fb292a571a8c0265cf4d650ef1d64e0c68b8eb6809aa7909cb9c5914
   languageName: node
   linkType: hard
 
-"@typescript-eslint/scope-manager@npm:8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/scope-manager@npm:8.72.2"
+"@typescript-eslint/scope-manager@npm:8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/scope-manager@npm:8.73.0"
   dependencies:
-    "@typescript-eslint/types": "npm:8.72.2"
-    "@typescript-eslint/visitor-keys": "npm:8.72.2"
-  checksum: 10c0/c8a0836f9f60b3bebec02f2ce75b7211479d02865e27ca628909d047b27a0dae33c928ea5e6622e58e33227e11bf7da58bf81e534c10cbf8bfd57bae4919da32
+    "@typescript-eslint/types": "npm:8.73.0"
+    "@typescript-eslint/visitor-keys": "npm:8.73.0"
+  checksum: 10c0/11940c2f77c5315d462e275be11521b506f6d63dcdfa31478f5e24994cfca9453c3a80809cd51f8b01a4a9d537c275af4efe6996b15748a9631bac8d046e9f66
   languageName: node
   linkType: hard
 
-"@typescript-eslint/tsconfig-utils@npm:8.72.2, @typescript-eslint/tsconfig-utils@npm:^8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/tsconfig-utils@npm:8.72.2"
+"@typescript-eslint/tsconfig-utils@npm:8.73.0, @typescript-eslint/tsconfig-utils@npm:^8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/tsconfig-utils@npm:8.73.0"
   peerDependencies:
     typescript: ">=4.8.4 <6.1.0"
-  checksum: 10c0/eafdd9b29185849218277c7c79a23fdcedea1d9d016b2f438e3518eba89e2fff09cb4434afd9ab5f3eec322f554456844cb5b6be5deeaaf77a915733c966b392
+  checksum: 10c0/685009953ba52016fedef4f958dfebd237a5641fe726cd2c6b385653de37d281460f512f3c6938590e4e818efea7c4138da4800007ac5b8f1d00576189e7c83b
   languageName: node
   linkType: hard
 
-"@typescript-eslint/type-utils@npm:8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/type-utils@npm:8.72.2"
+"@typescript-eslint/type-utils@npm:8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/type-utils@npm:8.73.0"
   dependencies:
-    "@typescript-eslint/types": "npm:8.72.2"
-    "@typescript-eslint/typescript-estree": "npm:8.72.2"
-    "@typescript-eslint/utils": "npm:8.72.2"
+    "@typescript-eslint/types": "npm:8.73.0"
+    "@typescript-eslint/typescript-estree": "npm:8.73.0"
+    "@typescript-eslint/utils": "npm:8.73.0"
     debug: "npm:^4.4.3"
     ts-api-utils: "npm:^2.5.0"
   peerDependencies:
     eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
     typescript: ">=4.8.4 <6.1.0"
-  checksum: 10c0/db237b79d866555c84cbaa555d9a23c3e01d5167a259f33a31c6c0e2905fb0111a637386ee9128291935f142cbeb0716ca280cd789c998b37a69aa53b15764ad
+  checksum: 10c0/c26815f01d79f9dce2b0a372a4f3753f94456b8071801920f68e40091da7897a7b83e1f2ade2a93f28e022d1b487c8108f1638a9f17d6c5c03d6adc4f59bbc8e
   languageName: node
   linkType: hard
 
-"@typescript-eslint/types@npm:8.72.2, @typescript-eslint/types@npm:^8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/types@npm:8.72.2"
-  checksum: 10c0/283cbfd02033da3790dde8a613f23bbcb21706281393daf256ea798112124e355679d1f5bdd16ee0d3b9730f4d16acd619504b3bfb25c7979f363c0963b3e1b6
+"@typescript-eslint/types@npm:8.73.0, @typescript-eslint/types@npm:^8.72.2, @typescript-eslint/types@npm:^8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/types@npm:8.73.0"
+  checksum: 10c0/42cb589388327e878101f4f208cf85ae3a3518435dc6c27a732c7bd88ffa11d64b822af1e6ec677bad9d0b95b90f5ef0b2a85607258c3b63fec7f0b2f041d51e
   languageName: node
   linkType: hard
 
-"@typescript-eslint/types@npm:^8.56.0":
-  version: 8.59.1
-  resolution: "@typescript-eslint/types@npm:8.59.1"
-  checksum: 10c0/a0bf98389e8673d4aa1034fdef9bb78f576b3dc6b8f413d4adf07ef6edff4a33fdb916148c3bac2cafdbf282c765eebf253c2a05edf3fda4123b8889921cd518
-  languageName: node
-  linkType: hard
-
-"@typescript-eslint/typescript-estree@npm:8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/typescript-estree@npm:8.72.2"
+"@typescript-eslint/typescript-estree@npm:8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/typescript-estree@npm:8.73.0"
   dependencies:
-    "@typescript-eslint/project-service": "npm:8.72.2"
-    "@typescript-eslint/tsconfig-utils": "npm:8.72.2"
-    "@typescript-eslint/types": "npm:8.72.2"
-    "@typescript-eslint/visitor-keys": "npm:8.72.2"
+    "@typescript-eslint/project-service": "npm:8.73.0"
+    "@typescript-eslint/tsconfig-utils": "npm:8.73.0"
+    "@typescript-eslint/types": "npm:8.73.0"
+    "@typescript-eslint/visitor-keys": "npm:8.73.0"
     debug: "npm:^4.4.3"
-    minimatch: "npm:^10.2.2"
+    minimatch: "npm:^11.0.1"
     semver: "npm:^7.7.3"
     tinyglobby: "npm:^0.2.15"
     ts-api-utils: "npm:^2.5.0"
   peerDependencies:
+    "@typescript/native": "*"
     typescript: ">=4.8.4 <6.1.0"
-  checksum: 10c0/5bcb59ec83bd7e750864308b2a6e2d7844777368f92180f4c4c3a9e92f8102c3fc8a6f9db4bee234e5417ce722a3f4835d6e74e6925b71654f4e8e7642f2fba5
+  peerDependenciesMeta:
+    "@typescript/native":
+      optional: true
+  checksum: 10c0/a4de0943b800d508d31514cbee8cd667222902b58d60deff8fd9790eb9f9b57b55f91dd52d7d523369793b0a4856625dcacb2b305fbd5595efcc50ce8bf71e8c
   languageName: node
   linkType: hard
 
-"@typescript-eslint/utils@npm:8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/utils@npm:8.72.2"
+"@typescript-eslint/utils@npm:8.73.0":
+  version: 8.73.0
+  resolution: "@typescript-eslint/utils@npm:8.73.0"
   dependencies:
     "@eslint-community/eslint-utils": "npm:^4.9.1"
-    "@typescript-eslint/scope-manager": "npm:8.72.2"
-    "@typescript-eslint/types": "npm:8.72.2"
-    "@typescript-eslint/typescript-estree": "npm:8.72.2"
+    "@typescript-eslint/scope-manager": "npm:8.73.0"
+    "@typescript-eslint/types": "npm:8.73.0"
+    "@typescript-eslint/typescript-estree": "npm:8.73.0"
   peerDependencies:
     eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
     typescript: ">=4.8.4 <6.1.0"
-  checksum: 10c0/beadf16888dd042ede231e4b062cc058d0b3a58d08ffa99bd111b98d0e9f076da4d62cb3ca5102706a72c381e24fe517903804d38db4c4b46e9d024387f6b8cf
+  checksum: 10c0/2366ab901a780e56c47e409b0822a22f13ba81f919b15e9335e43670e30a0500eb3965b992b77b2c922753b81553dee6433cfd65b1bf19ac78088845427f75e9
   languageName: node
   linkType: hard
 
-"@typescript-eslint/visitor-keys@npm:8.72.2":
-  version: 8.72.2
-  resolution: "@typescript-eslint/visitor-keys@npm:8.72.2"
+"@typescript-eslint/visitor-keys@npm:8.73.0, @typescript-eslint/visitor-keys@npm:^8.72.2":
+  version: 8.73.0
+  resolution: "@typescript-eslint/visitor-keys@npm:8.73.0"
   dependencies:
-    "@typescript-eslint/types": "npm:8.72.2"
+    "@typescript-eslint/types": "npm:8.73.0"
     eslint-visitor-keys: "npm:^5.0.0"
-  checksum: 10c0/134e441f0c1d055b6b82f59887bc96d07a89909f8e910622e1e95d7fbf42de9c4fa1910d8335af252910c298b474565d2c34888608130d53238eee1504df9894
+  checksum: 10c0/9d5c56ed5e7875f12c79e7604e4a40d63c79e3b377596ac789e994a90737c75dd010a660dc6909ac46113fff3a2f265891c68909db24576251c04e63b95202f6
   languageName: node
   linkType: hard
 
@@ -4015,13 +4024,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"better-sqlite3@npm:13.1.1":
-  version: 13.1.1
-  resolution: "better-sqlite3@npm:13.1.1"
+"better-sqlite3@npm:13.2.0":
+  version: 13.2.0
+  resolution: "better-sqlite3@npm:13.2.0"
   dependencies:
     node-addon-api: "npm:^8.0.0"
     node-gyp: "npm:latest"
-  checksum: 10c0/46a6ec5f0c1d4ea055369af8354b5257e68bc4a3edae3b9ee970fef78d094db0c495788bb10c956b4838a4ff4de18b59083729c31f06f1ccb9e30c69ada2f118
+  checksum: 10c0/b1073206f9fcc73ff31300c90805a71ade2b93b5c43cc2db7117f3f3decd82c9991018f8ffbe58f57310b6b037bb4a6d0986b32e5c3b1266be71410e8fa148ad
   languageName: node
   linkType: hard
 
@@ -5779,13 +5788,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint@npm:10.14.0":
-  version: 10.14.0
-  resolution: "eslint@npm:10.14.0"
+"eslint@npm:10.15.0":
+  version: 10.15.0
+  resolution: "eslint@npm:10.15.0"
   dependencies:
     "@eslint-community/eslint-utils": "npm:^4.8.0"
     "@eslint-community/regexpp": "npm:^4.12.2"
-    "@eslint/config-array": "npm:^0.23.5"
+    "@eslint/config-array": "npm:^0.23.6"
     "@eslint/config-helpers": "npm:^0.7.0"
     "@eslint/core": "npm:^1.2.1"
     "@eslint/plugin-kit": "npm:^0.7.3"
@@ -5810,7 +5819,7 @@ __metadata:
     imurmurhash: "npm:^0.1.4"
     is-glob: "npm:^4.0.0"
     json-stable-stringify-without-jsonify: "npm:^1.0.1"
-    minimatch: "npm:^10.2.6"
+    minimatch: "npm:^11.0.5"
     natural-compare: "npm:^1.4.0"
     optionator: "npm:^0.9.3"
   peerDependencies:
@@ -5820,11 +5829,11 @@ __metadata:
       optional: true
   bin:
     eslint: bin/eslint.js
-  checksum: 10c0/738cdd0a1aa37b8bddefb5c89206f9f202540e8fce57f7ef82649b5bdf0acd67f7b9f2724f538b11149bd9bfdd14605125568cf73b319baec007866677af72dd
+  checksum: 10c0/81775d3bc273007b3b6f08d114f57b0c83527e8ebbb89674726bbd29b66883a6fef016a0271e05014a067d1c1079514c5523df96b86740fdfe65ef56abacb030
   languageName: node
   linkType: hard
 
-"espree@npm:^10.0.1, espree@npm:^10.4.0":
+"espree@npm:^10.0.1":
   version: 10.4.0
   resolution: "espree@npm:10.4.0"
   dependencies:
@@ -5874,7 +5883,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"estraverse@npm:^5.1.0, estraverse@npm:^5.2.0, estraverse@npm:^5.3.0":
+"estraverse@npm:^5.1.0, estraverse@npm:^5.2.0":
   version: 5.3.0
   resolution: "estraverse@npm:5.3.0"
   checksum: 10c0/1ff9447b96263dec95d6d67431c5e0771eb9776427421260a3e2f0fdd5d6bd4f8e37a7338f5ad2880c9f143450c9b1e4fc2069060724570a49cf9cf0312bd107
@@ -5950,15 +5959,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"express-rate-limit@npm:8.7.4":
-  version: 8.7.4
-  resolution: "express-rate-limit@npm:8.7.4"
+"express-rate-limit@npm:8.7.5":
+  version: 8.7.5
+  resolution: "express-rate-limit@npm:8.7.5"
   dependencies:
     debug: "npm:^4.4.3"
     ip-address: "npm:^10.2.0"
   peerDependencies:
     express: ">= 4.11"
-  checksum: 10c0/65f98af650d29729ea58500a7ac218b3c43c31b962d85ba21db679c94a8012fab5c88d4bb41cdeaa8114169f5ac4f32576e2bc561c417507d567c3a4a2a24ece
+  checksum: 10c0/a050b858e2ff9dbc24b01e8dfe6a9ca243016454d1a7dfdca793038f89dd87fda2856be67c05e0fb0881a41ec8ee4fee1a7d4e678aee6b74a20fa4226a1d8217
   languageName: node
   linkType: hard
 
@@ -6418,10 +6427,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "gander@workspace:."
   dependencies:
-    "@capacitor/android": "npm:8.6.0"
+    "@capacitor/android": "npm:8.6.2"
     "@capacitor/app": "npm:8.1.2"
-    "@capacitor/cli": "npm:8.6.0"
-    "@capacitor/core": "npm:8.6.0"
+    "@capacitor/cli": "npm:8.6.2"
+    "@capacitor/core": "npm:8.6.2"
     "@capacitor/preferences": "npm:8.0.1"
     "@capacitor/push-notifications": "npm:8.1.3"
     "@capacitor/screen-orientation": "npm:8.0.2"
@@ -6435,8 +6444,8 @@ __metadata:
     "@prisma/client-runtime-utils": "npm:7.10.1"
     "@root/encoding": "npm:1.0.1"
     "@root/keypairs": "npm:0.10.3"
-    "@stylistic/eslint-plugin": "npm:5.10.0"
-    "@trapezedev/configure": "npm:7.1.11"
+    "@stylistic/eslint-plugin": "npm:6.0.1"
+    "@trapezedev/configure": "npm:7.1.13"
     "@types/better-sqlite3": "npm:9.6.0"
     "@types/cookie-parser": "npm:1.4.10"
     "@types/cors": "npm:2.8.19"
@@ -6444,12 +6453,12 @@ __metadata:
     "@types/express-rate-limit": "npm:6.0.2"
     "@types/greenlock-express": "npm:4.0.3"
     "@types/jsonwebtoken": "npm:9.0.10"
-    "@types/node": "npm:25.9.9"
+    "@types/node": "npm:26.6.6"
     "@types/web-push": "npm:3.6.4"
-    "@typescript-eslint/eslint-plugin": "npm:8.72.2"
-    "@typescript-eslint/parser": "npm:8.72.2"
+    "@typescript-eslint/eslint-plugin": "npm:8.73.0"
+    "@typescript-eslint/parser": "npm:8.73.0"
     "@yarnpkg/pnpify": "npm:4.1.7"
-    better-sqlite3: "npm:13.1.1"
+    better-sqlite3: "npm:13.2.0"
     chalk: "npm:6.0.1"
     chokidar: "npm:6.0.0"
     concurrently: "npm:10.0.7"
@@ -6460,14 +6469,14 @@ __metadata:
     cpy-cli: "npm:7.0.0"
     cross-env: "npm:10.1.0"
     csrf-csrf: "npm:4.1.0"
-    eslint: "npm:10.14.0"
+    eslint: "npm:10.15.0"
     eslint-config-prettier: "npm:10.1.8"
     eslint-plugin-import: "npm:2.32.0"
     eslint-plugin-prettier: "npm:5.5.7"
     eslint-plugin-react-hooks: "npm:7.1.1"
     eslint-plugin-unused-imports: "npm:4.4.1"
     express: "npm:5.3.0"
-    express-rate-limit: "npm:8.7.4"
+    express-rate-limit: "npm:8.7.5"
     firebase-admin: "npm:14.5.1"
     globals: "npm:17.14.0"
     greenlock-express: "npm:4.0.3"
@@ -6482,7 +6491,7 @@ __metadata:
     socket.io: "npm:4.8.4"
     tsx: "npm:4.23.15"
     typescript: "npm:6.0.3"
-    typescript-eslint: "npm:8.72.2"
+    typescript-eslint: "npm:8.73.0"
     web-push: "npm:4.0.0"
   dependenciesMeta:
     "@prisma/client":
@@ -7244,13 +7253,6 @@ __metadata:
   version: 2.0.4
   resolution: "inherits@npm:2.0.4"
   checksum: 10c0/4e531f648b29039fb7426fb94075e6545faa1eb9fe83c29f0b6d9e7263aceb4289d2d4557db0d428188eeb449cc7c5e77b0a0b2c4e248ff2a65933a0dee49ef2
-  languageName: node
-  linkType: hard
-
-"ini@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "ini@npm:2.0.0"
-  checksum: 10c0/2e0c8f386369139029da87819438b20a1ff3fe58372d93fb1a86e9d9344125ace3a806b8ec4eb160a46e64cbc422fe68251869441676af49b7fc441af2389c25
   languageName: node
   linkType: hard
 
@@ -9258,7 +9260,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss@npm:8.5.32, postcss@npm:^8.5.32":
+"postcss@npm:8.5.33":
+  version: 8.5.33
+  resolution: "postcss@npm:8.5.33"
+  dependencies:
+    nanoid: "npm:^3.3.20"
+    picocolors: "npm:^1.1.1"
+    source-map-js: "npm:^1.2.2"
+  checksum: 10c0/8711c5ad32a798813ae52dd51024881915ecc6171030f9cc1d3766d1969da20ade4cf71a645d7e54668cb45cb9622eac938dc1ce91fe1f9a0fa5f0bc8cbaa05a
+  languageName: node
+  linkType: hard
+
+"postcss@npm:^8.5.32":
   version: 8.5.32
   resolution: "postcss@npm:8.5.32"
   dependencies:
@@ -10409,7 +10422,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"simple-plist@npm:^1.1.0, simple-plist@npm:^1.3.1":
+"simple-plist@npm:^1.3.1":
   version: 1.4.0
   resolution: "simple-plist@npm:1.4.0"
   dependencies:
@@ -11179,18 +11192,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript-eslint@npm:8.72.2":
-  version: 8.72.2
-  resolution: "typescript-eslint@npm:8.72.2"
+"typescript-eslint@npm:8.73.0":
+  version: 8.73.0
+  resolution: "typescript-eslint@npm:8.73.0"
   dependencies:
-    "@typescript-eslint/eslint-plugin": "npm:8.72.2"
-    "@typescript-eslint/parser": "npm:8.72.2"
-    "@typescript-eslint/typescript-estree": "npm:8.72.2"
-    "@typescript-eslint/utils": "npm:8.72.2"
+    "@typescript-eslint/eslint-plugin": "npm:8.73.0"
+    "@typescript-eslint/parser": "npm:8.73.0"
+    "@typescript-eslint/typescript-estree": "npm:8.73.0"
+    "@typescript-eslint/utils": "npm:8.73.0"
   peerDependencies:
     eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
     typescript: ">=4.8.4 <6.1.0"
-  checksum: 10c0/9179509d74c3a0026f6b607e6f1b358b4b915e1ff1ae7a381cf415aa5a58ebfe05c871c5831550a872ca0c55d9cbc266f4b3ddee9bfedcb379d591e351b365a1
+  checksum: 10c0/2a44812a0e04a1f4b168b8a0aeb5bcfafea3cfefd50c2a356834b07ac6edf1c2fb491a409864f05ac0c697321ac722f377c7de9dc4ef18701d7f534654ffc6fb
   languageName: node
   linkType: hard
 
@@ -11240,13 +11253,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"undici-types@npm:>=7.24.0 <7.24.7":
-  version: 7.24.6
-  resolution: "undici-types@npm:7.24.6"
-  checksum: 10c0/d9cd8befb643ac904615c280a095ba4240531f6bb4a5e75a22a7483630ca8d3f1016d2ab6ace6ceda1f63b3a2db2fe037fafe121d6917a0187573aa548ff78ca
-  languageName: node
-  linkType: hard
-
 "undici-types@npm:~5.26.4":
   version: 5.26.5
   resolution: "undici-types@npm:5.26.5"
@@ -11258,6 +11264,13 @@ __metadata:
   version: 7.16.0
   resolution: "undici-types@npm:7.16.0"
   checksum: 10c0/3033e2f2b5c9f1504bdc5934646cb54e37ecaca0f9249c983f7b1fc2e87c6d18399ebb05dc7fd5419e02b2e915f734d872a65da2e3eeed1813951c427d33cc9a
+  languageName: node
+  linkType: hard
+
+"undici-types@npm:~8.9.0":
+  version: 8.9.0
+  resolution: "undici-types@npm:8.9.0"
+  checksum: 10c0/51c712c20c087368f62c6fc0f2bc49fa76bfe5dec28ff01584bb677ff29b0622569783c02d43e151143808c48c0503f804093bd2c491b10f2a830138034cb451
   languageName: node
   linkType: hard
 
@@ -11384,15 +11397,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"uuid@npm:11.1.1":
-  version: 11.1.1
-  resolution: "uuid@npm:11.1.1"
-  bin:
-    uuid: dist/esm/bin/uuid
-  checksum: 10c0/9e3af58eba872ece5a5e76f4773a94fc78a0ef2c2444c38dbe6b42f41dadf76c01850fd783604f27986f6195e6286aef064d45987d401b2a33127b98ddf7c0c5
-  languageName: node
-  linkType: hard
-
 "valibot@npm:1.4.2":
   version: 1.4.2
   resolution: "valibot@npm:1.4.2"
@@ -11495,22 +11499,22 @@ __metadata:
   resolution: "web2@workspace:web2"
   dependencies:
     "@capacitor/app": "npm:8.1.2"
-    "@capacitor/core": "npm:8.6.0"
+    "@capacitor/core": "npm:8.6.2"
     "@capacitor/preferences": "npm:8.0.1"
     "@capacitor/push-notifications": "npm:8.1.3"
     "@capacitor/screen-orientation": "npm:8.0.2"
     "@capacitor/splash-screen": "npm:8.0.2"
-    "@gfazioli/mantine-video": "npm:1.2.10"
-    "@mantine/carousel": "npm:9.8.0"
-    "@mantine/core": "npm:9.8.0"
-    "@mantine/dates": "npm:9.8.0"
-    "@mantine/form": "npm:9.8.0"
-    "@mantine/hooks": "npm:9.8.0"
-    "@mantine/lightbox": "npm:9.8.0"
-    "@mantine/modals": "npm:9.8.0"
-    "@mantine/notifications": "npm:9.8.0"
-    "@mantine/nprogress": "npm:9.8.0"
-    "@tabler/icons-react": "npm:3.51.0"
+    "@gfazioli/mantine-video": "npm:1.2.11"
+    "@mantine/carousel": "npm:9.8.1"
+    "@mantine/core": "npm:9.8.1"
+    "@mantine/dates": "npm:9.8.1"
+    "@mantine/form": "npm:9.8.1"
+    "@mantine/hooks": "npm:9.8.1"
+    "@mantine/lightbox": "npm:9.8.1"
+    "@mantine/modals": "npm:9.8.1"
+    "@mantine/notifications": "npm:9.8.1"
+    "@mantine/nprogress": "npm:9.8.1"
+    "@tabler/icons-react": "npm:3.52.0"
     "@types/react": "npm:19.3.0"
     "@types/react-dom": "npm:19.3.0"
     "@vitejs/plugin-react": "npm:6.3.0"
@@ -11519,7 +11523,7 @@ __metadata:
     embla-carousel: "npm:8.6.0"
     embla-carousel-react: "npm:8.6.0"
     hls.js: "npm:1.7.4"
-    postcss: "npm:8.5.32"
+    postcss: "npm:8.5.33"
     postcss-preset-mantine: "npm:1.18.0"
     postcss-simple-vars: "npm:7.0.1"
     react: "npm:19.3.1"
@@ -11699,16 +11703,6 @@ __metadata:
     is-wsl: "npm:^3.1.0"
     powershell-utils: "npm:^0.2.0"
   checksum: 10c0/535a7684d63d9dd0b4349997f81ebb38705809031f354bd0d3ec2e74ebaf94d21f2fbbf4f149e1832474827867ced07b5aadc256a17f9cfd3e70d2f9047dee8e
-  languageName: node
-  linkType: hard
-
-"xcode@npm:^3.0.1":
-  version: 3.0.1
-  resolution: "xcode@npm:3.0.1"
-  dependencies:
-    simple-plist: "npm:^1.1.0"
-    uuid: "npm:^7.0.3"
-  checksum: 10c0/51bf35cee52909aeb18f868ecf9828f93b8042fadf968159320f9f11e757a52e43f6563a53b586986cfe5a34d576f3300c4c0cf1e14300084344ae206eaa53c3
   languageName: node
   linkType: hard
 
