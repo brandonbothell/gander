@@ -17,7 +17,7 @@
     "@capacitor/screen-orientation": "8.0.2",
     "@capacitor/splash-screen": "8.0.2",
     "@gfazioli/mantine-video": "1.2.10",
-    "@mantine/carousel": "9.8.0",
+    "@mantine/carousel": "9.8.1",
     "@mantine/core": "9.8.0",
     "@mantine/dates": "9.8.0",
     "@mantine/form": "9.8.0",
