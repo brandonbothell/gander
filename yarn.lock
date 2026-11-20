@@ -1656,17 +1656,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mantine/carousel@npm:9.8.0":
-  version: 9.8.0
-  resolution: "@mantine/carousel@npm:9.8.0"
+"@mantine/carousel@npm:9.8.1":
+  version: 9.8.1
+  resolution: "@mantine/carousel@npm:9.8.1"
   peerDependencies:
-    "@mantine/core": 9.8.0
-    "@mantine/hooks": 9.8.0
+    "@mantine/core": 9.8.1
+    "@mantine/hooks": 9.8.1
     embla-carousel: ">=8.0.0"
     embla-carousel-react: ">=8.0.0"
     react: ^19.2.0
     react-dom: ^19.2.0
-  checksum: 10c0/d9bf8340d38dbd7faacf6fcc4e2053a125bbf8b33b8d58417502a3c8bf3eaedd8b0bb093a601cbf881ee01e8eeedd93d3c02adb5949b0cec01e0d0ce4acf8540
+  checksum: 10c0/511081b99a922fe48e73f5f59e06840c16193ebe4e520af4f3d3d77230d251350bb733da267ccb101b7fc5de8237963335352a3d9f46da88701c77dec515fa24
   languageName: node
   linkType: hard
 
@@ -11501,7 +11501,7 @@ __metadata:
     "@capacitor/screen-orientation": "npm:8.0.2"
     "@capacitor/splash-screen": "npm:8.0.2"
     "@gfazioli/mantine-video": "npm:1.2.10"
-    "@mantine/carousel": "npm:9.8.0"
+    "@mantine/carousel": "npm:9.8.1"
     "@mantine/core": "npm:9.8.0"
     "@mantine/dates": "npm:9.8.0"
     "@mantine/form": "npm:9.8.0"
