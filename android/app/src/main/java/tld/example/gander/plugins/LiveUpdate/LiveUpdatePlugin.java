@@ -2,8 +2,6 @@ package tld.example.gander.plugins.LiveUpdate;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Base64;
 import android.util.Log;
 
@@ -51,19 +49,24 @@ public class LiveUpdatePlugin extends Plugin {
 
   @Override
   public void load() {
-    if (getPublicKeyBase64() == null)
-      return;
+    // Handled in MainActivity.load()
+  }
 
-    SharedPreferences prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+  /**
+   * Evaluates pending/active Live Update state, handles rollback if the previous
+   * boot
+   * failed to confirm via notifyAppReady(), and returns the filesystem path
+   * to mount—or null to use built-in APK assets.
+   */
+  public static String resolveBootBundlePath(Context context) {
+    SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     String pendingPath = prefs.getString(KEY_PENDING_PATH, null);
     boolean bootAttempted = prefs.getBoolean(KEY_BOOT_ATTEMPTED, false);
     boolean bootConfirmed = prefs.getBoolean(KEY_BOOT_CONFIRMED, true);
 
-    String pathToLoad = null;
-
     if (pendingPath != null) {
       if (bootAttempted && !bootConfirmed) {
-        // Case 1: Previous boot crashed or froze before notifyAppReady() -> Roll back!
+        // Previous boot crashed or froze before notifyAppReady() -> Roll back!
         Log.w(TAG, "Unconfirmed Live Update boot detected. Rolling back to previous bundle.");
         prefs.edit()
             .remove(KEY_PENDING_PATH)
@@ -75,42 +78,44 @@ public class LiveUpdatePlugin extends Plugin {
 
         String fallbackPath = prefs.getString(KEY_ACTIVE_PATH, null);
         if (fallbackPath != null && new File(fallbackPath).exists()) {
-          pathToLoad = fallbackPath;
+          return fallbackPath;
         }
-      } else if (!bootAttempted && new File(pendingPath).exists()) {
-        // Case 2: Freshly staged bundle ready for its first boot -> Mark attempted and
-        // queue load
+        return null;
+      }
+
+      if (!bootAttempted && new File(pendingPath).exists()) {
+        // Freshly staged bundle ready for its first boot -> Mark attempted and return
         Log.i(TAG, "Applying staged Live Update bundle on boot: " + pendingPath);
         prefs.edit()
             .putBoolean(KEY_BOOT_ATTEMPTED, true)
             .putBoolean(KEY_BOOT_CONFIRMED, false)
             .apply();
 
-        pathToLoad = pendingPath;
-      }
-    } else {
-      // Case 3: Normal boot with active bundle
-      String activePath = prefs.getString(KEY_ACTIVE_PATH, null);
-      if (activePath != null && new File(activePath).exists()) {
-        pathToLoad = activePath;
+        return pendingPath;
       }
     }
 
-    // Defer setServerBasePath until after Bridge finishes initializing localServer
-    // & WebView
-    if (pathToLoad != null) {
-      final String finalPath = pathToLoad;
-      Log.d(TAG, "Setting server base path to: " + finalPath);
-      new Handler(Looper.getMainLooper()).post(() -> {
-        if (bridge != null) {
-          try {
-            bridge.setServerBasePath(finalPath);
-          } catch (Exception e) {
-            Log.e(TAG, "Error setting server base path: ", e);
-          }
-        }
-      });
+    // Normal boot with active bundle (or null to fall back to built-in APK assets)
+    String activePath = prefs.getString(KEY_ACTIVE_PATH, null);
+    if (activePath != null && new File(activePath).exists()) {
+      return activePath;
     }
+
+    return null;
+  }
+
+  private static void deleteRecursively(File fileOrDir) {
+    if (fileOrDir == null || !fileOrDir.exists())
+      return;
+    if (fileOrDir.isDirectory()) {
+      File[] children = fileOrDir.listFiles();
+      if (children != null) {
+        for (File child : children) {
+          deleteRecursively(child);
+        }
+      }
+    }
+    fileOrDir.delete();
   }
 
   @PluginMethod
@@ -358,22 +363,6 @@ public class LiveUpdatePlugin extends Plugin {
         zis.closeEntry();
       }
     }
-  }
-
-  private void deleteRecursively(File fileOrDir) {
-    if (fileOrDir == null || !fileOrDir.exists())
-      return;
-
-    if (fileOrDir.isDirectory()) {
-      File[] children = fileOrDir.listFiles();
-      if (children != null) {
-        for (File child : children) {
-          deleteRecursively(child);
-        }
-      }
-    }
-
-    fileOrDir.delete();
   }
 
   private String getPublicKeyBase64() {

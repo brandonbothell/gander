@@ -14,7 +14,7 @@
     "android:init": "dotenvx run -- yarn trapeze run .trapeze.yml --android-project android -y",
     "android:sync": "yarn build:client && yarn cap sync android && yarn android:init && node -e \"require('child_process').execSync(process.platform === 'win32' ? 'gradlew.bat prepareVscode' : './gradlew prepareVscode', { cwd: 'android', stdio: 'inherit' })\"",
     "android:open": "yarn cap open android",
-    "release": "yarn bundle && yarn bundle:release",
+    "release": "yarn build:client && yarn bundle && yarn bundle:release",
     "bundle": "yarn bundle:manifest && yarn bundle:client && yarn bundle:sign",
     "bundle:release": "yarn cpy web2/dist/manifest.json live-releases/latest.manifest.json && tsx --tsconfig tsconfig.build.json scripts/releaseBundle.ts",
     "bundle:client": "yarn workspace web2 bundle",

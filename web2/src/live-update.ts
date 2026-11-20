@@ -49,7 +49,6 @@ export function useLiveUpdater(updateEndpoint: string) {
             signature: data.signature,
           })
           console.log(`Staged verified Live Update v${staged.version}`)
-          await LiveUpdate.applyPending()
         } else {
           console.log('Live Update check resulted in no update found')
         }

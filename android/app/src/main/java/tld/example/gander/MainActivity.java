@@ -54,6 +54,11 @@ public class MainActivity extends BridgeActivity {
         // Do stuff here to access methods on the bridge
         super.load();
 
+        String updateBundlePath = LiveUpdatePlugin.resolveBootBundlePath(this);
+        if (updateBundlePath != null && this.bridge != null) {
+            this.bridge.setServerBasePath(updateBundlePath);
+        }
+
         userAgent = getBridge().getWebView().getSettings().getUserAgentString();
     }
 }
