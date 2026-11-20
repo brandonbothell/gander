@@ -3995,16 +3995,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bestzip@npm:4.0.3":
-  version: 4.0.3
-  resolution: "bestzip@npm:4.0.3"
+"bestzip@npm:4.0.4":
+  version: 4.0.4
+  resolution: "bestzip@npm:4.0.4"
   dependencies:
     archiver: "npm:^8.0.0"
     glob: "npm:^13.0.6"
     yargs: "npm:^16.2.0"
   bin:
     bestzip: bin/cli.js
-  checksum: 10c0/0783ce8d55f137dae44fa97c66f72621c945a8be5b186c098b90dd2fa2a9aa7d40a1b5f989273aaf9c4de8bb141870465aab0053796681f52ff1587f8d4b058e
+  checksum: 10c0/5f9ab0b7b0e88d820436ba8db9c8001a4db885ebdbf9f1cc9946b0da54a3c3491e56384c43d0b37e17ee1ddc753eabe231df54952f9c864dca4625c62fb9ded7
   languageName: node
   linkType: hard
 
@@ -11514,7 +11514,7 @@ __metadata:
     "@types/react": "npm:19.3.0"
     "@types/react-dom": "npm:19.3.0"
     "@vitejs/plugin-react": "npm:6.3.0"
-    bestzip: "npm:4.0.3"
+    bestzip: "npm:4.0.4"
     dayjs: "npm:1.11.23"
     embla-carousel: "npm:8.6.0"
     embla-carousel-react: "npm:8.6.0"
