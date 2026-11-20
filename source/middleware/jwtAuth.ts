@@ -21,6 +21,7 @@ export async function jwtAuth(
 
     const apiKey = auth.slice(7) // Use API key
 
+    // @ts-ignore
     const user = config.users.find((user) => user.apiKeys?.includes(apiKey))
     if (!user) {
       res.status(401).json({ error: 'Invalid API key.' })
