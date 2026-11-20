@@ -35,5 +35,8 @@
   "java.project.explorer.showNonJavaResources": true,
   "java.import.gradle.wrapper.enabled": true,
   "gradle.nestedProjects": ["android"],
-  "java.compile.nullAnalysis.mode": "automatic"
+  "java.compile.nullAnalysis.mode": "automatic",
+  "[java]": {
+    "editor.defaultFormatter": "redhat.java"
+  }
 }

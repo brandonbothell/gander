@@ -1,5 +1,7 @@
 import '@dotenvx/dotenvx/config'
+import path from 'path'
 import os from 'os'
+import fs from 'fs'
 import type { CapacitorConfig } from '@capacitor/cli'
 import { isLocalIPv4 } from './web2/src/util'
 
@@ -40,6 +42,9 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: true,
     },
+    LiveUpdate: {
+      publicKey: loadPublicKeyBase64('live-update-public-key.pub.pem'),
+    },
   },
 }
 
@@ -65,6 +70,23 @@ export function getLocalIp() {
   }
 
   return ip
+}
+
+function loadPublicKeyBase64(pemFilename: string): string {
+  const pemPath = path.resolve(__dirname, pemFilename)
+
+  if (!fs.existsSync(pemPath)) {
+    console.warn(
+      `No public key found at: ${pemFilename}. Live update will be disabled.`,
+    )
+  }
+
+  const pemContent = fs.readFileSync(pemPath, 'utf8')
+
+  return pemContent
+    .replace(/-----BEGIN PUBLIC KEY-----/g, '')
+    .replace(/-----END PUBLIC KEY-----/g, '')
+    .replace(/\s+/g, '')
 }
 
 export default config

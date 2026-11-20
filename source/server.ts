@@ -27,6 +27,7 @@ import initializeMotionRoutes, {
   saveMotionSegmentsWithRetry,
 } from './routes/motion'
 import initializeMaskRoutes from './routes/masks'
+import liveUpdateRouter from './routes/live-update'
 import initializeHlsRoutes from './routes/hls'
 import initializeAuthRoutes from './routes/auth'
 import { detectMotion, cleanFrameCache, debugLog } from './motionDetector'
@@ -873,6 +874,7 @@ setVapidDetails(
 )
 
 // Route initialization
+app.use('/api/liveupdate', liveUpdateRouter)
 initializeMotionRoutes(app, streamStates, dynamicStreams)
 initializeAuthRoutes(app, dynamicStreams)
 initializeNotificationRoutes(app)

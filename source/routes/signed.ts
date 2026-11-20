@@ -648,7 +648,7 @@ export default function initializeSignedRoutes(
       const { streamId } = req.params
       const { base } = req.query
       if (base && typeof base !== 'string') {
-        return res.status(400).send({ error: 'Invalid base URL' })
+        return res.status(400).json({ error: 'Invalid base URL' })
       }
       if (!dynamicStreams[streamId]) {
         res.status(404).json({ error: 'Stream not found' })

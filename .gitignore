@@ -65,6 +65,9 @@ compiled/
 *.tgz
 *.buildinfo.*
 
+# Live Updates
+live-releases/
+
 # Logs
 logs/
 *.log

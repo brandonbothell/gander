@@ -9,11 +9,13 @@ import { ModalsProvider } from '@mantine/modals'
 import { readLocalStorageValue, useLocalStorage } from '@mantine/hooks'
 import { LoadingOverlay, MantineProvider } from '@mantine/core'
 import { SplashScreen } from '@capacitor/splash-screen'
+import { Preferences } from '@capacitor/preferences'
 import { Capacitor } from '@capacitor/core'
 import { isLocalIPv4 } from './util'
 import theme from './theme'
 import SecureStorage from './secure-storage'
 import { API_BASE, setAuthHandlers, authFetch } from './main'
+import { useLiveUpdater } from './live-update'
 import {
   getDeviceFingerprint,
   getSessionId,
@@ -81,6 +83,9 @@ export default function App() {
   const [hasCheckedSessions, setHasCheckedSessions] = useState(false)
   const [sessions, setSessions] = useState<(Session & TrustedDevice)[]>([])
   const [lastFailedJwt, setFailedJwt] = useState<string>()
+
+  useLiveUpdater(`${API_BASE}/api/liveupdate/check?base=${API_BASE}`)
+
   // Helper: Try to refresh token
   const tryRefreshToken = async (): Promise<boolean> => {
     console.log('=== STARTING TOKEN REFRESH ===')
@@ -523,7 +528,7 @@ export default function App() {
     }
   }
 
-  const checkLocalStorageStateConsistency = useCallback(() => {
+  const checkLocalStorageStateConsistency = useCallback(async () => {
     try {
       const currentVersion = import.meta.env.CLIENT_REACT_APP_VERSION ?? '1.0.0'
       const lastUsedVersion = readLocalStorageValue({
@@ -536,6 +541,12 @@ export default function App() {
 
       if (lastUsedVersion === 'unknown') {
         setLastUsedUpdate(currentVersion)
+        if (Capacitor.isNativePlatform()) {
+          await Preferences.set({
+            key: 'reactAppVersion',
+            value: currentVersion,
+          })
+        }
       } else if (!notifiedUpdate && lastUsedVersion !== currentVersion) {
         // Reset all cached states if the website was updated
         setCachedRecordings({})
@@ -545,6 +556,12 @@ export default function App() {
         setSignedUrlCache({})
         setSignedLiveThumbUrls({})
         setLastUsedUpdate(currentVersion)
+        if (Capacitor.isNativePlatform()) {
+          await Preferences.set({
+            key: 'reactAppVersion',
+            value: currentVersion,
+          })
+        }
         notifications.show({
           message:
             "There's been an update to the website. Things may take a little longer to load.",

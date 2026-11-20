@@ -65,15 +65,21 @@ export default function StreamVideo(props: {
   const { width } = useViewportSize()
 
   const fetchStreamUrl = useCallback(
-    async (currentUrl?: string, force = false) => {
-      const parsedUrl = currentUrl ? URL.parse(currentUrl) : null
-      const expires = Number(parsedUrl?.searchParams.get('expires'))
-      const isFresh =
-        parsedUrl &&
-        Number.isFinite(expires) &&
-        expires * 1000 - 5_000 >= Date.now()
+    async (force = false) => {
+      const parsedUrl = streamUrl
+        ? new URL(API_BASE ? streamUrl : `localhost:3000${streamUrl}`)
+        : undefined
+      if (parsedUrl?.pathname.includes(`stream/${props.stream.id}`)) {
+        const expires = Number(parsedUrl?.searchParams.get('expires'))
+        const isFresh =
+          parsedUrl &&
+          Number.isFinite(expires) &&
+          expires * 1000 - 5_000 >= Date.now()
 
-      if (!force && isFresh) return
+        if (!force && isFresh) return
+      } else {
+        console.log('Signed url needs to be refetched: ' + streamUrl)
+      }
 
       const requestId = ++streamRequestId.current
       const url = `${API_BASE}/api/signed-stream-url/${props.stream.id}?base=${encodeURIComponent(API_BASE)}`
@@ -89,14 +95,13 @@ export default function StreamVideo(props: {
         if (requestId !== streamRequestId.current) return
         console.error('Failed to fetch signed stream URL')
         setError('Failed to load the stream. Please try again later.')
+        setTimeout(() => fetchStreamUrl())
       }
     },
-    [props.stream.id],
+    [props.stream.id, streamUrl],
   )
 
   useEffect(() => {
-    streamRequestId.current++
-    setStreamUrl(undefined)
     fetchStreamUrl()
   }, [props.stream.id])
 
@@ -107,7 +112,7 @@ export default function StreamVideo(props: {
     if (!Number.isFinite(expires)) return
 
     const refreshTimer = window.setTimeout(
-      () => fetchStreamUrl(streamUrl, true),
+      () => fetchStreamUrl(true),
       Math.max(0, expires * 1000 - Date.now() - 5_000),
     )
 
@@ -155,7 +160,7 @@ export default function StreamVideo(props: {
           data.response.code === 403
         ) {
           console.warn('HLS 403 Forbidden')
-          fetchStreamUrl(streamUrl, true)
+          fetchStreamUrl(true)
           return
         }
       })

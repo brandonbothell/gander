@@ -122,7 +122,7 @@ export default function FullLayout(props: {
   }, [])
 
   useEffect(() => {
-    if (loadingFailed < 3 && !loadingStreams && !streamsLoaded) {
+    if (loadingFailed < 5 && !loadingStreams && !streamsLoaded) {
       setLoadingStreams(true)
       authFetch(`${API_BASE}/api/streams`)
         .then((res) => {
@@ -131,7 +131,10 @@ export default function FullLayout(props: {
             setLoadingStreams(false)
             throw new Error(`Failed to fetch streams: ${res.statusText}`)
           }
-          return res.json() as Promise<Stream[]>
+          return res.text().then((text) => {
+            console.info(`Streams response: ${text}`)
+            return JSON.parse(text)
+          }) as Promise<Stream[]>
         })
         .then((nextStreams) => {
           resetLoadingFailed()
@@ -315,7 +318,7 @@ export default function FullLayout(props: {
       </AppShell.Aside>
       <AppShell.Footer p="sm" zIndex={1001}>
         Gander © 2026 Brandon Bothell. All rights reserved&mdash;Privacy is a
-        right.
+        right. v{import.meta.env.CLIENT_REACT_APP_VERSION}
       </AppShell.Footer>
     </AppShell>
   )

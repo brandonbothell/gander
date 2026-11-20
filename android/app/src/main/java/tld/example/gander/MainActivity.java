@@ -11,6 +11,7 @@ import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderF
 
 import tld.example.gander.plugins.AppIntegrityCheck.AppIntegrityCheckPlugin;
 import tld.example.gander.plugins.BatteryOptimization.BatteryOptimizationPlugin;
+import tld.example.gander.plugins.LiveUpdate.LiveUpdatePlugin;
 import tld.example.gander.plugins.MotionService.MotionServicePlugin;
 import tld.example.gander.plugins.NativeVideoDownload.NativeVideoDownloadPlugin;
 import tld.example.gander.plugins.SecurePreferences.SecurePreferencesPlugin;
@@ -26,21 +27,24 @@ public class MainActivity extends BridgeActivity {
         Log.d("OnCreate", "Build in debug mode: " + BuildConfig.DEBUG);
         if (BuildConfig.DEBUG) {
             try {
-                Class<?> debugFactoryClass = Class.forName("com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory");
-                AppCheckProviderFactory factory = (AppCheckProviderFactory) debugFactoryClass.getMethod("getInstance").invoke(null);
+                Class<?> debugFactoryClass = Class
+                        .forName("com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory");
+                AppCheckProviderFactory factory = (AppCheckProviderFactory) debugFactoryClass.getMethod("getInstance")
+                        .invoke(null);
                 assert factory != null;
                 firebaseAppCheck.installAppCheckProviderFactory(factory);
             } catch (Exception e) {
                 Log.e("OnCreate", "Error initializing debug app check provider: ", e);
             }
-        }
-        else firebaseAppCheck.installAppCheckProviderFactory(PlayIntegrityAppCheckProviderFactory.getInstance());
+        } else
+            firebaseAppCheck.installAppCheckProviderFactory(PlayIntegrityAppCheckProviderFactory.getInstance());
 
         registerPlugin(BatteryOptimizationPlugin.class);
         registerPlugin(MotionServicePlugin.class);
         registerPlugin(NativeVideoDownloadPlugin.class);
         registerPlugin(SecurePreferencesPlugin.class);
         registerPlugin(AppIntegrityCheckPlugin.class);
+        registerPlugin(LiveUpdatePlugin.class);
 
         super.onCreate(savedInstanceState);
     }

@@ -89,7 +89,7 @@ export default function RecordingsGrid(props: {
         return signedUrl
       } catch {
         if (requestId !== recordingRequestId.current) return
-        console.error('Failed to fetch signed stream URL')
+        console.error('Failed to fetch signed recording URL')
       }
     },
     [activeRecording],
