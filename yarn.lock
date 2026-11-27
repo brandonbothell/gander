@@ -1710,16 +1710,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mantine/form@npm:9.8.1":
-  version: 9.8.1
-  resolution: "@mantine/form@npm:9.8.1"
+"@mantine/form@npm:9.8.2":
+  version: 9.8.2
+  resolution: "@mantine/form@npm:9.8.2"
   dependencies:
     "@standard-schema/spec": "npm:^1.1.0"
     fast-deep-equal: "npm:^3.1.3"
     klona: "npm:^2.0.6"
   peerDependencies:
     react: ^19.2.0
-  checksum: 10c0/0a387a994dd37838323ff721e9912038856ba8a67ab809799ee897db0e26ab5f1c6f338770cdc09f5d1f3c03ac61d2563ff3b648da4a7084b259db8354b6cbfb
+  checksum: 10c0/a856f1e5dfd9dd66974775cdb2e023184d57c8e38aab517bf35e3325cbd16d1ab9edc044e9d1f30892b23f26a9cf446eeb50111d7e2804dcb45c4fc4e2488770
   languageName: node
   linkType: hard
 
@@ -11508,7 +11508,7 @@ __metadata:
     "@mantine/carousel": "npm:9.8.1"
     "@mantine/core": "npm:9.8.1"
     "@mantine/dates": "npm:9.8.1"
-    "@mantine/form": "npm:9.8.1"
+    "@mantine/form": "npm:9.8.2"
     "@mantine/hooks": "npm:9.8.1"
     "@mantine/lightbox": "npm:9.8.1"
     "@mantine/modals": "npm:9.8.1"
